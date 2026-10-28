@@ -9,6 +9,7 @@ import {
     updatePropertyStatus,
 } from "../controllers/property.controller.js";
 
+import { getRentalCost } from "../controllers/rentalCost.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
@@ -25,6 +26,7 @@ router.get(
     getMyProperties
 );
 
+router.get("/:id/costs", getRentalCost);
 router.get("/:id", getPropertyById);
 
 // Authenticated landlord/property-manager routes
