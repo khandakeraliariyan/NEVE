@@ -10,6 +10,7 @@ import {
 } from "../controllers/property.controller.js";
 
 import { getRentalCost } from "../controllers/rentalCost.controller.js";
+import { getNearbyPlaces } from "../controllers/neighborhood.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
@@ -27,6 +28,7 @@ router.get(
 );
 
 router.get("/:id/costs", getRentalCost);
+router.get("/:id/nearby", getNearbyPlaces);
 router.get("/:id", getPropertyById);
 
 // Authenticated landlord/property-manager routes
