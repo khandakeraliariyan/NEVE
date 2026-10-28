@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import Inquiry from "../models/Inquiry.js";
-import Property from "../models/Property.js";
+import { findPubliclyAvailableProperty } from "../services/propertyAvailability.service.js";
 
 export async function createInquiry(req, res, next) {
     try {
@@ -24,15 +24,12 @@ export async function createInquiry(req, res, next) {
             });
         }
 
-        const property = await Property.findOne({
-            _id: propertyId,
-            status: "published",
-        }).select("landlord title");
+        const property = await findPubliclyAvailableProperty(propertyId);
 
         if (!property) {
             return res.status(404).json({
                 success: false,
-                message: "Published property not found",
+                message: "Property is not available for inquiries or viewings.",
             });
         }
 

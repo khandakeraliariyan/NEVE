@@ -1,85 +1,40 @@
-function validAmount(value) {
-    return (
-        typeof value === "number" &&
-        Number.isFinite(value) &&
-        value >= 0
-    );
-}
+export function calculateRentalCost(costRecord) {
+    const items = costRecord?.items || [];
 
-function sumKnown(values) {
-    return values.reduce(
-        (total, value) => total + (validAmount(value) ? value : 0),
-        0
-    );
-}
+    const sum = (type) =>
+        items
+            .filter((item) => item.type === type)
+            .reduce((total, item) => total + item.amount, 0);
 
-export function calculateRentalCost(pricing) {
-    const {
-        monthlyRent,
-        securityDeposit,
-        advanceRent,
-        oneTimeFees,
-        monthlyServiceCharge,
-        estimatedMonthlyUtilities,
-    } = pricing;
+    const monthlyRentAndFees = sum("monthly");
+    const monthlyEstimates = sum("monthly_estimate");
+    const oneTimeCosts = sum("one_time");
+    const refundableDeposit = sum("refundable_deposit");
 
-    if (!validAmount(monthlyRent) || monthlyRent === 0) {
-        throw new Error("A valid monthly rent is required");
-    }
+    const estimatedMonthlyTotal =
+        monthlyRentAndFees + monthlyEstimates;
 
-    const upfrontItems = [
-        { name: "First month's rent", amount: monthlyRent, source: "landlord_provided" },
-        { name: "Security deposit", amount: securityDeposit, source: securityDeposit === null ? "unknown" : "landlord_provided" },
-        { name: "Advance rent", amount: advanceRent, source: advanceRent === null ? "unknown" : "landlord_provided" },
-        { name: "One-time fees", amount: oneTimeFees, source: oneTimeFees === null ? "unknown" : "landlord_provided" },
-    ];
-
-    const monthlyItems = [
-        { name: "Monthly rent", amount: monthlyRent, source: "landlord_provided" },
-        { name: "Monthly service charge", amount: monthlyServiceCharge, source: monthlyServiceCharge === null ? "unknown" : "landlord_provided" },
-        { name: "Estimated monthly utilities", amount: estimatedMonthlyUtilities, source: estimatedMonthlyUtilities === null ? "unknown" : "estimated" },
-    ];
-
-    const upfrontComplete = upfrontItems.every(
-        (item) => item.amount !== null && validAmount(item.amount)
-    );
-
-    const monthlyComplete = monthlyItems.every(
-        (item) => item.amount !== null && validAmount(item.amount)
-    );
-
-    const upfrontKnownSubtotal = sumKnown(
-        upfrontItems.map((item) => item.amount)
-    );
-
-    const monthlyKnownSubtotal = sumKnown(
-        monthlyItems.map((item) => item.amount)
-    );
+    // Illustrative move-in budget: one month of recurring costs,
+    // plus listed one-time costs and the refundable deposit.
+    const estimatedMoveInBudget =
+        estimatedMonthlyTotal + oneTimeCosts + refundableDeposit;
 
     return {
-        currency: "BDT",
+        currency: costRecord?.currency || "BDT",
 
-        upfront: {
-            items: upfrontItems,
-            knownSubtotal: upfrontKnownSubtotal,
-            total: upfrontComplete ? upfrontKnownSubtotal : null,
-            complete: upfrontComplete,
-            classification: upfrontComplete ? "calculated" : "incomplete",
+        monthly: {
+            knownRecurringCosts: monthlyRentAndFees,
+            estimatedAdditionalCosts: monthlyEstimates,
+            estimatedTotal: estimatedMonthlyTotal,
         },
 
-        recurringMonthly: {
-            items: monthlyItems,
-            knownSubtotal: monthlyKnownSubtotal,
-            total: monthlyComplete ? monthlyKnownSubtotal : null,
-            complete: monthlyComplete,
-            classification: monthlyComplete ? "estimated" : "incomplete",
+        moveIn: {
+            oneTimeCosts,
+            refundableDeposit,
+            estimatedTotal: estimatedMoveInBudget,
         },
 
-        assumptions: [
-            "The first month's rent is included in the upfront calculation.",
-            "The full stated deposit, advance rent, and one-time fees are assumed payable upfront.",
-            "Estimated utilities are not guaranteed bills.",
-            "Unknown charges are not treated as zero.",
-        ],
+        unknownCosts: costRecord?.unknownCosts || [],
+        hasUnknownCosts: (costRecord?.unknownCosts || []).length > 0,
     };
 }

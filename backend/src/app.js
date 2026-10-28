@@ -14,7 +14,10 @@ import landlordDashboardRoutes from "./routes/landlordDashboard.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import propertyReportRoutes from "./routes/propertyReport.routes.js";
 import duplicateListingRoutes from "./routes/duplicateListing.routes.js";
-
+import propertyImageRoutes from "./routes/propertyImage.routes.js";
+import nearbyPlacesRoutes from "./routes/nearbyPlaces.routes.js";
+import rentalCostRoutes from "./routes/rentalCost.routes.js";
+import fileUploadRoutes from "./routes/fileUpload.routes.js";
 
 const app = express();
 
@@ -51,6 +54,10 @@ app.use("/api/v1/landlord/dashboard", landlordDashboardRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/property-reports", propertyReportRoutes);
 app.use("/api/v1/duplicate-listings", duplicateListingRoutes);
+app.use("/api/v1/property-images", propertyImageRoutes);
+app.use("/api/v1/nearby-places", nearbyPlacesRoutes);
+app.use("/api/v1/rental-costs", rentalCostRoutes);
+app.use("/api/v1/uploads", fileUploadRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
