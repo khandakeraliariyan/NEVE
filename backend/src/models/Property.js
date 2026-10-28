@@ -102,13 +102,18 @@ const propertySchema = new mongoose.Schema(
         },
 
         images: {
-            type: [{ type: String, trim: true }],
+            type: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "UploadedFile",
+                },
+            ],
             default: [],
             validate: {
                 validator(value) {
                     return value.length <= 20;
                 },
-                message: "A maximum of 20 image URLs is allowed",
+                message: "A maximum of 20 property images is allowed",
             },
         },
 
