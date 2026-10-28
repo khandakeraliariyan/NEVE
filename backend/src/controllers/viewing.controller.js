@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import ViewingRequest from "../models/ViewingRequest.js";
 import Property from "../models/Property.js";
+import { createNotification } from "../services/notification.service.js";
 
 export async function createViewingRequest(req, res, next) {
     try {
@@ -68,6 +69,19 @@ export async function createViewingRequest(req, res, next) {
             requestedDate: date,
             message: message.trim(),
         });
+
+        try {
+            await createNotification({
+                recipient: property.landlord,
+                type: "viewing_request_received",
+                title: "New viewing request",
+                message: `A renter has requested to view ${property.title}.`,
+                relatedProperty: property._id,
+                relatedViewingRequest: viewing._id,
+            });
+        } catch (error) {
+            console.error("Failed to create viewing notification:", error);
+        }
 
         return res.status(201).json({
             success: true,

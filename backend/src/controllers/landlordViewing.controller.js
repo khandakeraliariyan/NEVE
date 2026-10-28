@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import ViewingRequest from "../models/ViewingRequest.js";
 import Property from "../models/Property.js";
+import { createNotification } from "../services/notification.service.js";
 
 // GET /api/v1/viewings/landlord
 export const getLandlordViewingRequests = async (req, res, next) => {
@@ -162,6 +163,29 @@ export const respondToViewingRequest = async (req, res, next) => {
                 success: false,
                 message: "The request was already updated. Refresh and try again.",
             });
+        }
+
+        try {
+            const approved = updatedRequest.status === "approved";
+            const propertyId = updatedRequest.property?._id
+                || updatedRequest.property;
+
+            await createNotification({
+                recipient: updatedRequest.renter._id || updatedRequest.renter,
+                type: approved
+                    ? "viewing_request_approved"
+                    : "viewing_request_rejected",
+                title: approved
+                    ? "Viewing request approved"
+                    : "Viewing request rejected",
+                message: approved
+                    ? "Your property viewing request has been approved."
+                    : "Your property viewing request has been rejected.",
+                relatedProperty: propertyId,
+                relatedViewingRequest: updatedRequest._id,
+            });
+        } catch (error) {
+            console.error("Failed to create renter notification:", error);
         }
 
         return res.status(200).json({
