@@ -7,6 +7,11 @@ import {
     updateInquiry,
 } from "../controllers/inquiry.controller.js";
 
+import {
+    getLandlordInquiries as getNewLandlordInquiries,
+    respondToInquiry,
+} from "../controllers/landlordInquiry.controller.js";
+
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
@@ -28,6 +33,20 @@ router.get(
 );
 
 // Landlord routes
+router.get(
+    "/landlord",
+    authenticateUser,
+    allowRoles("landlord"),
+    getNewLandlordInquiries
+);
+
+router.patch(
+    "/:inquiryId/respond",
+    authenticateUser,
+    allowRoles("landlord"),
+    respondToInquiry
+);
+
 router.get(
     "/received",
     authenticateUser,

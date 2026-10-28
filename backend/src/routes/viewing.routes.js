@@ -11,6 +11,16 @@ import {
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
+import {
+    getLandlordViewingRequests as getDedicatedLandlordViewingRequests,
+    respondToViewingRequest,
+} from "../controllers/landlordViewing.controller.js";
+
+import {
+    getMyViewingRequests as getDedicatedMyViewingRequests,
+    cancelMyViewingRequest as cancelDedicatedMyViewingRequest,
+} from "../controllers/renterViewing.controller.js";
+
 const router = Router();
 
 // Renter routes
@@ -35,7 +45,35 @@ router.patch(
     cancelMyViewingRequest
 );
 
+router.get(
+    "/my-requests",
+    authenticateUser,
+    allowRoles("renter"),
+    getDedicatedMyViewingRequests
+);
+
+router.patch(
+    "/:viewingId/cancel",
+    authenticateUser,
+    allowRoles("renter"),
+    cancelDedicatedMyViewingRequest
+);
+
 // Landlord routes
+router.get(
+    "/landlord",
+    authenticateUser,
+    allowRoles("landlord"),
+    getDedicatedLandlordViewingRequests
+);
+
+router.patch(
+    "/:viewingId/respond",
+    authenticateUser,
+    allowRoles("landlord"),
+    respondToViewingRequest
+);
+
 router.get(
     "/received",
     authenticateUser,

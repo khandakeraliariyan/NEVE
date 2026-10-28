@@ -49,6 +49,27 @@ const userSchema = new mongoose.Schema(
             required: true,
         },
 
+        favorites: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Property",
+            }
+        ],
+
+        recentlyViewed: [
+            {
+                property: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Property",
+                    required: true,
+                },
+                viewedAt: {
+                    type: Date,
+                    default: Date.now,
+                },
+            }
+        ],
+
         isActive: {
             type: Boolean,
             default: true,
