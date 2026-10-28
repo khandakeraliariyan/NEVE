@@ -1,4 +1,6 @@
 import Property from "../models/Property.js";
+import { sendSuccess } from "../utils/apiResponse.js";
+import { buildPagination, getPagination } from "../utils/pagination.js";
 
 const escapeRegex = (value) =>
   value.replace(/[.*+^${}()|[\]\\]/g, "\\$&");
@@ -18,10 +20,9 @@ export const searchProperties = async (req, res) => {
       minRent,
       maxRent,
       bedrooms,
-      page,
-      limit,
       sort,
     } = req.validated.query;
+    const { page, limit, skip } = getPagination(req.validated.query);
 
     const filter = { status: "published" };
 
@@ -59,8 +60,6 @@ export const searchProperties = async (req, res) => {
       filter.bedrooms = bedrooms;
     }
 
-    const skip = (page - 1) * limit;
-
     const [properties, total] = await Promise.all([
       Property.find(filter)
         .sort(allowedSorts[sort])
@@ -71,26 +70,14 @@ export const searchProperties = async (req, res) => {
       Property.countDocuments(filter),
     ]);
 
-    return res.status(200).json({
+    return sendSuccess(res, {
       message: "Properties retrieved successfully.",
-      filters: {
-        city: city || null,
-        area: area || null,
-        propertyType: propertyType || null,
-        minRent: minRent ?? null,
-        maxRent: maxRent ?? null,
-        bedrooms: bedrooms ?? null,
-        sort,
-      },
-      pagination: {
+      data: properties,
+      pagination: buildPagination({
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page * limit < total,
-        hasPreviousPage: page > 1,
-      },
-      results: properties,
+      }),
     });
   } catch (error) {
     console.error("Property search error:", error);
