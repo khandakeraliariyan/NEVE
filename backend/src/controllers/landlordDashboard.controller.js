@@ -1,0 +1,102 @@
+
+import mongoose from "mongoose";
+import Property from "../models/Property.js";
+
+const ALLOWED_STATUSES = ["draft", "published", "paused"];
+
+export async function getLandlordDashboard(req, res, next) {
+    try {
+        const landlordId = req.neveUser._id;
+        const { status } = req.query;
+
+        const page = Number(req.query.page ?? 1);
+        const limit = Number(req.query.limit ?? 10);
+
+        if (status && !ALLOWED_STATUSES.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property status.",
+                allowedValues: ALLOWED_STATUSES
+            });
+        }
+
+        if (
+            !Number.isInteger(page) ||
+            page < 1 ||
+            !Number.isInteger(limit) ||
+            limit < 1 ||
+            limit > 50
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "page must be >= 1 and limit must be from 1 to 50."
+            });
+        }
+
+        // Always restrict the query to the authenticated landlord.
+        const filter = { landlord: landlordId };
+
+        if (status) {
+            filter.status = status;
+        }
+
+        const [properties, total, statusCounts] = await Promise.all([
+            Property.find(filter)
+                .select(
+                    "title propertyType address bedrooms bathrooms areaSqft images pricing status availabilityDate createdAt updatedAt"
+                )
+                .sort({ updatedAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .lean(),
+
+            Property.countDocuments(filter),
+
+            Property.aggregate([
+                {
+                    $match: {
+                        landlord: new mongoose.Types.ObjectId(
+                            landlordId.toString()
+                        )
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$status",
+                        count: { $sum: 1 }
+                    }
+                }
+            ])
+        ]);
+
+        const stats = {
+            total: 0,
+            draft: 0,
+            published: 0,
+            paused: 0
+        };
+
+        for (const item of statusCounts) {
+            if (Object.hasOwn(stats, item._id)) {
+                stats[item._id] = item.count;
+                stats.total += item.count;
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            stats,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page * limit < total,
+                hasPreviousPage: page > 1
+            },
+            properties
+        });
+    } catch (error) {
+        next(error);
+    }
+}
