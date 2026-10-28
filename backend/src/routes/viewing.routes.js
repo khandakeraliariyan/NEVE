@@ -1,4 +1,7 @@
+import { createRequire } from "node:module";
 import { Router } from "express";
+
+const require = createRequire(import.meta.url);
 
 import {
     createViewingRequest,
@@ -10,6 +13,11 @@ import {
 
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
+
+const {
+    getLandlordViewingRequests: getDedicatedLandlordViewingRequests,
+    respondToViewingRequest,
+} = require("../controllers/landlordViewing.controller.js");
 
 const router = Router();
 
@@ -36,6 +44,20 @@ router.patch(
 );
 
 // Landlord routes
+router.get(
+    "/landlord",
+    authenticateUser,
+    allowRoles("landlord"),
+    getDedicatedLandlordViewingRequests
+);
+
+router.patch(
+    "/:viewingId/respond",
+    authenticateUser,
+    allowRoles("landlord"),
+    respondToViewingRequest
+);
+
 router.get(
     "/received",
     authenticateUser,
