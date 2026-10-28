@@ -23,6 +23,7 @@ import savedPropertyRoutes from "./routes/savedProperty.routes.js";
 import renterPreferenceRoutes from "./routes/renterPreference.routes.js";
 import propertyMatchingRoutes from "./routes/propertyMatching.routes.js";
 import propertyDetailRoutes from "./routes/propertyDetail.routes.js";
+import listingConsistencyRoutes from "./routes/listingConsistency.routes.js";
 
 const app = express();
 
@@ -76,7 +77,6 @@ app.get("/api/v1/health", (req, res) => {
 // API routes
 app.use("/api/v1/auth", authLimiter, authRoutes);
 app.use("/api/v1/users", userLimiter, userRoutes);
-// Keep before propertyRoutes so /:id-style routes cannot shadow /:propertyId/details
 app.use("/api/v1/properties", propertyDetailRoutes);
 app.use("/api/v1/properties", propertyRoutes);
 app.use("/api/v1/inquiries", inquiryRoutes);
@@ -95,6 +95,7 @@ app.use("/api/v1/uploads", uploadLimiter, fileUploadRoutes);
 app.use("/api/v1/saved-properties", savedPropertyRoutes);
 app.use("/api/v1/renter-preferences", renterPreferenceRoutes);
 app.use("/api/v1/recommendations", propertyMatchingRoutes);
+app.use("/api/v1/listing-consistency", listingConsistencyRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
