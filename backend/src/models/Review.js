@@ -33,6 +33,30 @@ const reviewSchema = new mongoose.Schema(
             trim: true,
             minlength: 10,
             maxlength: 1000
+        },
+
+        moderationStatus: {
+            type: String,
+            enum: ["visible", "hidden"],
+            default: "visible",
+            index: true
+        },
+
+        moderatedAt: {
+            type: Date,
+            default: null
+        },
+
+        moderatedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null
+        },
+
+        moderationReason: {
+            type: String,
+            default: null,
+            maxlength: 500
         }
     },
     { timestamps: true }
