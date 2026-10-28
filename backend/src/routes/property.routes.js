@@ -19,6 +19,8 @@ import { searchNearbyProperties } from "../controllers/geoProperty.controller.js
 import { recordPropertyViewEvent } from "../controllers/propertyViewEvent.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
+import { validateRequest } from "../middleware/validateRequest.js";
+import { propertySearchSchema } from "../validators/common.validator.js";
 
 const router = Router();
 
@@ -35,7 +37,11 @@ router.get(
 
 router.post("/compare", compareProperties);
 
-router.get("/search", searchProperties);
+router.get(
+    "/search",
+    validateRequest(propertySearchSchema),
+    searchProperties
+);
 
 router.get("/nearby", searchNearbyProperties);
 

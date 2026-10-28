@@ -120,22 +120,25 @@ app.use((req, res) => {
 
 // Central error handler
 app.use((error, req, res, next) => {
-    console.error("Server error:", error);
-
     if (res.headersSent) {
         return next(error);
     }
 
-    const status =
+    console.error(error);
+
+    const statusCode =
         Number.isInteger(error.status) &&
         error.status >= 400 &&
         error.status < 600
             ? error.status
             : 500;
 
-    return res.status(status).json({
+    return res.status(statusCode).json({
         success: false,
-        message: status < 500 ? error.message : "Internal server error",
+        message:
+            statusCode < 500
+                ? error.message
+                : "Internal server error.",
     });
 });
 
