@@ -14,6 +14,12 @@ import {
     removeFavorite,
 } from "../controllers/favorite.controller.js";
 
+import {
+    recordPropertyView,
+    getRecentlyViewed,
+    clearRecentlyViewed,
+} from "../controllers/recentlyViewed.controller.js";
+
 const router = Router();
 
 router.post("/profile", authenticateUser, createProfile);
@@ -38,6 +44,27 @@ router.delete(
     authenticateUser,
     allowRoles("renter"),
     removeFavorite
+);
+
+router.post(
+    "/me/recently-viewed/:propertyId",
+    authenticateUser,
+    allowRoles("renter"),
+    recordPropertyView
+);
+
+router.get(
+    "/me/recently-viewed",
+    authenticateUser,
+    allowRoles("renter"),
+    getRecentlyViewed
+);
+
+router.delete(
+    "/me/recently-viewed",
+    authenticateUser,
+    allowRoles("renter"),
+    clearRecentlyViewed
 );
 
 export default router;
