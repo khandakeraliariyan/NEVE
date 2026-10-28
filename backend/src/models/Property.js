@@ -131,6 +131,12 @@ const propertySchema = new mongoose.Schema(
                 min: 0,
             },
 
+            oneTimeFees: {
+                type: Number,
+                default: 0,
+                min: 0,
+            },
+
             monthlyServiceCharge: {
                 type: Number,
                 default: 0,
