@@ -1,3 +1,6 @@
+import Property from "../models/Property.js";
+import RenterPreference from "../models/RenterPreference.js";
+
 const WEIGHTS = {
     budget: 35,
     bedrooms: 25,
@@ -220,5 +223,188 @@ export function matchProperty(property, preferences) {
             possible === 0
                 ? "No preferences could be evaluated."
                 : "Score is normalized across evaluated preferences only. Missing listing information is excluded and shown separately.",
+    };
+}
+
+// Personalized recommendations based on the renter's saved preferences.
+const RECOMMENDATION_WEIGHTS = {
+    budget: 30,
+    location: 25,
+    bedrooms: 15,
+    propertyType: 15,
+    amenities: 15,
+};
+
+const normalize = (value) => String(value ?? "").trim().toLowerCase();
+
+function scoreBudget(property, preferences) {
+    const rent = property.pricing?.monthlyRent;
+
+    if (!Number.isFinite(rent)) return null;
+
+    const { minRent, maxRent } = preferences;
+
+    if (minRent == null && maxRent == null) return null;
+
+    if (minRent != null && rent < minRent) {
+        const difference = minRent - rent;
+        return Math.max(0, 100 - (difference / Math.max(minRent, 1)) * 100);
+    }
+
+    if (maxRent != null && rent > maxRent) {
+        const difference = rent - maxRent;
+        return Math.max(0, 100 - (difference / Math.max(maxRent, 1)) * 100);
+    }
+
+    return 100;
+}
+
+function scoreLocation(property, preferences) {
+    const preferredCities = (preferences.cities || []).map(normalize);
+    const preferredAreas = (preferences.areas || []).map(normalize);
+
+    if (!preferredCities.length && !preferredAreas.length) return null;
+
+    const cityMatches = preferredCities.includes(
+        normalize(property.address?.city)
+    );
+
+    const areaMatches = preferredAreas.includes(
+        normalize(property.address?.area)
+    );
+
+    if (areaMatches) return 100;
+    if (cityMatches) return 70;
+
+    return 0;
+}
+
+function scoreBedrooms(property, preferences) {
+    if (!preferences.bedrooms?.length) return null;
+
+    if (!Number.isFinite(property.bedrooms)) return 0;
+
+    return preferences.bedrooms.includes(property.bedrooms) ? 100 : 0;
+}
+
+function scorePropertyType(property, preferences) {
+    if (!preferences.propertyTypes?.length) return null;
+
+    const preferred = preferences.propertyTypes.map(normalize);
+
+    return preferred.includes(normalize(property.propertyType)) ? 100 : 0;
+}
+
+function scoreAmenities(property, preferences) {
+    if (!preferences.amenities?.length) return null;
+
+    const propertyAmenities = (property.amenities || []).map(normalize);
+    const preferred = preferences.amenities.map(normalize);
+
+    const matched = preferred.filter((amenity) =>
+        propertyAmenities.includes(amenity)
+    ).length;
+
+    return (matched / preferred.length) * 100;
+}
+
+function calculateMatch(property, preferences) {
+    const componentScores = {
+        budget: scoreBudget(property, preferences),
+        location: scoreLocation(property, preferences),
+        bedrooms: scoreBedrooms(property, preferences),
+        propertyType: scorePropertyType(property, preferences),
+        amenities: scoreAmenities(property, preferences),
+    };
+
+    let weightedTotal = 0;
+    let applicableWeight = 0;
+
+    for (const [key, score] of Object.entries(componentScores)) {
+        if (score === null) continue;
+
+        weightedTotal += score * RECOMMENDATION_WEIGHTS[key];
+        applicableWeight += RECOMMENDATION_WEIGHTS[key];
+    }
+
+    const score =
+        applicableWeight > 0 ? Math.round(weightedTotal / applicableWeight) : 0;
+
+    const matchedCriteria = Object.entries(componentScores)
+        .filter(([, value]) => value !== null && value >= 70)
+        .map(([key]) => key);
+
+    return {
+        score,
+        componentScores,
+        matchedCriteria,
+    };
+}
+
+// MVP limit: ranks at most 500 recent published listings per request.
+// For a large database, move filtering and ranking into an optimized
+// query or a dedicated search service.
+const MAX_CANDIDATES = 500;
+
+export async function getMatchedProperties(
+    renterId,
+    { page = 1, limit = 10 } = {}
+) {
+    const preferences = await RenterPreference.findOne({
+        renter: renterId,
+    }).lean();
+
+    if (!preferences) {
+        return {
+            hasPreferences: false,
+            results: [],
+            pagination: {
+                page,
+                limit,
+                total: 0,
+                totalPages: 0,
+            },
+        };
+    }
+
+    const filter = {
+        status: "published",
+    };
+
+    // Apply the maximum budget as a hard filter when provided.
+    if (preferences.maxRent != null) {
+        filter["pricing.monthlyRent"] = { $lte: preferences.maxRent };
+    }
+
+    const properties = await Property.find(filter)
+        .sort({ createdAt: -1 })
+        .limit(MAX_CANDIDATES)
+        .lean();
+
+    const ranked = properties
+        .map((property) => {
+            const match = calculateMatch(property, preferences);
+
+            return {
+                property,
+                matchScore: match.score,
+                matchedCriteria: match.matchedCriteria,
+                breakdown: match.componentScores,
+            };
+        })
+        .sort((a, b) => b.matchScore - a.matchScore);
+
+    const total = ranked.length;
+    const start = (page - 1) * limit;
+
+    return {
+        hasPreferences: true,
+        results: ranked.slice(start, start + limit),
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        },
     };
 }

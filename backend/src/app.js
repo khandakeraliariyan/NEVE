@@ -21,6 +21,7 @@ import rentalCostRoutes from "./routes/rentalCost.routes.js";
 import fileUploadRoutes from "./routes/fileUpload.routes.js";
 import savedPropertyRoutes from "./routes/savedProperty.routes.js";
 import renterPreferenceRoutes from "./routes/renterPreference.routes.js";
+import propertyMatchingRoutes from "./routes/propertyMatching.routes.js";
 
 const app = express();
 
@@ -90,6 +91,7 @@ app.use("/api/v1/rental-costs", rentalCostRoutes);
 app.use("/api/v1/uploads", uploadLimiter, fileUploadRoutes);
 app.use("/api/v1/saved-properties", savedPropertyRoutes);
 app.use("/api/v1/renter-preferences", renterPreferenceRoutes);
+app.use("/api/v1/recommendations", propertyMatchingRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
