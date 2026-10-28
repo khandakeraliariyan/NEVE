@@ -12,6 +12,7 @@ import reviewRoutes from "./routes/review.routes.js";
 import reviewModerationRoutes from "./routes/reviewModeration.routes.js";
 import landlordDashboardRoutes from "./routes/landlordDashboard.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
+import propertyReportRoutes from "./routes/propertyReport.routes.js";
 
 
 const app = express();
@@ -47,6 +48,7 @@ app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/review-moderation", reviewModerationRoutes);
 app.use("/api/v1/landlord/dashboard", landlordDashboardRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/property-reports", propertyReportRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {

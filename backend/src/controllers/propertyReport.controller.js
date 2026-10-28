@@ -1,6 +1,6 @@
-const mongoose = require("mongoose");
-const Property = require("../models/Property");
-const PropertyReport = require("../models/PropertyReport");
+import mongoose from "mongoose";
+import Property from "../models/Property.js";
+import PropertyReport from "../models/PropertyReport.js";
 
 const VALID_REASONS = [
     "duplicate_listing",
@@ -19,7 +19,7 @@ const VALID_REVIEW_STATUSES = [
 ];
 
 // POST /api/v1/property-reports
-const createPropertyReport = async (req, res, next) => {
+export const createPropertyReport = async (req, res, next) => {
     try {
         const { propertyId, reason, details = "" } = req.body;
 
@@ -76,7 +76,7 @@ const createPropertyReport = async (req, res, next) => {
 };
 
 // GET /api/v1/property-reports/my-reports
-const getMyPropertyReports = async (req, res, next) => {
+export const getMyPropertyReports = async (req, res, next) => {
     try {
         const page = Number(req.query.page || 1);
         const limit = Number(req.query.limit || 10);
@@ -125,7 +125,7 @@ const getMyPropertyReports = async (req, res, next) => {
 };
 
 // GET /api/v1/property-reports/admin
-const getPropertyReportsForReview = async (req, res, next) => {
+export const getPropertyReportsForReview = async (req, res, next) => {
     try {
         const page = Number(req.query.page || 1);
         const limit = Number(req.query.limit || 20);
@@ -186,7 +186,7 @@ const getPropertyReportsForReview = async (req, res, next) => {
 };
 
 // PATCH /api/v1/property-reports/admin/:reportId
-const reviewPropertyReport = async (req, res, next) => {
+export const reviewPropertyReport = async (req, res, next) => {
     try {
         const { reportId } = req.params;
         const { status, reviewNote = "" } = req.body;
@@ -251,11 +251,4 @@ const reviewPropertyReport = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-};
-
-module.exports = {
-    createPropertyReport,
-    getMyPropertyReports,
-    getPropertyReportsForReview,
-    reviewPropertyReport,
 };

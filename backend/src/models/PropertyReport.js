@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const propertyReportSchema = new mongoose.Schema(
     {
@@ -67,4 +67,6 @@ const propertyReportSchema = new mongoose.Schema(
 propertyReportSchema.index({ reporter: 1, createdAt: -1 });
 propertyReportSchema.index({ status: 1, createdAt: -1 });
 
-module.exports = mongoose.model("PropertyReport", propertyReportSchema);
+const PropertyReport = mongoose.model("PropertyReport", propertyReportSchema);
+
+export default PropertyReport;
