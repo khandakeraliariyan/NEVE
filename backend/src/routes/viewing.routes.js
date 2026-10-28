@@ -1,7 +1,4 @@
-import { createRequire } from "node:module";
 import { Router } from "express";
-
-const require = createRequire(import.meta.url);
 
 import {
     createViewingRequest,
@@ -14,15 +11,15 @@ import {
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
-const {
-    getLandlordViewingRequests: getDedicatedLandlordViewingRequests,
+import {
+    getLandlordViewingRequests as getDedicatedLandlordViewingRequests,
     respondToViewingRequest,
-} = require("../controllers/landlordViewing.controller.js");
+} from "../controllers/landlordViewing.controller.js";
 
-const {
-    getMyViewingRequests: getDedicatedMyViewingRequests,
-    cancelMyViewingRequest: cancelDedicatedMyViewingRequest,
-} = require("../controllers/renterViewing.controller.js");
+import {
+    getMyViewingRequests as getDedicatedMyViewingRequests,
+    cancelMyViewingRequest as cancelDedicatedMyViewingRequest,
+} from "../controllers/renterViewing.controller.js";
 
 const router = Router();
 

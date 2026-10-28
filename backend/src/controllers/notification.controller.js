@@ -1,8 +1,8 @@
-const mongoose = require("mongoose");
-const Notification = require("../models/Notification");
+import mongoose from "mongoose";
+import Notification from "../models/Notification.js";
 
 // GET /api/v1/notifications
-const getMyNotifications = async (req, res, next) => {
+export const getMyNotifications = async (req, res, next) => {
     try {
         const page = Number(req.query.page || 1);
         const limit = Number(req.query.limit || 20);
@@ -68,7 +68,7 @@ const getMyNotifications = async (req, res, next) => {
 };
 
 // GET /api/v1/notifications/unread-count
-const getUnreadCount = async (req, res, next) => {
+export const getUnreadCount = async (req, res, next) => {
     try {
         const count = await Notification.countDocuments({
             recipient: req.neveUser._id,
@@ -85,7 +85,7 @@ const getUnreadCount = async (req, res, next) => {
 };
 
 // PATCH /api/v1/notifications/:id/read
-const markNotificationAsRead = async (req, res, next) => {
+export const markNotificationAsRead = async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -131,7 +131,7 @@ const markNotificationAsRead = async (req, res, next) => {
 };
 
 // PATCH /api/v1/notifications/read-all
-const markAllNotificationsAsRead = async (req, res, next) => {
+export const markAllNotificationsAsRead = async (req, res, next) => {
     try {
         const result = await Notification.updateMany(
             {
@@ -154,11 +154,4 @@ const markAllNotificationsAsRead = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-};
-
-module.exports = {
-    getMyNotifications,
-    getUnreadCount,
-    markNotificationAsRead,
-    markAllNotificationsAsRead,
 };

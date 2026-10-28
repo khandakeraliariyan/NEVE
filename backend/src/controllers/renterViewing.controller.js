@@ -1,8 +1,8 @@
-const mongoose = require("mongoose");
-const ViewingRequest = require("../models/ViewingRequest");
+import mongoose from "mongoose";
+import ViewingRequest from "../models/ViewingRequest.js";
 
 // GET /api/v1/viewings/my-requests
-const getMyViewingRequests = async (req, res, next) => {
+export const getMyViewingRequests = async (req, res, next) => {
     try {
         const page = Number(req.query.page || 1);
         const limit = Number(req.query.limit || 10);
@@ -58,7 +58,7 @@ const getMyViewingRequests = async (req, res, next) => {
 };
 
 // PATCH /api/v1/viewings/:viewingId/cancel
-const cancelMyViewingRequest = async (req, res, next) => {
+export const cancelMyViewingRequest = async (req, res, next) => {
     try {
         const { viewingId } = req.params;
 
@@ -116,9 +116,4 @@ const cancelMyViewingRequest = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-};
-
-module.exports = {
-    getMyViewingRequests,
-    cancelMyViewingRequest,
 };

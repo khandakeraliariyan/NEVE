@@ -1,9 +1,9 @@
-const mongoose = require("mongoose");
-const ViewingRequest = require("../models/ViewingRequest");
-const Property = require("../models/Property");
+import mongoose from "mongoose";
+import ViewingRequest from "../models/ViewingRequest.js";
+import Property from "../models/Property.js";
 
 // GET /api/v1/viewings/landlord
-const getLandlordViewingRequests = async (req, res, next) => {
+export const getLandlordViewingRequests = async (req, res, next) => {
     try {
         const {
             status,
@@ -70,7 +70,7 @@ const getLandlordViewingRequests = async (req, res, next) => {
 };
 
 // PATCH /api/v1/viewings/:viewingId/respond
-const respondToViewingRequest = async (req, res, next) => {
+export const respondToViewingRequest = async (req, res, next) => {
     try {
         const { viewingId } = req.params;
         const { status, landlordResponse = "" } = req.body;
@@ -172,9 +172,4 @@ const respondToViewingRequest = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-};
-
-module.exports = {
-    getLandlordViewingRequests,
-    respondToViewingRequest,
 };
