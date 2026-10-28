@@ -1,13 +1,8 @@
 import mongoose from "mongoose";
+import { env } from "./env.js";
 
 export async function connectDatabase() {
-    const mongoUri = process.env.MONGODB_URI;
-
-    if (!mongoUri) {
-        throw new Error("MONGODB_URI is missing from the environment");
-    }
-
-    await mongoose.connect(mongoUri);
+    await mongoose.connect(env.MONGODB_URI);
 
     console.log("MongoDB connected successfully");
 }

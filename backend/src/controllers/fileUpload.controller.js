@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 import UploadedFile from "../models/UploadedFile.js";
 import Property from "../models/Property.js";
+import { env } from "../config/env.js";
 
 import {
     validateUpload,
@@ -107,9 +108,7 @@ export const requestUploadUrl = async (req, res) => {
                 uploadUrl,
                 method: "PUT",
                 headers: { "Content-Type": mimeType },
-                expiresInSeconds: Number(
-                    process.env.UPLOAD_URL_TTL_SECONDS || 300
-                ),
+                expiresInSeconds: env.UPLOAD_URL_TTL_SECONDS,
             });
         } catch (error) {
             await UploadedFile.findByIdAndDelete(file._id);

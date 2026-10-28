@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { env } from "./config/env.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -23,8 +24,16 @@ import savedPropertyRoutes from "./routes/savedProperty.routes.js";
 import renterPreferenceRoutes from "./routes/renterPreference.routes.js";
 import propertyMatchingRoutes from "./routes/propertyMatching.routes.js";
 import propertyDetailRoutes from "./routes/propertyDetail.routes.js";
+import propertyTrustRoutes from "./routes/propertyTrust.routes.js";
+import listingConsistencyRoutes from "./routes/listingConsistency.routes.js";
+import evidenceGraphRoutes from "./routes/evidenceGraph.routes.js";
+import adminDashboardRoutes from "./routes/adminDashboard.routes.js";
+import adminModerationRoutes from "./routes/adminModeration.routes.js";
+import adminAuditRoutes from "./routes/adminAudit.routes.js";
 
 const app = express();
+
+app.disable("x-powered-by");
 
 app.use(helmet());
 
@@ -57,7 +66,8 @@ app.use("/api/v1", apiLimiter);
 
 app.use(
     cors({
-        origin: process.env.CLIENT_URL || "http://localhost:3000",
+        origin: env.CLIENT_URL,
+        credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
     })
@@ -76,8 +86,8 @@ app.get("/api/v1/health", (req, res) => {
 // API routes
 app.use("/api/v1/auth", authLimiter, authRoutes);
 app.use("/api/v1/users", userLimiter, userRoutes);
-// Keep before propertyRoutes so /:id-style routes cannot shadow /:propertyId/details
 app.use("/api/v1/properties", propertyDetailRoutes);
+app.use("/api/v1/property-trust", propertyTrustRoutes);
 app.use("/api/v1/properties", propertyRoutes);
 app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/viewings", viewingRoutes);
@@ -95,6 +105,11 @@ app.use("/api/v1/uploads", uploadLimiter, fileUploadRoutes);
 app.use("/api/v1/saved-properties", savedPropertyRoutes);
 app.use("/api/v1/renter-preferences", renterPreferenceRoutes);
 app.use("/api/v1/recommendations", propertyMatchingRoutes);
+app.use("/api/v1/listing-consistency", listingConsistencyRoutes);
+app.use("/api/v1/evidence-graph", evidenceGraphRoutes);
+app.use("/api/v1/admin/dashboard", adminDashboardRoutes);
+app.use("/api/v1/admin/moderation", adminModerationRoutes);
+app.use("/api/v1/admin/audit-logs", adminAuditRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
@@ -105,12 +120,26 @@ app.use((req, res) => {
 });
 
 // Central error handler
-app.use((err, req, res, next) => {
-    console.error("Server error:", err.message);
+app.use((error, req, res, next) => {
+    if (res.headersSent) {
+        return next(error);
+    }
 
-    res.status(500).json({
+    console.error(error);
+
+    const statusCode =
+        Number.isInteger(error.status) &&
+        error.status >= 400 &&
+        error.status < 600
+            ? error.status
+            : 500;
+
+    return res.status(statusCode).json({
         success: false,
-        message: "Internal server error",
+        message:
+            statusCode < 500
+                ? error.message
+                : "Internal server error.",
     });
 });
 

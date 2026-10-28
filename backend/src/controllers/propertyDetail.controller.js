@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import Property from "../models/Property.js";
 import RentalCost from "../models/RentalCost.js";
 import NearbyPlaceCache from "../models/NearbyPlaceCache.js";
+import ListingWarning from "../models/ListingWarning.js";
+import PropertyClaim from "../models/PropertyClaim.js";
 
 import { createDownloadUrl } from "../services/fileUpload.service.js";
 import { calculateRentalCost } from "../services/rentalCost.service.js";
@@ -129,6 +131,87 @@ export const getPropertyDetails = async (req, res) => {
 
         return res.status(500).json({
             message: "Could not retrieve property details.",
+        });
+    }
+};
+
+export const getPublicPropertyTransparency = async (req, res) => {
+    try {
+        const { propertyId } = req.params;
+
+        if (!mongoose.isValidObjectId(propertyId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID.",
+            });
+        }
+
+        const property = await Property.findOne({
+            _id: propertyId,
+            status: "published",
+        })
+            .select("_id title")
+            .lean();
+
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Published property not found.",
+            });
+        }
+
+        const [warnings, claims] = await Promise.all([
+            ListingWarning.find({
+                property: property._id,
+                publiclyVisible: true,
+                publicSummary: { $type: "string", $ne: "" },
+                status: { $in: ["reviewed", "resolved"] },
+            })
+                .select("_id type publicSummary status reviewedAt")
+                .sort({ reviewedAt: -1 })
+                .lean(),
+            PropertyClaim.find({
+                property: property._id,
+                publiclyVisible: true,
+                publicSummary: { $type: "string", $ne: "" },
+                status: {
+                    $in: ["supported", "contradicted", "inconclusive"],
+                },
+            })
+                .select("_id claimType publicSummary status reviewedAt")
+                .sort({ reviewedAt: -1 })
+                .lean(),
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            property: {
+                id: property._id,
+                title: property.title,
+            },
+            listingWarnings: warnings.map((warning) => ({
+                id: warning._id,
+                type: warning.type,
+                status: warning.status,
+                summary: warning.publicSummary,
+                reviewedAt: warning.reviewedAt,
+            })),
+            reviewedClaims: claims.map((claim) => ({
+                id: claim._id,
+                type: claim.claimType,
+                assessment: claim.status,
+                summary: claim.publicSummary,
+                reviewedAt: claim.reviewedAt,
+            })),
+            notice:
+                "Assessments summarize a review and are not absolute proof. Listing warnings indicate possible inconsistencies and do not establish fraud or intentional misrepresentation.",
+        });
+    } catch (error) {
+        console.error("Get public property transparency error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Could not retrieve property transparency information.",
         });
     }
 };

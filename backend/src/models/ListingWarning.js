@@ -39,6 +39,18 @@ const listingWarningSchema = new mongoose.Schema(
             descriptionValue: mongoose.Schema.Types.Mixed,
         },
 
+        publicSummary: {
+            type: String,
+            trim: true,
+            maxlength: 500,
+            default: null,
+        },
+
+        publiclyVisible: {
+            type: Boolean,
+            default: false,
+        },
+
         status: {
             type: String,
             enum: ["open", "reviewed", "dismissed", "resolved"],
