@@ -59,7 +59,10 @@ export async function getPropertyReviews(req, res, next) {
             });
         }
 
-        const filter = { property: property._id };
+        const filter = {
+            property: property._id,
+            moderationStatus: "visible"
+        };
 
         const [reviews, total, summary] = await Promise.all([
             Review.find(filter)
@@ -72,7 +75,7 @@ export async function getPropertyReviews(req, res, next) {
             Review.countDocuments(filter),
 
             Review.aggregate([
-                { $match: { property: property._id } },
+                { $match: filter },
                 {
                     $group: {
                         _id: null,

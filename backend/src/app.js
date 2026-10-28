@@ -9,6 +9,7 @@ import inquiryRoutes from "./routes/inquiry.routes.js";
 import viewingRoutes from "./routes/viewing.routes.js";
 import matchingRoutes from "./routes/matching.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
+import reviewModerationRoutes from "./routes/reviewModeration.routes.js";
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/viewings", viewingRoutes);
 app.use("/api/v1/matching", matchingRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
+app.use("/api/v1/review-moderation", reviewModerationRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
