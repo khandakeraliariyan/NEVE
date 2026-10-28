@@ -31,6 +31,8 @@ import adminAuditRoutes from "./routes/adminAudit.routes.js";
 
 const app = express();
 
+app.disable("x-powered-by");
+
 app.use(helmet());
 
 const apiLimiter = rateLimit({
@@ -62,7 +64,8 @@ app.use("/api/v1", apiLimiter);
 
 app.use(
     cors({
-        origin: process.env.CLIENT_URL || "http://localhost:3000",
+        origin: process.env.CLIENT_URL,
+        credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
     })
@@ -114,12 +117,23 @@ app.use((req, res) => {
 });
 
 // Central error handler
-app.use((err, req, res, next) => {
-    console.error("Server error:", err.message);
+app.use((error, req, res, next) => {
+    console.error("Server error:", error);
 
-    res.status(500).json({
+    if (res.headersSent) {
+        return next(error);
+    }
+
+    const status =
+        Number.isInteger(error.status) &&
+        error.status >= 400 &&
+        error.status < 600
+            ? error.status
+            : 500;
+
+    return res.status(status).json({
         success: false,
-        message: "Internal server error",
+        message: status < 500 ? error.message : "Internal server error",
     });
 });
 
