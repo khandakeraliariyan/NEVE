@@ -18,6 +18,7 @@ import {
     recordPropertyView,
     getRecentlyViewed,
     clearRecentlyViewed,
+    removeRecentlyViewed,
 } from "../controllers/recentlyViewed.controller.js";
 
 const router = Router();
@@ -58,6 +59,13 @@ router.get(
     authenticateUser,
     allowRoles("renter"),
     getRecentlyViewed
+);
+
+router.delete(
+    "/me/recently-viewed/:propertyId",
+    authenticateUser,
+    allowRoles("renter"),
+    removeRecentlyViewed
 );
 
 router.delete(

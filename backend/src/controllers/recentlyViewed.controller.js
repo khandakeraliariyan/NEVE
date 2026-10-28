@@ -152,3 +152,41 @@ export async function clearRecentlyViewed(req, res, next) {
         next(error);
     }
 }
+
+export async function removeRecentlyViewed(req, res, next) {
+    try {
+        const { propertyId } = req.params;
+
+        if (!mongoose.isValidObjectId(propertyId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID.",
+            });
+        }
+
+        const result = await User.updateOne(
+            { _id: req.neveUser._id },
+            {
+                $pull: {
+                    recentlyViewed: {
+                        property: new mongoose.Types.ObjectId(propertyId),
+                    },
+                },
+            }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Property removed from browsing history.",
+        });
+    } catch (error) {
+        next(error);
+    }
+}
