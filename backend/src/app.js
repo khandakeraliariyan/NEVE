@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -18,15 +19,46 @@ import propertyImageRoutes from "./routes/propertyImage.routes.js";
 import nearbyPlacesRoutes from "./routes/nearbyPlaces.routes.js";
 import rentalCostRoutes from "./routes/rentalCost.routes.js";
 import fileUploadRoutes from "./routes/fileUpload.routes.js";
+import savedPropertyRoutes from "./routes/savedProperty.routes.js";
+import renterPreferenceRoutes from "./routes/renterPreference.routes.js";
+import propertyMatchingRoutes from "./routes/propertyMatching.routes.js";
+import propertyDetailRoutes from "./routes/propertyDetail.routes.js";
 
 const app = express();
 
 app.use(helmet());
 
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        message: "Too many requests. Please try again later.",
+    },
+});
+
+const createSensitiveLimiter = () =>
+    rateLimit({
+        windowMs: 15 * 60 * 1000,
+        limit: 20,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: {
+            message: "Too many requests. Please try again later.",
+        },
+    });
+
+const authLimiter = createSensitiveLimiter();
+const userLimiter = createSensitiveLimiter();
+const uploadLimiter = createSensitiveLimiter();
+
+app.use("/api/v1", apiLimiter);
+
 app.use(
     cors({
         origin: process.env.CLIENT_URL || "http://localhost:3000",
-        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
     })
 );
@@ -42,8 +74,10 @@ app.get("/api/v1/health", (req, res) => {
 });
 
 // API routes
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/auth", authLimiter, authRoutes);
+app.use("/api/v1/users", userLimiter, userRoutes);
+// Keep before propertyRoutes so /:id-style routes cannot shadow /:propertyId/details
+app.use("/api/v1/properties", propertyDetailRoutes);
 app.use("/api/v1/properties", propertyRoutes);
 app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/viewings", viewingRoutes);
@@ -57,7 +91,10 @@ app.use("/api/v1/duplicate-listings", duplicateListingRoutes);
 app.use("/api/v1/property-images", propertyImageRoutes);
 app.use("/api/v1/nearby-places", nearbyPlacesRoutes);
 app.use("/api/v1/rental-costs", rentalCostRoutes);
-app.use("/api/v1/uploads", fileUploadRoutes);
+app.use("/api/v1/uploads", uploadLimiter, fileUploadRoutes);
+app.use("/api/v1/saved-properties", savedPropertyRoutes);
+app.use("/api/v1/renter-preferences", renterPreferenceRoutes);
+app.use("/api/v1/recommendations", propertyMatchingRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {

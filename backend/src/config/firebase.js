@@ -1,4 +1,5 @@
-import admin from "firebase-admin";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,11 +17,10 @@ const serviceAccount = JSON.parse(
     readFileSync(serviceAccountPath, "utf8")
 );
 
-if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-    });
-}
+const firebaseApp = getApps().length
+    ? getApp()
+    : initializeApp({
+          credential: cert(serviceAccount),
+      });
 
-export const firebaseAuth = admin.auth();
-export default admin;
+export const firebaseAuth = getAuth(firebaseApp);
