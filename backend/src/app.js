@@ -23,6 +23,7 @@ import savedPropertyRoutes from "./routes/savedProperty.routes.js";
 import renterPreferenceRoutes from "./routes/renterPreference.routes.js";
 import propertyMatchingRoutes from "./routes/propertyMatching.routes.js";
 import propertyDetailRoutes from "./routes/propertyDetail.routes.js";
+import propertyTrustRoutes from "./routes/propertyTrust.routes.js";
 import listingConsistencyRoutes from "./routes/listingConsistency.routes.js";
 import evidenceGraphRoutes from "./routes/evidenceGraph.routes.js";
 import adminDashboardRoutes from "./routes/adminDashboard.routes.js";
@@ -85,6 +86,7 @@ app.get("/api/v1/health", (req, res) => {
 app.use("/api/v1/auth", authLimiter, authRoutes);
 app.use("/api/v1/users", userLimiter, userRoutes);
 app.use("/api/v1/properties", propertyDetailRoutes);
+app.use("/api/v1/property-trust", propertyTrustRoutes);
 app.use("/api/v1/properties", propertyRoutes);
 app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/viewings", viewingRoutes);
