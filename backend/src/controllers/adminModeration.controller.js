@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 import PropertyReport from "../models/PropertyReport.js";
 import ListingWarning from "../models/ListingWarning.js";
+import { recordAdminAction } from "../services/adminAudit.service.js";
 
 const isValidObjectId = (id) => mongoose.isValidObjectId(id);
 
@@ -45,6 +46,16 @@ export const updateReportStatus = async (req, res, next) => {
                 message: "Report not found.",
             });
         }
+
+        await recordAdminAction({
+            req,
+            action: "report_status_updated",
+            targetType: "property_report",
+            targetId: report._id,
+            details: {
+                newStatus: report.status,
+            },
+        });
 
         return res.status(200).json({
             success: true,
@@ -95,6 +106,16 @@ export const updateWarningStatus = async (req, res, next) => {
                 message: "Listing warning not found.",
             });
         }
+
+        await recordAdminAction({
+            req,
+            action: "listing_warning_status_updated",
+            targetType: "listing_warning",
+            targetId: warning._id,
+            details: {
+                newStatus: warning.status,
+            },
+        });
 
         return res.status(200).json({
             success: true,

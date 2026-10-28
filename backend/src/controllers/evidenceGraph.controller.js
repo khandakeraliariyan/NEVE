@@ -7,6 +7,7 @@ import {
     findManageableProperty,
     attachEvidenceToClaim,
 } from "../services/evidenceGraph.service.js";
+import { recordAdminAction } from "../services/adminAudit.service.js";
 
 const getUserId = (req) => req.user?._id || req.user?.id;
 
@@ -236,6 +237,17 @@ export const reviewPropertyClaim = async (req, res) => {
         if (!claim) {
             return res.status(404).json({ message: "Claim not found." });
         }
+
+        await recordAdminAction({
+            req,
+            action: "property_claim_reviewed",
+            targetType: "property_claim",
+            targetId: claim._id,
+            details: {
+                newStatus: claim.status,
+                reviewedAt: claim.reviewedAt,
+            },
+        });
 
         return res.json({
             message: "Claim review updated.",
