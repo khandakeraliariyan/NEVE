@@ -7,6 +7,7 @@ import userRoutes from "./routes/user.routes.js";
 import propertyRoutes from "./routes/property.routes.js";
 import inquiryRoutes from "./routes/inquiry.routes.js";
 import viewingRoutes from "./routes/viewing.routes.js";
+import matchingRoutes from "./routes/matching.routes.js";
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/properties", propertyRoutes);
 app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/viewings", viewingRoutes);
+app.use("/api/v1/matching", matchingRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
