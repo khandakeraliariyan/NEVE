@@ -19,6 +19,8 @@ import propertyImageRoutes from "./routes/propertyImage.routes.js";
 import nearbyPlacesRoutes from "./routes/nearbyPlaces.routes.js";
 import rentalCostRoutes from "./routes/rentalCost.routes.js";
 import fileUploadRoutes from "./routes/fileUpload.routes.js";
+import savedPropertyRoutes from "./routes/savedProperty.routes.js";
+import renterPreferenceRoutes from "./routes/renterPreference.routes.js";
 
 const app = express();
 
@@ -54,7 +56,7 @@ app.use("/api/v1", apiLimiter);
 app.use(
     cors({
         origin: process.env.CLIENT_URL || "http://localhost:3000",
-        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
     })
 );
@@ -86,6 +88,8 @@ app.use("/api/v1/property-images", propertyImageRoutes);
 app.use("/api/v1/nearby-places", nearbyPlacesRoutes);
 app.use("/api/v1/rental-costs", rentalCostRoutes);
 app.use("/api/v1/uploads", uploadLimiter, fileUploadRoutes);
+app.use("/api/v1/saved-properties", savedPropertyRoutes);
+app.use("/api/v1/renter-preferences", renterPreferenceRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
