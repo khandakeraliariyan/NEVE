@@ -19,6 +19,11 @@ const {
     respondToViewingRequest,
 } = require("../controllers/landlordViewing.controller.js");
 
+const {
+    getMyViewingRequests: getDedicatedMyViewingRequests,
+    cancelMyViewingRequest: cancelDedicatedMyViewingRequest,
+} = require("../controllers/renterViewing.controller.js");
+
 const router = Router();
 
 // Renter routes
@@ -41,6 +46,20 @@ router.patch(
     authenticateUser,
     allowRoles("renter"),
     cancelMyViewingRequest
+);
+
+router.get(
+    "/my-requests",
+    authenticateUser,
+    allowRoles("renter"),
+    getDedicatedMyViewingRequests
+);
+
+router.patch(
+    "/:viewingId/cancel",
+    authenticateUser,
+    allowRoles("renter"),
+    cancelDedicatedMyViewingRequest
 );
 
 // Landlord routes
