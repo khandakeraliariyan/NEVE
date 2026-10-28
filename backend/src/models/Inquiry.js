@@ -33,19 +33,23 @@ const inquirySchema = new mongoose.Schema(
         status: {
             type: String,
             enum: [
+                "pending",
+                "accepted",
+                "declined",
                 "submitted",
                 "acknowledged",
                 "responded",
                 "closed",
             ],
-            default: "submitted",
+            default: "pending",
             index: true,
         },
 
         landlordResponse: {
             type: String,
-            default: null,
-            maxlength: 2000,
+            trim: true,
+            maxlength: 1000,
+            default: "",
         },
 
         respondedAt: {
