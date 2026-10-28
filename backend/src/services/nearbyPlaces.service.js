@@ -1,8 +1,7 @@
 import NearbyPlaceCache from "../models/NearbyPlaceCache.js";
+import { env } from "../config/env.js";
 
-const OVERPASS_URL =
-    process.env.OVERPASS_URL ||
-    "https://overpass-api.de/api/interpreter";
+const OVERPASS_URL = env.OVERPASS_API_URL;
 
 const CACHE_HOURS = 24;
 

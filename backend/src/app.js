@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { env } from "./config/env.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -65,7 +66,7 @@ app.use("/api/v1", apiLimiter);
 
 app.use(
     cors({
-        origin: process.env.CLIENT_URL,
+        origin: env.CLIENT_URL,
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
