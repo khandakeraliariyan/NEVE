@@ -5,6 +5,8 @@ import helmet from "helmet";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import propertyRoutes from "./routes/property.routes.js";
+import inquiryRoutes from "./routes/inquiry.routes.js";
+import viewingRoutes from "./routes/viewing.routes.js";
 
 const app = express();
 
@@ -32,6 +34,8 @@ app.get("/api/v1/health", (req, res) => {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/properties", propertyRoutes);
+app.use("/api/v1/inquiries", inquiryRoutes);
+app.use("/api/v1/viewings", viewingRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
