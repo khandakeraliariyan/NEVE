@@ -5,6 +5,7 @@ import {
     searchProperties,
     getMyProperties,
     getPropertyById,
+    getPropertyDetail,
     updateProperty,
     updatePropertyStatus,
 } from "../controllers/property.controller.js";
@@ -32,6 +33,7 @@ router.get(
 router.get("/:id/costs", getRentalCost);
 router.get("/:id/nearby", getNearbyPlaces);
 router.get("/:id/neighborhood-insights", getNeighborhoodInsights);
+router.get("/:id/detail", getPropertyDetail);
 router.get("/:id", getPropertyById);
 
 router.post("/compare", compareProperties);

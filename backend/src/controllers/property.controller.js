@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
+import { calculateRentalCost } from "../services/rentalCost.service.js";
 
 const editableFields = [
     "title",
@@ -223,6 +224,132 @@ export async function getMyProperties(req, res, next) {
             success: true,
             count: properties.length,
             properties,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/properties/:id/detail
+export async function getPropertyDetail(req, res, next) {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "A valid property ID is required",
+            });
+        }
+
+        const property = await Property.findOne({
+            _id: id,
+            status: "published",
+        }).select("-landlord -houseRules");
+
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Property not found or not publicly available",
+            });
+        }
+
+        const pricing = property.pricing.toObject();
+        const costBreakdown = calculateRentalCost(pricing);
+        const coordinates = property.address.location?.coordinates;
+        const validCoordinates =
+            Array.isArray(coordinates) &&
+            coordinates.length === 2 &&
+            coordinates.every(Number.isFinite);
+        const utilitiesEstimateAvailable =
+            pricing.estimatedMonthlyUtilities !== null &&
+            pricing.estimatedMonthlyUtilities !== undefined;
+
+        const missingInformation = [];
+        if (!utilitiesEstimateAvailable) {
+            missingInformation.push("estimated_utilities");
+        }
+        if (!property.availabilityDate) {
+            missingInformation.push("availability_date");
+        }
+        if (!property.description?.trim()) {
+            missingInformation.push("description");
+        }
+        if (!validCoordinates) {
+            missingInformation.push("coordinates");
+        }
+        if (!Array.isArray(property.amenities) || property.amenities.length === 0) {
+            missingInformation.push("amenities");
+        }
+
+        const completenessFields = [
+            Boolean(property.description?.trim()),
+            utilitiesEstimateAvailable,
+            Boolean(property.availabilityDate),
+            validCoordinates,
+            Array.isArray(property.amenities) && property.amenities.length > 0,
+        ];
+        const completeness = Math.round(
+            (completenessFields.filter(Boolean).length /
+                completenessFields.length) *
+                100
+        );
+
+        const [longitude, latitude] = validCoordinates
+            ? coordinates
+            : [undefined, undefined];
+
+        return res.status(200).json({
+            property: {
+                id: property._id,
+                title: property.title,
+                description: property.description,
+                propertyType: property.propertyType,
+                address: property.address.area
+                    ? {
+                        area: property.address.area,
+                        city: property.address.city,
+                        country: property.address.country,
+                    }
+                    : property.address,
+                areaSqft: property.areaSqft,
+                latitude,
+                longitude,
+                bedrooms: property.bedrooms,
+                bathrooms: property.bathrooms,
+                floor: property.floor,
+                furnishing: property.furnishing,
+                amenities: property.amenities,
+                images: property.images,
+                createdAt: property.createdAt,
+                updatedAt: property.updatedAt,
+            },
+            listings: [
+                {
+                    id: property._id,
+                    rentAmount: pricing.monthlyRent,
+                    currency: costBreakdown.currency,
+                    depositAmount: pricing.securityDeposit ?? null,
+                    advanceRent: pricing.advanceRent ?? null,
+                    serviceCharge: pricing.monthlyServiceCharge ?? null,
+                    estimatedUtilities: utilitiesEstimateAvailable
+                        ? pricing.estimatedMonthlyUtilities
+                        : null,
+                    utilitiesEstimateAvailable,
+                    monthlyTotal: costBreakdown.recurringMonthly.knownSubtotal,
+                    costBreakdown,
+                    availabilityDate: property.availabilityDate,
+                    leaseDurationMonths: property.leaseDurationMonths,
+                    reliability: {
+                        completeness,
+                        missingInformation,
+                        note: "Completeness measures the availability of listing information. It does not verify the truth or accuracy of the claims.",
+                    },
+                    createdAt: property.createdAt,
+                    updatedAt: property.updatedAt,
+                },
+            ],
+            listingCount: 1,
         });
     } catch (error) {
         next(error);
