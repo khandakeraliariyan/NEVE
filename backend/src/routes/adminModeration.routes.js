@@ -4,6 +4,8 @@ import express from "express";
 import {
     updateReportStatus,
     updateWarningStatus,
+    updateWarningPublicSummary,
+    updateClaimPublicSummary,
 } from "../controllers/adminModeration.controller.js";
 
 import {
@@ -21,7 +23,15 @@ router.use(allowRoles("admin"));
 router.patch("/reports/:reportId/status", updateReportStatus);
 
 router.patch("/warnings/:warningId/status", updateWarningStatus);
+router.patch(
+    "/warnings/:warningId/public-visibility",
+    updateWarningPublicSummary
+);
 
 router.patch("/claims/:claimId/review", reviewPropertyClaim);
+router.patch(
+    "/claims/:claimId/public-visibility",
+    updateClaimPublicSummary
+);
 
 export default router;

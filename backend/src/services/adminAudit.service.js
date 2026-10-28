@@ -8,7 +8,7 @@ export const recordAdminAction = async ({
     targetId,
     details = {},
 }) => {
-    const actorId = req.user?._id ?? req.user?.id;
+    const actorId = req.neveUser?._id ?? req.user?._id ?? req.user?.id;
 
     if (!actorId) {
         throw new Error("Authenticated admin ID is missing.");

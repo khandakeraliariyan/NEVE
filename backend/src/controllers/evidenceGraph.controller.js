@@ -9,7 +9,8 @@ import {
 } from "../services/evidenceGraph.service.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
 
-const getUserId = (req) => req.user?._id || req.user?.id;
+const getUserId = (req) =>
+    req.neveUser?._id ?? req.user?._id ?? req.user?.id;
 
 export const createPropertyClaim = async (req, res) => {
     try {
@@ -229,6 +230,8 @@ export const reviewPropertyClaim = async (req, res) => {
                     reviewNote: reviewNote.trim(),
                     reviewedBy: getUserId(req),
                     reviewedAt: new Date(),
+                    publiclyVisible: false,
+                    publicSummary: null,
                 },
             },
             { new: true, runValidators: true }

@@ -7,7 +7,8 @@ import {
     detectListingInconsistencies,
 } from "../services/listingConsistency.service.js";
 
-const getUserId = (req) => req.user?._id || req.user?.id;
+const getUserId = (req) =>
+    req.neveUser?._id ?? req.user?._id ?? req.user?.id;
 
 export const reviewListingConsistency = async (req, res) => {
     try {

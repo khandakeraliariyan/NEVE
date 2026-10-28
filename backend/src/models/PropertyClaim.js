@@ -59,6 +59,18 @@ const propertyClaimSchema = new mongoose.Schema(
             maxlength: 1000,
         },
 
+        publicSummary: {
+            type: String,
+            trim: true,
+            maxlength: 500,
+            default: null,
+        },
+
+        publiclyVisible: {
+            type: Boolean,
+            default: false,
+        },
+
         reviewedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
