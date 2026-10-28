@@ -2,7 +2,7 @@ import { Router } from "express";
 
 import {
     createProperty,
-    searchProperties,
+    getProperties,
     getMyProperties,
     getPropertyById,
     getPropertyDetail,
@@ -20,7 +20,7 @@ import { allowRoles } from "../middleware/role.middleware.js";
 const router = Router();
 
 // Public routes
-router.get("/", searchProperties);
+router.get("/", getProperties);
 
 // Keep this route before /:id
 router.get(

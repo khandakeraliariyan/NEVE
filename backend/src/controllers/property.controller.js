@@ -26,12 +26,42 @@ function pickFields(source, allowedFields) {
     );
 }
 
-function parseNonNegativeNumber(value) {
-    if (value === undefined || value === "") return null;
+const PROPERTY_TYPES = [
+    "apartment",
+    "house",
+    "room",
+    "shared_accommodation",
+];
 
-    const number = Number(value);
+const FURNISHING_TYPES = [
+    "furnished",
+    "semi_furnished",
+    "unfurnished",
+];
 
-    return Number.isFinite(number) && number >= 0 ? number : null;
+const SORT_OPTIONS = {
+    rent_asc: { "pricing.monthlyRent": 1 },
+    rent_desc: { "pricing.monthlyRent": -1 },
+    newest: { createdAt: -1 },
+    oldest: { createdAt: 1 },
+};
+
+function escapeRegex(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseOptionalNumber(value) {
+    if (value === undefined) return undefined;
+
+    if (
+        value === "" ||
+        !Number.isFinite(Number(value)) ||
+        Number(value) < 0
+    ) {
+        return null;
+    }
+
+    return Number(value);
 }
 
 // POST /api/v1/properties
@@ -64,19 +94,74 @@ export async function createProperty(req, res, next) {
 }
 
 // GET /api/v1/properties
-export async function searchProperties(req, res, next) {
+export async function getProperties(req, res, next) {
     try {
         const {
             city,
             area,
-            propertyType,
-            furnishing,
             minRent,
             maxRent,
             bedrooms,
+            propertyType,
+            furnishing,
+            q,
+            sort = "newest",
             page = "1",
-            limit = "12",
+            limit = "10",
         } = req.query;
+
+        const parsedMinRent = parseOptionalNumber(minRent);
+        const parsedMaxRent = parseOptionalNumber(maxRent);
+        const parsedBedrooms = parseOptionalNumber(bedrooms);
+
+        if (
+            parsedMinRent === null ||
+            parsedMaxRent === null ||
+            parsedBedrooms === null
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Rent and bedroom filters must be valid non-negative numbers.",
+            });
+        }
+
+        if (
+            parsedBedrooms !== undefined &&
+            (!Number.isInteger(parsedBedrooms) || parsedBedrooms > 100)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Bedrooms must be an integer between 0 and 100.",
+            });
+        }
+
+        if (
+            parsedMinRent !== undefined &&
+            parsedMaxRent !== undefined &&
+            parsedMinRent > parsedMaxRent
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "minRent cannot exceed maxRent.",
+            });
+        }
+
+        if (propertyType && !PROPERTY_TYPES.includes(propertyType)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid propertyType.",
+                allowedValues: PROPERTY_TYPES,
+            });
+        }
+
+        if (furnishing && !FURNISHING_TYPES.includes(furnishing)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid furnishing.",
+                allowedValues: FURNISHING_TYPES,
+            });
+        }
 
         const pageNumber = Number(page);
         const pageSize = Number(limit);
@@ -90,107 +175,90 @@ export async function searchProperties(req, res, next) {
         ) {
             return res.status(400).json({
                 success: false,
-                message: "Page must be positive and limit must be between 1 and 50",
+                message:
+                    "page must be >= 1; limit must be an integer from 1 to 50.",
+            });
+        }
+
+        if (sort && !SORT_OPTIONS[sort]) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid sort option.",
+                allowedValues: Object.keys(SORT_OPTIONS),
+            });
+        }
+
+        if (
+            q !== undefined &&
+            (typeof q !== "string" || q.trim().length > 100)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Search text must be at most 100 characters.",
             });
         }
 
         const filter = { status: "published" };
 
-        if (city) {
+        if (city?.trim()) {
             filter["address.city"] = {
-                $regex: String(city).slice(0, 100),
+                $regex: `^${escapeRegex(city.trim())}$`,
                 $options: "i",
             };
         }
 
-        if (area) {
+        if (area?.trim()) {
             filter["address.area"] = {
-                $regex: String(area).slice(0, 100),
+                $regex: `^${escapeRegex(area.trim())}$`,
                 $options: "i",
             };
         }
 
         if (propertyType) {
-            const allowed = [
-                "apartment",
-                "house",
-                "room",
-                "shared_accommodation",
-            ];
-
-            if (!allowed.includes(propertyType)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid property type",
-                });
-            }
-
             filter.propertyType = propertyType;
         }
 
         if (furnishing) {
-            const allowed = [
-                "furnished",
-                "semi_furnished",
-                "unfurnished",
-            ];
-
-            if (!allowed.includes(furnishing)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid furnishing type",
-                });
-            }
-
             filter.furnishing = furnishing;
         }
 
-        if (bedrooms !== undefined) {
-            const count = Number(bedrooms);
-
-            if (!Number.isInteger(count) || count < 0 || count > 100) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid bedroom count",
-                });
-            }
-
-            filter.bedrooms = count;
+        if (parsedBedrooms !== undefined) {
+            filter.bedrooms = { $gte: parsedBedrooms };
         }
 
-        if (minRent !== undefined || maxRent !== undefined) {
-            const minimum = parseNonNegativeNumber(minRent);
-            const maximum = parseNonNegativeNumber(maxRent);
-
-            if (
-                (minRent !== undefined && minimum === null) ||
-                (maxRent !== undefined && maximum === null) ||
-                (minimum !== null &&
-                    maximum !== null &&
-                    minimum > maximum)
-            ) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid rent range",
-                });
-            }
-
+        if (
+            parsedMinRent !== undefined ||
+            parsedMaxRent !== undefined
+        ) {
             filter["pricing.monthlyRent"] = {};
 
-            if (minimum !== null) {
-                filter["pricing.monthlyRent"].$gte = minimum;
+            if (parsedMinRent !== undefined) {
+                filter["pricing.monthlyRent"].$gte = parsedMinRent;
             }
 
-            if (maximum !== null) {
-                filter["pricing.monthlyRent"].$lte = maximum;
+            if (parsedMaxRent !== undefined) {
+                filter["pricing.monthlyRent"].$lte = parsedMaxRent;
             }
         }
+
+        if (q?.trim()) {
+            const searchPattern = new RegExp(escapeRegex(q.trim()), "i");
+
+            filter.$or = [
+                { title: searchPattern },
+                { description: searchPattern },
+                { "address.area": searchPattern },
+                { "address.city": searchPattern },
+            ];
+        }
+
+        const skip = (pageNumber - 1) * pageSize;
 
         const [properties, total] = await Promise.all([
             Property.find(filter)
                 .populate("landlord", "displayName photoURL")
-                .sort({ createdAt: -1 })
-                .skip((pageNumber - 1) * pageSize)
+                .sort(SORT_OPTIONS[sort])
+                .skip(skip)
                 .limit(pageSize)
                 .lean(),
 
@@ -199,12 +267,14 @@ export async function searchProperties(req, res, next) {
 
         return res.status(200).json({
             success: true,
-            results: properties.length,
+            count: properties.length,
             pagination: {
                 page: pageNumber,
                 limit: pageSize,
                 total,
                 totalPages: Math.ceil(total / pageSize),
+                hasNextPage: pageNumber * pageSize < total,
+                hasPreviousPage: pageNumber > 1,
             },
             properties,
         });
