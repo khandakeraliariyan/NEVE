@@ -30,13 +30,13 @@ router.get(
     getMyProperties
 );
 
+router.post("/compare", compareProperties);
+
 router.get("/:id/costs", getRentalCost);
 router.get("/:id/nearby", getNearbyPlaces);
 router.get("/:id/neighborhood-insights", getNeighborhoodInsights);
 router.get("/:id/detail", getPropertyDetail);
 router.get("/:id", getPropertyById);
-
-router.post("/compare", compareProperties);
 
 // Authenticated landlord/property-manager routes
 router.post(
