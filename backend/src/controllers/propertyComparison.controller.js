@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
+import NearbyPlaceCache from "../models/NearbyPlaceCache.js";
 import { buildPropertyComparison } from "../services/propertyComparison.service.js";
 
 export async function compareProperties(req, res, next) {
@@ -66,11 +67,38 @@ export async function compareProperties(req, res, next) {
         }
 
         const comparison = buildPropertyComparison(orderedProperties);
+        const nearbyCaches = await NearbyPlaceCache.find({
+            property: { $in: uniqueIds },
+        }).lean();
+        const nearbyCacheByProperty = new Map(
+            nearbyCaches.map((cache) => [String(cache.property), cache])
+        );
+
+        const comparisonWithNearbyPlaces = comparison.map((property) => {
+            const cache = nearbyCacheByProperty.get(String(property.id));
+            const places = cache?.places ?? [];
+            const countNearby = (category) =>
+                places.filter((place) => place.category === category).length;
+
+            return {
+                ...property,
+                nearbyPlaces: {
+                    school: countNearby("school"),
+                    hospital: countNearby("hospital"),
+                    transport: countNearby("transport"),
+                    supermarket: countNearby("supermarket"),
+                    park: countNearby("park"),
+                    cacheAvailable: Boolean(cache),
+                    fetchedAt: cache?.fetchedAt ?? null,
+                },
+            };
+        });
 
         return res.status(200).json({
             success: true,
-            count: comparison.length,
-            comparison,
+            count: comparisonWithNearbyPlaces.length,
+            comparison: comparisonWithNearbyPlaces,
+            note: "Nearby counts use cached map data and may be incomplete or outdated. Null costs indicate missing data.",
             notes: [
                 "Upfront costs include the security deposit, advance rent, and one-time fees.",
                 "An unknown upfront fee makes the total unknown.",
