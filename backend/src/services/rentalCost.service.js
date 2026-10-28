@@ -1,122 +1,85 @@
+function validAmount(value) {
+    return (
+        typeof value === "number" &&
+        Number.isFinite(value) &&
+        value >= 0
+    );
+}
+
+function sumKnown(values) {
+    return values.reduce(
+        (total, value) => total + (validAmount(value) ? value : 0),
+        0
+    );
+}
+
 export function calculateRentalCost(pricing) {
     const {
-        monthlyRent,
-        securityDeposit = 0,
-        advanceRent = 0,
-        oneTimeFees = 0,
-        monthlyServiceCharge = 0,
-        estimatedMonthlyUtilities = null,
-    } = pricing;
-
-    // Monthly rent is required. Other disclosed charges must be valid.
-    const requiredValues = {
         monthlyRent,
         securityDeposit,
         advanceRent,
         oneTimeFees,
         monthlyServiceCharge,
-    };
+        estimatedMonthlyUtilities,
+    } = pricing;
 
-    for (const [field, value] of Object.entries(requiredValues)) {
-        if (
-            typeof value !== "number" ||
-            !Number.isFinite(value) ||
-            value < 0
-        ) {
-            throw new Error(`Invalid pricing value: ${field}`);
-        }
+    if (!validAmount(monthlyRent) || monthlyRent === 0) {
+        throw new Error("A valid monthly rent is required");
     }
 
-    if (
-        estimatedMonthlyUtilities !== null &&
-        (typeof estimatedMonthlyUtilities !== "number" ||
-            !Number.isFinite(estimatedMonthlyUtilities) ||
-            estimatedMonthlyUtilities < 0)
-    ) {
-        throw new Error("Invalid pricing value: estimatedMonthlyUtilities");
-    }
+    const upfrontItems = [
+        { name: "First month's rent", amount: monthlyRent, source: "landlord_provided" },
+        { name: "Security deposit", amount: securityDeposit, source: securityDeposit === null ? "unknown" : "landlord_provided" },
+        { name: "Advance rent", amount: advanceRent, source: advanceRent === null ? "unknown" : "landlord_provided" },
+        { name: "One-time fees", amount: oneTimeFees, source: oneTimeFees === null ? "unknown" : "landlord_provided" },
+    ];
 
-    const upfrontTotal =
-        monthlyRent +
-        securityDeposit +
-        advanceRent +
-        oneTimeFees;
+    const monthlyItems = [
+        { name: "Monthly rent", amount: monthlyRent, source: "landlord_provided" },
+        { name: "Monthly service charge", amount: monthlyServiceCharge, source: monthlyServiceCharge === null ? "unknown" : "landlord_provided" },
+        { name: "Estimated monthly utilities", amount: estimatedMonthlyUtilities, source: estimatedMonthlyUtilities === null ? "unknown" : "estimated" },
+    ];
 
-    const knownMonthlySubtotal =
-        monthlyRent + monthlyServiceCharge;
+    const upfrontComplete = upfrontItems.every(
+        (item) => item.amount !== null && validAmount(item.amount)
+    );
 
-    const monthlyCostComplete = estimatedMonthlyUtilities !== null;
+    const monthlyComplete = monthlyItems.every(
+        (item) => item.amount !== null && validAmount(item.amount)
+    );
 
-    const estimatedMonthlyTotal = monthlyCostComplete
-        ? knownMonthlySubtotal + estimatedMonthlyUtilities
-        : null;
+    const upfrontKnownSubtotal = sumKnown(
+        upfrontItems.map((item) => item.amount)
+    );
+
+    const monthlyKnownSubtotal = sumKnown(
+        monthlyItems.map((item) => item.amount)
+    );
 
     return {
         currency: "BDT",
 
         upfront: {
-            items: [
-                {
-                    name: "First month's rent",
-                    amount: monthlyRent,
-                    source: "landlord_provided",
-                },
-                {
-                    name: "Security deposit",
-                    amount: securityDeposit,
-                    source: "landlord_provided",
-                },
-                {
-                    name: "Advance rent",
-                    amount: advanceRent,
-                    source: "landlord_provided",
-                },
-                {
-                    name: "One-time fees",
-                    amount: oneTimeFees,
-                    source: "landlord_provided",
-                },
-            ],
-
-            total: upfrontTotal,
-            classification: "calculated",
-            assumption:
-                "Includes the first month's rent and the full stated advance rent and deposit. Confirm the actual payment schedule with the landlord.",
+            items: upfrontItems,
+            knownSubtotal: upfrontKnownSubtotal,
+            total: upfrontComplete ? upfrontKnownSubtotal : null,
+            complete: upfrontComplete,
+            classification: upfrontComplete ? "calculated" : "incomplete",
         },
 
         recurringMonthly: {
-            items: [
-                {
-                    name: "Monthly rent",
-                    amount: monthlyRent,
-                    source: "landlord_provided",
-                },
-                {
-                    name: "Monthly service charge",
-                    amount: monthlyServiceCharge,
-                    source: "landlord_provided",
-                },
-                {
-                    name: "Estimated monthly utilities",
-                    amount: estimatedMonthlyUtilities,
-                    source:
-                        estimatedMonthlyUtilities === null
-                            ? "unknown"
-                            : "estimated",
-                },
-            ],
-
-            knownSubtotal: knownMonthlySubtotal,
-            total: estimatedMonthlyTotal,
-            classification: monthlyCostComplete
-                ? "estimated"
-                : "incomplete",
-
-            complete: monthlyCostComplete,
-
-            note: monthlyCostComplete
-                ? "Utilities are estimates, not guaranteed bills."
-                : "Utility costs are unknown, so the total monthly cost is incomplete.",
+            items: monthlyItems,
+            knownSubtotal: monthlyKnownSubtotal,
+            total: monthlyComplete ? monthlyKnownSubtotal : null,
+            complete: monthlyComplete,
+            classification: monthlyComplete ? "estimated" : "incomplete",
         },
+
+        assumptions: [
+            "The first month's rent is included in the upfront calculation.",
+            "The full stated deposit, advance rent, and one-time fees are assumed payable upfront.",
+            "Estimated utilities are not guaranteed bills.",
+            "Unknown charges are not treated as zero.",
+        ],
     };
 }

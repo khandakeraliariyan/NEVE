@@ -121,25 +121,25 @@ const propertySchema = new mongoose.Schema(
 
             securityDeposit: {
                 type: Number,
-                default: 0,
+                default: null,
                 min: 0,
             },
 
             advanceRent: {
                 type: Number,
-                default: 0,
+                default: null,
                 min: 0,
             },
 
             oneTimeFees: {
                 type: Number,
-                default: 0,
+                default: null,
                 min: 0,
             },
 
             monthlyServiceCharge: {
                 type: Number,
-                default: 0,
+                default: null,
                 min: 0,
             },
 
