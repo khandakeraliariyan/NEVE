@@ -1,0 +1,27 @@
+
+import express from "express";
+
+import {
+    updateReportStatus,
+    updateWarningStatus,
+} from "../controllers/adminModeration.controller.js";
+
+import {
+    reviewPropertyClaim,
+} from "../controllers/evidenceGraph.controller.js";
+
+import { authenticateUser } from "../middleware/auth.middleware.js";
+import { allowRoles } from "../middleware/role.middleware.js";
+
+const router = express.Router();
+
+router.use(authenticateUser);
+router.use(allowRoles("admin"));
+
+router.patch("/reports/:reportId/status", updateReportStatus);
+
+router.patch("/warnings/:warningId/status", updateWarningStatus);
+
+router.patch("/claims/:claimId/review", reviewPropertyClaim);
+
+export default router;

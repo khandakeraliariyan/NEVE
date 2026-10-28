@@ -26,6 +26,7 @@ import propertyDetailRoutes from "./routes/propertyDetail.routes.js";
 import listingConsistencyRoutes from "./routes/listingConsistency.routes.js";
 import evidenceGraphRoutes from "./routes/evidenceGraph.routes.js";
 import adminDashboardRoutes from "./routes/adminDashboard.routes.js";
+import adminModerationRoutes from "./routes/adminModeration.routes.js";
 
 const app = express();
 
@@ -100,6 +101,7 @@ app.use("/api/v1/recommendations", propertyMatchingRoutes);
 app.use("/api/v1/listing-consistency", listingConsistencyRoutes);
 app.use("/api/v1/evidence-graph", evidenceGraphRoutes);
 app.use("/api/v1/admin/dashboard", adminDashboardRoutes);
+app.use("/api/v1/admin/moderation", adminModerationRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
