@@ -30,6 +30,7 @@ import evidenceGraphRoutes from "./routes/evidenceGraph.routes.js";
 import adminDashboardRoutes from "./routes/adminDashboard.routes.js";
 import adminModerationRoutes from "./routes/adminModeration.routes.js";
 import adminAuditRoutes from "./routes/adminAudit.routes.js";
+import adminTrustApprovalRoutes from "./routes/adminTrustApproval.routes.js";
 
 const app = express();
 
@@ -110,6 +111,7 @@ app.use("/api/v1/evidence-graph", evidenceGraphRoutes);
 app.use("/api/v1/admin/dashboard", adminDashboardRoutes);
 app.use("/api/v1/admin/moderation", adminModerationRoutes);
 app.use("/api/v1/admin/audit-logs", adminAuditRoutes);
+app.use("/api/v1/admin/trust-approval", adminTrustApprovalRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {
@@ -129,8 +131,8 @@ app.use((error, req, res, next) => {
 
     const statusCode =
         Number.isInteger(error.status) &&
-        error.status >= 400 &&
-        error.status < 600
+            error.status >= 400 &&
+            error.status < 600
             ? error.status
             : 500;
 
