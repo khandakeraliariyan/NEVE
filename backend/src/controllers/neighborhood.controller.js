@@ -1,17 +1,11 @@
 
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
-import { findNearbyPlaces } from "../services/neighborhood.service.js";
-
-const ALLOWED_CATEGORIES = new Set([
-    "healthcare",
-    "education",
-    "groceries",
-    "transport",
-    "banking",
-    "recreation",
-    "food"
-]);
+import {
+    findNearbyPlaces,
+    getPropertyCoordinates,
+    NEIGHBORHOOD_CATEGORIES,
+} from "../services/neighborhood.service.js";
 
 export async function getNearbyPlaces(req, res, next) {
     try {
@@ -24,35 +18,22 @@ export async function getNearbyPlaces(req, res, next) {
             });
         }
 
-        const radius = Number(req.query.radius ?? 5000);
-
-        if (
-            !Number.isInteger(radius) ||
-            radius < 100 ||
-            radius > 5000
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Radius must be an integer between 100 and 5000 meters."
-            });
-        }
-
         const category = req.query.category
             ? String(req.query.category).toLowerCase()
             : undefined;
 
-        if (category && !ALLOWED_CATEGORIES.has(category)) {
+        if (category && !NEIGHBORHOOD_CATEGORIES.includes(category)) {
             return res.status(400).json({
                 success: false,
                 message: "Unsupported category.",
-                allowedCategories: [...ALLOWED_CATEGORIES]
+                allowedCategories: NEIGHBORHOOD_CATEGORIES,
             });
         }
 
         const property = await Property.findOne({
             _id: id,
             status: "published"
-        }).select("title address.location");
+        }).select("title address.location location");
 
         if (!property) {
             return res.status(404).json({
@@ -61,29 +42,19 @@ export async function getNearbyPlaces(req, res, next) {
             });
         }
 
-        const location = property.address?.location;
-        const coordinates = location?.coordinates;
-
-        if (
-            location?.type !== "Point" ||
-            !Array.isArray(coordinates) ||
-            coordinates.length !== 2 ||
-            !coordinates.every(Number.isFinite)
-        ) {
+        const coordinates = getPropertyCoordinates(property);
+        if (!coordinates) {
             return res.status(422).json({
                 success: false,
                 message: "This property does not have valid map coordinates."
             });
         }
 
-        // GeoJSON coordinates are [longitude, latitude].
-        const [longitude, latitude] = coordinates;
-
         const result = await findNearbyPlaces({
-            latitude,
-            longitude,
-            radius,
-            category
+            ...coordinates,
+            radius: Number(req.query.radius ?? 5000),
+            category,
+            propertyId: property._id,
         });
 
         return res.status(200).json({
@@ -91,8 +62,7 @@ export async function getNearbyPlaces(req, res, next) {
             property: {
                 id: property._id,
                 title: property.title,
-                latitude,
-                longitude
+                ...coordinates,
             },
             ...result,
             distanceNote:

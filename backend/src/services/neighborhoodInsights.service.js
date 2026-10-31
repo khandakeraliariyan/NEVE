@@ -7,7 +7,6 @@ const CATEGORY_LABELS = {
     banking: "Banks and ATMs",
     recreation: "Parks and recreation",
     food: "Restaurants and cafes",
-    other: "Other places"
 };
 
 export function buildNeighborhoodInsights(places = []) {
@@ -44,11 +43,47 @@ export function buildNeighborhoodInsights(places = []) {
             message: `${item.count} mapped ${item.label.toLowerCase()
                 } place${item.count === 1 ? "" : "s"} found`
         }));
+    const nearestPlacesByCategory = Object.keys(CATEGORY_LABELS).flatMap(
+        (category) => {
+            const nearest = places
+                .filter((place) => place.category === category)
+                .sort((first, second) =>
+                    first.distanceMeters - second.distanceMeters
+                )[0];
+
+            return nearest
+                ? [
+                      {
+                          category,
+                          name: nearest.name,
+                          distanceMeters: nearest.distanceMeters,
+                          distanceKm: nearest.distanceKm,
+                      },
+                  ]
+                : [];
+        }
+    );
+    const nearestPlace = places.reduce(
+        (nearest, place) =>
+            !nearest || place.distanceMeters < nearest.distanceMeters
+                ? place
+                : nearest,
+        null
+    );
 
     return {
         mappedPlacesReturned: places.length,
         categories,
         highlights,
+        nearestPlace: nearestPlace
+            ? {
+                  name: nearestPlace.name,
+                  category: nearestPlace.category,
+                  distanceMeters: nearestPlace.distanceMeters,
+                  distanceKm: nearestPlace.distanceKm,
+              }
+            : null,
+        nearestPlacesByCategory,
         summary:
             places.length === 0
                 ? "No nearby places were returned by the map data provider. This does not confirm that the area has no facilities."

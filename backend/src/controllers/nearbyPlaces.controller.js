@@ -1,58 +1,71 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
-import { getNearbyPlaces } from "../services/nearbyPlaces.service.js";
+import {
+    findNearbyPlaces,
+    getPropertyCoordinates,
+} from "../services/neighborhood.service.js";
 
-export const getPropertyNearbyPlaces = async (req, res) => {
+export const getPropertyNearbyPlaces = async (req, res, next) => {
     try {
         const { propertyId } = req.params;
 
         if (!mongoose.isValidObjectId(propertyId)) {
-            return res.status(400).json({ message: "Invalid property ID." });
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID.",
+            });
         }
 
         const property = await Property.findById(propertyId)
-            .select("location status")
+            .select("title address.location location status")
             .lean();
 
         if (!property) {
-            return res.status(404).json({ message: "Property not found." });
+            return res.status(404).json({
+                success: false,
+                message: "Property not found.",
+            });
         }
 
-        // Adjust this check to match your actual public listing status.
         if (property.status !== "published") {
-            return res.status(404).json({ message: "Property not found." });
+            return res.status(404).json({
+                success: false,
+                message: "Property not found.",
+            });
         }
 
-        const latitude = property.location?.latitude;
-        const longitude = property.location?.longitude;
-
-        if (
-            !Number.isFinite(latitude) ||
-            !Number.isFinite(longitude)
-        ) {
+        const coordinates = getPropertyCoordinates(property);
+        if (!coordinates) {
             return res.status(422).json({
+                success: false,
                 message: "This property does not have valid coordinates yet.",
             });
         }
 
-        const result = await getNearbyPlaces(
-            property._id,
-            latitude,
-            longitude,
-            2000
-        );
-
-        return res.json({
+        const radius = Number(req.query.radius ?? 2000);
+        const category = req.query.category
+            ? String(req.query.category).toLowerCase()
+            : undefined;
+        const result = await findNearbyPlaces({
+            ...coordinates,
             propertyId: property._id,
-            radiusMeters: 2000,
-            attribution: "© OpenStreetMap contributors",
+            radius,
+            category,
+        });
+
+        return res.status(200).json({
+            success: true,
+            propertyId: property._id,
+            property: {
+                id: property._id,
+                title: property.title,
+                ...coordinates,
+            },
             ...result,
+            distanceNote:
+                "Distances are straight-line estimates, not walking or driving distances.",
         });
     } catch (error) {
-        console.error("Nearby places error:", error);
-
-        return res.status(502).json({
-            message: "Nearby places are temporarily unavailable. Please try again later.",
-        });
+        return next(error);
     }
 };

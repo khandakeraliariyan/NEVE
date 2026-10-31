@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 import Property from "../models/Property.js";
 import NearbyPlaceCache from "../models/NearbyPlaceCache.js";
 import { buildPropertyComparison } from "../services/propertyComparison.service.js";
+import {
+    getPropertyCoordinates,
+    isNearbyCacheFresh,
+    normalizeNeighborhoodPlace,
+} from "../services/neighborhood.service.js";
 
 export async function compareProperties(req, res, next) {
     try {
@@ -76,19 +81,33 @@ export async function compareProperties(req, res, next) {
 
         const comparisonWithNearbyPlaces = comparison.map((property) => {
             const cache = nearbyCacheByProperty.get(String(property.id));
-            const places = cache?.places ?? [];
+            const places = (cache?.places ?? []).map(
+                normalizeNeighborhoodPlace
+            );
             const countNearby = (category) =>
                 places.filter((place) => place.category === category).length;
+            const sourceProperty = propertiesById.get(String(property.id));
+            const coordinates = getPropertyCoordinates(sourceProperty);
+            const cacheFresh =
+                coordinates !== null &&
+                isNearbyCacheFresh(cache, {
+                    ...coordinates,
+                    radius: 100,
+                });
 
             return {
                 ...property,
                 nearbyPlaces: {
-                    school: countNearby("school"),
-                    hospital: countNearby("hospital"),
+                    healthcare: countNearby("healthcare"),
+                    education: countNearby("education"),
+                    groceries: countNearby("groceries"),
                     transport: countNearby("transport"),
-                    supermarket: countNearby("supermarket"),
-                    park: countNearby("park"),
+                    banking: countNearby("banking"),
+                    recreation: countNearby("recreation"),
+                    food: countNearby("food"),
                     cacheAvailable: Boolean(cache),
+                    cacheFresh,
+                    radiusMeters: cache?.radiusMeters ?? null,
                     fetchedAt: cache?.fetchedAt ?? null,
                 },
             };

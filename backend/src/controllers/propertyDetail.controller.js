@@ -8,13 +8,20 @@ import PropertyClaim from "../models/PropertyClaim.js";
 
 import { createDownloadUrl } from "../services/fileUpload.service.js";
 import { buildRentalCostSummary } from "../services/propertyIntelligence.service.js";
+import {
+    getPropertyCoordinates,
+    isNearbyCacheFresh,
+    normalizeNeighborhoodPlace,
+} from "../services/neighborhood.service.js";
 
 const NEARBY_CATEGORIES = [
-    "school",
-    "hospital",
+    "healthcare",
+    "education",
+    "groceries",
     "transport",
-    "supermarket",
-    "park",
+    "banking",
+    "recreation",
+    "food",
 ];
 
 function countByCategory(places) {
@@ -100,11 +107,34 @@ export const getPropertyDetails = async (req, res, next) => {
             NearbyPlaceCache.findOne({ property: property._id }).lean(),
         ]);
 
-        const places = nearbyCache?.places || [];
+        const places = (nearbyCache?.places || []).map(
+            normalizeNeighborhoodPlace
+        );
+        const coordinates = getPropertyCoordinates(property);
+        const cacheFresh =
+            coordinates !== null &&
+            isNearbyCacheFresh(nearbyCache, {
+                ...coordinates,
+                radius: 100,
+            });
 
         const nearbyPlaces = {
             available: Boolean(nearbyCache),
+            cacheFresh,
             fetchedAt: nearbyCache?.fetchedAt ?? null,
+            radiusMeters: nearbyCache?.radiusMeters ?? null,
+            cacheCenter:
+                Number.isFinite(nearbyCache?.centerLatitude) &&
+                Number.isFinite(nearbyCache?.centerLongitude)
+                    ? {
+                          latitude: nearbyCache.centerLatitude,
+                          longitude: nearbyCache.centerLongitude,
+                      }
+                    : null,
+            provider: nearbyCache ? "OpenStreetMap" : null,
+            attribution: nearbyCache
+                ? "© OpenStreetMap contributors"
+                : null,
             places,
             counts: countByCategory(places),
         };
@@ -113,27 +143,6 @@ export const getPropertyDetails = async (req, res, next) => {
             property.pricing,
             costRecord
         );
-        const addressCoordinates =
-            property.address?.location?.coordinates;
-        const hasAddressCoordinates =
-            Array.isArray(addressCoordinates) &&
-            addressCoordinates.length === 2 &&
-            addressCoordinates.every(Number.isFinite);
-        const hasLegacyCoordinates =
-            Number.isFinite(property.location?.latitude) &&
-            Number.isFinite(property.location?.longitude);
-        const coordinates = hasAddressCoordinates
-            ? {
-                  longitude: addressCoordinates[0],
-                  latitude: addressCoordinates[1],
-              }
-            : hasLegacyCoordinates
-              ? property.location
-              : null;
-        const hasCoordinates =
-            coordinates !== null &&
-            Number.isFinite(coordinates.longitude) &&
-            Number.isFinite(coordinates.latitude);
 
         return res.status(200).json({
             success: true,
@@ -149,7 +158,7 @@ export const getPropertyDetails = async (req, res, next) => {
                     city: property.address?.city ?? null,
                     country: property.address?.country ?? null,
                 },
-                coordinates: hasCoordinates ? coordinates : null,
+                coordinates,
                 areaSqft: property.areaSqft ?? null,
                 floor: property.floor ?? null,
                 bedrooms: property.bedrooms,

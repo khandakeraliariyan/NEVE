@@ -198,7 +198,7 @@ the feature inventory previously proposed.
 | `/api/v1/duplicate-listings` | `GET /:propertyId/duplicate-check` | Admin-only duplicate check |
 | `/api/v1/uploads` | `POST /presign`, `PATCH /:fileId/complete`, `GET /:fileId/access-url` | Authenticated upload and authorized file access |
 | `/api/v1/property-images` | `GET /:propertyId`, `POST /:propertyId/:fileId/attach`, `DELETE /:propertyId/:fileId` | Public listing media for published properties; authenticated media management |
-| `/api/v1/nearby-places` | `GET /:propertyId` | Nearby-place lookup |
+| `/api/v1/nearby-places` | `GET /:propertyId` | Nearby-place lookup for a published property |
 | `/api/v1/rental-costs` | `GET /:propertyId`, `PUT /:propertyId` | Rental-cost summary and update |
 | `/api/v1/saved-properties` | `GET /`, `POST /:propertyId`, `DELETE /:propertyId` | Authenticated saved properties |
 | `/api/v1/renter-preferences` | `GET /`, `PUT /` | Authenticated preference read/update |
@@ -290,6 +290,27 @@ landlord's public name/photo/role, and attached media. The response includes
 listed recurring costs and an estimated move-in total; optional itemized rental
 cost records are returned separately to avoid double counting. Renter inquiries
 and viewing requests are handled by the inquiries and viewings route groups.
+
+### Neighborhood intelligence
+
+`GET /api/v1/properties/:id/nearby`,
+`GET /api/v1/properties/:id/neighborhood-insights`, and
+`GET /api/v1/nearby-places/:propertyId` use the same OpenStreetMap Overpass
+provider and property-specific cache. They accept an optional `radius` in
+meters (100–5000); nearby-place endpoints also accept `category`:
+`healthcare`, `education`, `groceries`, `transport`, `banking`, `recreation`,
+or `food`. Results include map coordinates, category and OSM type, straight-
+line distance in meters and kilometers, provider attribution, cache state, and
+fetch time. The shared cache is reused for up to 24 hours only when its saved
+center matches the property's current coordinates and it covers the requested
+radius. Property details and comparisons normalize older cached category names
+and report cache freshness.
+
+`GET /api/v1/properties/:id/neighborhood-insights` reports category counts,
+highlights, and the nearest returned places. These results reflect available
+OpenStreetMap data, not a complete inventory or a measure of neighborhood
+safety or quality. Distances are straight-line estimates; walking/driving
+routes and travel times are not currently provided.
 
 ### Trust, claims, and moderation
 

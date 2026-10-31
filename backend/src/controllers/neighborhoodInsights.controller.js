@@ -1,7 +1,10 @@
 
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
-import { findNearbyPlaces } from "../services/neighborhood.service.js";
+import {
+    findNearbyPlaces,
+    getPropertyCoordinates,
+} from "../services/neighborhood.service.js";
 import { buildNeighborhoodInsights } from "../services/neighborhoodInsights.service.js";
 
 export async function getNeighborhoodInsights(req, res, next) {
@@ -15,23 +18,10 @@ export async function getNeighborhoodInsights(req, res, next) {
             });
         }
 
-        const radius = Number(req.query.radius ?? 5000);
-
-        if (
-            !Number.isInteger(radius) ||
-            radius < 100 ||
-            radius > 5000
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Radius must be an integer between 100 and 5000 meters."
-            });
-        }
-
         const property = await Property.findOne({
             _id: id,
             status: "published"
-        }).select("title address.location");
+        }).select("title address.location location");
 
         if (!property) {
             return res.status(404).json({
@@ -40,27 +30,18 @@ export async function getNeighborhoodInsights(req, res, next) {
             });
         }
 
-        const location = property.address?.location;
-        const coordinates = location?.coordinates;
-
-        if (
-            location?.type !== "Point" ||
-            !Array.isArray(coordinates) ||
-            coordinates.length !== 2 ||
-            !coordinates.every(Number.isFinite)
-        ) {
+        const coordinates = getPropertyCoordinates(property);
+        if (!coordinates) {
             return res.status(422).json({
                 success: false,
                 message: "This property does not have valid map coordinates."
             });
         }
 
-        const [longitude, latitude] = coordinates;
-
         const nearbyData = await findNearbyPlaces({
-            latitude,
-            longitude,
-            radius
+            ...coordinates,
+            radius: Number(req.query.radius ?? 5000),
+            propertyId: property._id,
         });
 
         const insights = buildNeighborhoodInsights(
@@ -76,7 +57,11 @@ export async function getNeighborhoodInsights(req, res, next) {
             provider: nearbyData.provider,
             source: nearbyData.source,
             fetchedAt: nearbyData.fetchedAt,
-            radiusMeters: radius,
+            radiusMeters: nearbyData.radiusMeters,
+            cached: nearbyData.cached,
+            attribution: nearbyData.attribution,
+            distanceNote:
+                "Distances are straight-line estimates, not walking or driving distances.",
             ...insights
         });
     } catch (error) {
