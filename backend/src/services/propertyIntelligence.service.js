@@ -1,55 +1,303 @@
 import { calculateRentalCost } from "./rentalCost.service.js";
 
 export function buildRentalCostSummary(pricing = {}, costRecord = null) {
-    const monthlyRent = pricing.monthlyRent ?? 0;
-    const monthlyServiceCharge = pricing.monthlyServiceCharge ?? 0;
+    const additionalCosts = calculateRentalCost(costRecord);
+    const items = Array.isArray(costRecord?.items) ? costRecord.items : [];
+    const unknownCosts = additionalCosts.unknownCosts;
+    const roundCurrency = (amount) =>
+        Math.round((amount + Number.EPSILON) * 100) / 100;
+    const monthlyRent = pricing.monthlyRent ?? null;
+    const monthlyServiceCharge = pricing.monthlyServiceCharge ?? null;
     const estimatedMonthlyUtilities =
-        pricing.estimatedMonthlyUtilities ?? 0;
-    const advanceRent = pricing.advanceRent ?? 0;
-    const oneTimeFees = pricing.oneTimeFees ?? 0;
-    const refundableDeposit = pricing.securityDeposit ?? 0;
-    const knownMonthlyTotal = monthlyRent + monthlyServiceCharge;
-    const estimatedMonthlyTotal =
-        knownMonthlyTotal + estimatedMonthlyUtilities;
-    const listedUpfrontTotal =
-        advanceRent + oneTimeFees + refundableDeposit;
+        pricing.estimatedMonthlyUtilities ?? null;
+    const advanceRent = pricing.advanceRent ?? null;
+    const oneTimeFees = pricing.oneTimeFees ?? null;
+    const refundableDeposit = pricing.securityDeposit ?? null;
+    const listedRecurringCosts =
+        (monthlyRent ?? 0) + (monthlyServiceCharge ?? 0);
+    const additionalRecurringCosts =
+        additionalCosts.monthly.knownRecurringCosts;
+    const knownRecurringCosts =
+        listedRecurringCosts + additionalRecurringCosts;
+    const estimatedAdditionalCosts =
+        (estimatedMonthlyUtilities ?? 0) +
+        additionalCosts.monthly.estimatedAdditionalCosts;
+    const monthlyKnownSubtotal =
+        knownRecurringCosts + estimatedAdditionalCosts;
+    const knownOneTimeCosts = items
+        .filter((item) => item.type === "one_time")
+        .reduce((total, item) => total + item.amount, 0);
+    const knownRefundableDeposits = items
+        .filter((item) => item.type === "refundable_deposit")
+        .reduce((total, item) => total + item.amount, 0);
+    const sumRequiredItemized = (types, required) =>
+        items
+            .filter(
+                (item) =>
+                    types.includes(item.type) &&
+                    Boolean(item.required) === required
+            )
+            .reduce((total, item) => total + item.amount, 0);
+    const requiredRecurringCosts =
+        listedRecurringCosts + sumRequiredItemized(["monthly"], true);
+    const optionalRecurringCosts = sumRequiredItemized(["monthly"], false);
+    const requiredEstimatedCosts =
+        (estimatedMonthlyUtilities ?? 0) +
+        sumRequiredItemized(["monthly_estimate"], true);
+    const optionalEstimatedCosts = sumRequiredItemized(
+        ["monthly_estimate"],
+        false
+    );
+    const listedUpfrontComponents = [
+        advanceRent,
+        oneTimeFees,
+        refundableDeposit,
+    ];
+    const listedUpfrontTotal = listedUpfrontComponents.every(
+        (amount) => amount !== null
+    )
+        ? roundCurrency(
+              listedUpfrontComponents.reduce(
+                  (total, amount) => total + amount,
+                  0
+              )
+          )
+        : null;
+    const knownUpfrontSubtotal = roundCurrency(
+        listedUpfrontComponents.reduce(
+            (total, amount) => total + (amount ?? 0),
+            0
+        ) +
+            knownOneTimeCosts +
+            knownRefundableDeposits
+    );
+    const missingMonthlyComponents = [
+        ...(monthlyRent === null ? ["monthlyRent"] : []),
+        ...(monthlyServiceCharge === null ? ["monthlyServiceCharge"] : []),
+        ...(estimatedMonthlyUtilities === null
+            ? ["estimatedMonthlyUtilities"]
+            : []),
+    ];
+    const missingUpfrontComponents = [
+        ...(advanceRent === null ? ["advanceRent"] : []),
+        ...(oneTimeFees === null ? ["oneTimeFees"] : []),
+        ...(refundableDeposit === null ? ["securityDeposit"] : []),
+    ];
+    const additionalCostDisclosureMissing = !costRecord;
+    const monthlyMissingComponents = [
+        ...missingMonthlyComponents,
+        ...(additionalCostDisclosureMissing
+            ? ["additionalCostDisclosure"]
+            : []),
+    ];
+    const upfrontMissingComponents = [
+        ...missingUpfrontComponents,
+        ...(additionalCostDisclosureMissing
+            ? ["additionalCostDisclosure"]
+            : []),
+    ];
+    const monthlyComplete =
+        monthlyMissingComponents.length === 0 && unknownCosts.length === 0;
+    const moveInComplete =
+        monthlyMissingComponents.length === 0 &&
+        upfrontMissingComponents.length === 0 &&
+        unknownCosts.length === 0;
+    const monthlyBreakdown = [
+        ...(monthlyRent === null
+            ? []
+            : [
+                  {
+                      name: "Monthly rent",
+                      amount: monthlyRent,
+                      type: "monthly",
+                      source: "listing",
+                      required: true,
+                  },
+              ]),
+        ...(monthlyServiceCharge === null
+            ? []
+            : [
+                  {
+                      name: "Service and maintenance charge",
+                      amount: monthlyServiceCharge,
+                      type: "monthly",
+                      source: "listing",
+                      required: true,
+                  },
+              ]),
+        ...(estimatedMonthlyUtilities === null
+            ? []
+            : [
+                  {
+                      name: "Estimated utilities",
+                      amount: estimatedMonthlyUtilities,
+                      type: "monthly_estimate",
+                      source: "landlord_estimate",
+                      required: true,
+                  },
+              ]),
+        ...items.map((item) => ({
+            name: item.name,
+            amount: item.amount,
+            type: item.type,
+            source:
+                item.type === "monthly_estimate"
+                    ? "landlord_estimate"
+                    : "landlord_provided",
+            required: Boolean(item.required),
+            notes: item.notes || "",
+        })),
+    ].filter(
+        (item) =>
+            item.type === "monthly" || item.type === "monthly_estimate"
+    );
+    const upfrontBreakdown = [
+        ...(advanceRent === null
+            ? []
+            : [
+                  {
+                      name: "Advance rent",
+                      amount: advanceRent,
+                      type: "advance_rent",
+                      source: "listing",
+                      refundable: false,
+                      required: true,
+                  },
+              ]),
+        ...(oneTimeFees === null
+            ? []
+            : [
+                  {
+                      name: "One-time fees",
+                      amount: oneTimeFees,
+                      type: "one_time",
+                      source: "listing",
+                      refundable: false,
+                      required: true,
+                  },
+              ]),
+        ...(refundableDeposit === null
+            ? []
+            : [
+                  {
+                      name: "Security deposit",
+                      amount: refundableDeposit,
+                      type: "refundable_deposit",
+                      source: "listing",
+                      refundable: true,
+                      required: true,
+                  },
+              ]),
+        ...items
+            .filter(
+                (item) =>
+                    item.type === "one_time" ||
+                    item.type === "refundable_deposit"
+            )
+            .map((item) => ({
+                name: item.name,
+                amount: item.amount,
+                type: item.type,
+                source: "landlord_provided",
+                refundable: item.type === "refundable_deposit",
+                required: Boolean(item.required),
+                notes: item.notes || "",
+            })),
+    ];
 
     return {
         currency: costRecord?.currency ?? "BDT",
         pricing: {
             monthlyRent,
-            monthlyServiceCharge:
-                pricing.monthlyServiceCharge ?? null,
-            estimatedMonthlyUtilities:
-                pricing.estimatedMonthlyUtilities ?? null,
-            advanceRent: pricing.advanceRent ?? null,
-            oneTimeFees: pricing.oneTimeFees ?? null,
-            securityDeposit: pricing.securityDeposit ?? null,
+            monthlyServiceCharge,
+            estimatedMonthlyUtilities,
+            advanceRent,
+            oneTimeFees,
+            securityDeposit: refundableDeposit,
         },
         monthly: {
-            knownRecurringCosts: knownMonthlyTotal,
-            estimatedAdditionalCosts: estimatedMonthlyUtilities,
-            estimatedTotal: estimatedMonthlyTotal,
+            knownRecurringCosts: roundCurrency(knownRecurringCosts),
+            estimatedAdditionalCosts: roundCurrency(
+                estimatedAdditionalCosts
+            ),
+            knownSubtotal: roundCurrency(knownRecurringCosts),
+            quantifiedSubtotal: roundCurrency(monthlyKnownSubtotal),
+            estimatedTotal: monthlyComplete
+                ? roundCurrency(monthlyKnownSubtotal)
+                : null,
+            requiredRecurringCosts: roundCurrency(
+                requiredRecurringCosts
+            ),
+            optionalRecurringCosts: roundCurrency(
+                optionalRecurringCosts
+            ),
+            requiredEstimatedCosts: roundCurrency(requiredEstimatedCosts),
+            optionalEstimatedCosts: roundCurrency(optionalEstimatedCosts),
+            requiredQuantifiedTotal: roundCurrency(
+                requiredRecurringCosts + requiredEstimatedCosts
+            ),
+            optionalQuantifiedTotal: roundCurrency(
+                optionalRecurringCosts + optionalEstimatedCosts
+            ),
+            complete: monthlyComplete,
+            missingComponents: monthlyMissingComponents,
+            breakdown: monthlyBreakdown,
         },
         moveIn: {
             advanceRent,
             oneTimeFees,
             refundableDeposit,
             listedUpfrontTotal,
-            estimatedTotal: estimatedMonthlyTotal + listedUpfrontTotal,
+            knownUpfrontSubtotal: roundCurrency(knownUpfrontSubtotal),
+            refundableAdditionalDeposits: roundCurrency(
+                knownRefundableDeposits
+            ),
+            nonRefundableAdditionalFees: roundCurrency(knownOneTimeCosts),
+            requiredUpfrontCosts: roundCurrency(
+                listedUpfrontComponents.reduce(
+                    (total, amount) => total + (amount ?? 0),
+                    0
+                ) +
+                    sumRequiredItemized(
+                        ["one_time", "refundable_deposit"],
+                        true
+                    )
+            ),
+            optionalUpfrontCosts: roundCurrency(
+                sumRequiredItemized(
+                    ["one_time", "refundable_deposit"],
+                    false
+                )
+            ),
+            knownSubtotal: roundCurrency(
+                knownRecurringCosts + knownUpfrontSubtotal
+            ),
+            quantifiedSubtotal: roundCurrency(
+                monthlyKnownSubtotal + knownUpfrontSubtotal
+            ),
+            estimatedTotal: moveInComplete
+                ? roundCurrency(monthlyKnownSubtotal + knownUpfrontSubtotal)
+                : null,
+            complete: moveInComplete,
+            missingComponents: [
+                ...upfrontMissingComponents,
+                ...monthlyMissingComponents,
+            ],
+            breakdown: upfrontBreakdown,
         },
-        additionalCosts: costRecord
-            ? {
-                  ...calculateRentalCost(costRecord),
-                  items: costRecord.items,
-                  updatedAt: costRecord.updatedAt,
-              }
-            : null,
+        additionalCosts: {
+            ...additionalCosts,
+            items,
+            updatedAt: costRecord?.updatedAt ?? null,
+            provided: Boolean(costRecord),
+        },
+        unknownCosts,
+        hasUnknownCosts: unknownCosts.length > 0,
         assumptions: [
-            "Monthly totals include listed rent and service charge; estimated utilities are shown separately.",
-            "Estimated move-in total adds one month of estimated recurring costs to listed advance rent, one-time fees, and refundable deposit.",
-            "Additional cost items are reported separately and are not added to the listed-property estimate to avoid double counting.",
-            "Missing costs are not assumed to be zero for payment decisions.",
+            "Monthly totals include listed rent, listed service charges, and separately itemized recurring add-on costs; estimated utilities and estimated add-ons are identified as estimates.",
+            "The move-in estimate includes one month of recurring costs, advance rent, listed one-time fees, listed refundable security deposit, and separately itemized one-time fees or refundable deposits.",
+            "Itemized costs are treated as additional to the listing's pricing fields. Do not enter the same charge in both places.",
+            "A missing amount or an unknown-cost note makes the complete estimate unavailable; known subtotals are shown separately and do not imply that undisclosed costs are zero.",
         ],
     };
 }

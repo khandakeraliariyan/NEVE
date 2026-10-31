@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
 import NearbyPlaceCache from "../models/NearbyPlaceCache.js";
+import RentalCost from "../models/RentalCost.js";
 import { buildPropertyComparison } from "../services/propertyComparison.service.js";
+import { buildRentalCostSummary } from "../services/propertyIntelligence.service.js";
 import {
     getPropertyCoordinates,
     isNearbyCacheFresh,
@@ -72,11 +74,22 @@ export async function compareProperties(req, res, next) {
         }
 
         const comparison = buildPropertyComparison(orderedProperties);
-        const nearbyCaches = await NearbyPlaceCache.find({
-            property: { $in: uniqueIds },
-        }).lean();
+        const [nearbyCaches, rentalCostRecords] = await Promise.all([
+            NearbyPlaceCache.find({
+                property: { $in: uniqueIds },
+            }).lean(),
+            RentalCost.find({
+                property: { $in: uniqueIds },
+            }).lean(),
+        ]);
         const nearbyCacheByProperty = new Map(
             nearbyCaches.map((cache) => [String(cache.property), cache])
+        );
+        const rentalCostsByProperty = new Map(
+            rentalCostRecords.map((record) => [
+                String(record.property),
+                record,
+            ])
         );
 
         const comparisonWithNearbyPlaces = comparison.map((property) => {
@@ -88,6 +101,9 @@ export async function compareProperties(req, res, next) {
                 places.filter((place) => place.category === category).length;
             const sourceProperty = propertiesById.get(String(property.id));
             const coordinates = getPropertyCoordinates(sourceProperty);
+            const rentalCost = rentalCostsByProperty.get(
+                String(property.id)
+            );
             const cacheFresh =
                 coordinates !== null &&
                 isNearbyCacheFresh(cache, {
@@ -97,6 +113,10 @@ export async function compareProperties(req, res, next) {
 
             return {
                 ...property,
+                rentalCosts: buildRentalCostSummary(
+                    sourceProperty.pricing,
+                    rentalCost
+                ),
                 nearbyPlaces: {
                     healthcare: countNearby("healthcare"),
                     education: countNearby("education"),

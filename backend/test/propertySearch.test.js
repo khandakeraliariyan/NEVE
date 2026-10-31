@@ -129,11 +129,13 @@ test("property intelligence separates listed estimates from extra costs", () => 
         }
     );
 
-    assert.equal(summary.monthly.knownRecurringCosts, 21500);
+    assert.equal(summary.monthly.knownRecurringCosts, 22000);
     assert.equal(summary.monthly.estimatedAdditionalCosts, 2500);
-    assert.equal(summary.monthly.estimatedTotal, 24000);
+    assert.equal(summary.monthly.quantifiedSubtotal, 24500);
+    assert.equal(summary.monthly.estimatedTotal, null);
     assert.equal(summary.moveIn.listedUpfrontTotal, 61000);
-    assert.equal(summary.moveIn.estimatedTotal, 85000);
+    assert.equal(summary.moveIn.quantifiedSubtotal, 85500);
+    assert.equal(summary.moveIn.estimatedTotal, null);
     assert.equal(summary.additionalCosts.monthly.knownRecurringCosts, 500);
     assert.deepEqual(summary.additionalCosts.unknownCosts, ["Internet"]);
 });

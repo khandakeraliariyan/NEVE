@@ -280,16 +280,78 @@ listing after upload and is returned by the property detail and
 `/api/v1/property-images/:propertyId` endpoints as short-lived signed URLs.
 Each listing supports up to 20 images, 5 videos, and 5 floor plans.
 
-### Property details, costs, and contact
+### Property details, true rental costs, and contact
 
 `GET /api/v1/properties/:id/detail` and
 `GET /api/v1/properties/:propertyId/details` return the published listing's
 description, property type, location coordinates, bedrooms, bathrooms,
 floor, area, furnishing, amenities, house rules, availability, lease duration,
-landlord's public name/photo/role, and attached media. The response includes
-listed recurring costs and an estimated move-in total; optional itemized rental
-cost records are returned separately to avoid double counting. Renter inquiries
-and viewing requests are handled by the inquiries and viewings route groups.
+landlord's public name/photo/role, and attached media. The response includes the
+same rental-cost summary returned by `GET /api/v1/properties/:id/costs` and
+`GET /api/v1/rental-costs/:propertyId`.
+
+The summary separates known recurring costs, estimated utilities and other
+estimated charges, refundable deposits, one-time fees, and advance rent. It
+includes itemized cost breakdowns with required/optional and
+landlord-provided/estimated classifications. `monthly.estimatedTotal` and
+`moveIn.estimatedTotal` are `null` when required amounts or the additional-cost
+disclosure are missing, or when the landlord lists unknown costs. Known
+subtotals remain available and missing components are returned explicitly.
+Landlords can record an empty item list and empty `unknownCosts` to disclose
+that there are no additional itemized charges.
+
+The move-in estimate adds one month of estimated recurring costs to listed
+advance rent, one-time fees, refundable security deposit, and itemized one-time
+fees or refundable deposits. Itemized entries are additional to the listing's
+pricing fields; the same fee must not be entered in both places. These values
+are estimates based on landlord-provided data, not a quote or a guarantee of
+all tenancy expenses.
+
+Landlords can replace the itemized disclosure with:
+
+```http
+PUT /api/v1/rental-costs/:propertyId
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "items": [
+    {
+      "name": "Parking",
+      "amount": 500,
+      "type": "monthly",
+      "required": true,
+      "notes": ""
+    },
+    {
+      "name": "Electricity",
+      "amount": 2500,
+      "type": "monthly_estimate",
+      "required": true,
+      "notes": "Based on typical usage"
+    },
+    {
+      "name": "Key deposit",
+      "amount": 2000,
+      "type": "refundable_deposit",
+      "required": false,
+      "notes": ""
+    }
+  ],
+  "unknownCosts": ["Internet installation fee"]
+}
+```
+
+Supported item types are `monthly`, `monthly_estimate`, `one_time`, and
+`refundable_deposit`. The landlord of the property or an admin may update the
+disclosure. `unknownCosts` is limited to 20 notes; itemized costs are limited
+to 50 entries.
+
+Property comparisons include this same calculated summary for each listing.
+Renter inquiries and viewing requests are handled by the inquiries and viewings
+route groups.
 
 ### Neighborhood intelligence
 
