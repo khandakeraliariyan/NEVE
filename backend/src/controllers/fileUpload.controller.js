@@ -14,7 +14,7 @@ import {
     deleteStoredObject,
 } from "../services/fileUpload.service.js";
 
-const getUserId = (req) => req.user?._id || req.user?.id;
+const getUserId = (req) => req.neveUser?._id;
 
 const getSafeFileName = (name) =>
     path.basename(name).replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
@@ -52,7 +52,11 @@ export const requestUploadUrl = async (req, res) => {
                 });
             }
 
-            if (!["landlord", "admin"].includes(req.user.role)) {
+            if (
+                !["landlord", "property_manager", "admin"].includes(
+                    req.neveUser.role
+                )
+            ) {
                 return res.status(403).json({
                     message: "Only landlords or admins can upload property images.",
                 });
@@ -67,7 +71,7 @@ export const requestUploadUrl = async (req, res) => {
             const landlordId = property.landlord?._id || property.landlord;
 
             if (
-                req.user.role !== "admin" &&
+                req.neveUser.role !== "admin" &&
                 String(landlordId) !== String(userId)
             ) {
                 return res.status(403).json({
@@ -203,7 +207,7 @@ export const getFileAccessUrl = async (req, res) => {
 
         const userId = String(getUserId(req));
         const isUploader = String(file.uploadedBy) === userId;
-        const isAdmin = req.user.role === "admin";
+        const isAdmin = req.neveUser.role === "admin";
 
         let isPropertyOwner = false;
 

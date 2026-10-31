@@ -107,7 +107,7 @@ export const attachClaimEvidence = async (req, res) => {
             claimId,
             fileId,
             userId: getUserId(req),
-            isAdmin: req.user.role === "admin",
+            isAdmin: req.neveUser.role === "admin",
         });
 
         if (result.error === "CLAIM_NOT_FOUND") {

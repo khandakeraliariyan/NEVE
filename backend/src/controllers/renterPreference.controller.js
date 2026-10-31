@@ -1,6 +1,6 @@
 import RenterPreference from "../models/RenterPreference.js";
 
-const getUserId = (req) => req.user?._id || req.user?.id;
+const getUserId = (req) => req.neveUser._id;
 
 const allowedFields = [
     "cities",

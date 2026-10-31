@@ -7,6 +7,7 @@ import {
 } from "../controllers/propertyImage.controller.js";
 
 import { authenticateUser } from "../middleware/auth.middleware.js";
+import { allowRoles } from "../middleware/role.middleware.js";
 
 const router = express.Router();
 
@@ -17,12 +18,14 @@ router.get("/:propertyId", getPropertyImages);
 router.post(
   "/:propertyId/:fileId/attach",
   authenticateUser,
+  allowRoles("landlord", "property_manager", "admin"),
   attachPropertyImage
 );
 
 router.delete(
   "/:propertyId/:fileId",
   authenticateUser,
+  allowRoles("landlord", "property_manager", "admin"),
   removePropertyImage
 );
 

@@ -1,6 +1,6 @@
 import { getMatchedProperties } from "../services/propertyMatching.service.js";
 
-const getUserId = (req) => req.user?._id || req.user?.id;
+const getUserId = (req) => req.neveUser._id;
 
 export const getPersonalizedRecommendations = async (req, res) => {
     try {

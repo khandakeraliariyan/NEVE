@@ -1,0 +1,106 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+    nearbyPropertySearchSchema,
+    propertySearchSchema,
+} from "../src/validators/common.validator.js";
+import { buildPropertySearchFilter } from "../src/services/propertySearch.service.js";
+
+test("property search parses all marketplace filters", () => {
+    const { query } = propertySearchSchema.parse({
+        query: {
+            city: "Dhaka",
+            area: "Dhanmondi",
+            propertyType: "apartment",
+            furnishing: "furnished",
+            minRent: "10000",
+            maxRent: "30000",
+            bedrooms: "2",
+            maxBedrooms: "4",
+            availableBy: "2026-12-01",
+            minLeaseDurationMonths: "6",
+            maxLeaseDurationMonths: "24",
+            amenities: "elevator,parking",
+            q: "large flat",
+        },
+    });
+
+    assert.deepEqual(query.amenities, ["elevator", "parking"]);
+    assert.equal(query.minRent, 10000);
+    assert.equal(query.bedrooms, 2);
+    assert.ok(query.availableBy instanceof Date);
+
+    const filter = buildPropertySearchFilter(query);
+
+    assert.equal(filter.status, "published");
+    assert.deepEqual(filter.propertyType, "apartment");
+    assert.deepEqual(filter.furnishing, "furnished");
+    assert.deepEqual(filter.bedrooms, { $gte: 2, $lte: 4 });
+    assert.deepEqual(filter["pricing.monthlyRent"], {
+        $gte: 10000,
+        $lte: 30000,
+    });
+    assert.deepEqual(filter.leaseDurationMonths, {
+        $gte: 6,
+        $lte: 24,
+    });
+    assert.deepEqual(filter.amenities, {
+        $all: ["elevator", "parking"],
+    });
+    assert.deepEqual(filter.availabilityDate, {
+        $lte: query.availableBy,
+    });
+    assert.ok(filter.$or[0].title instanceof RegExp);
+});
+
+test("property search rejects invalid enum and reversed ranges", () => {
+    assert.throws(() =>
+        propertySearchSchema.parse({
+            query: {
+                propertyType: "studio",
+            },
+        })
+    );
+
+    assert.throws(() =>
+        propertySearchSchema.parse({
+            query: {
+                minRent: "30000",
+                maxRent: "10000",
+            },
+        })
+    );
+
+    assert.throws(() =>
+        propertySearchSchema.parse({
+            query: {
+                bedrooms: "4",
+                maxBedrooms: "2",
+            },
+        })
+    );
+});
+
+test("nearby search validates its map center and radius", () => {
+    const result = nearbyPropertySearchSchema.parse({
+        query: {
+            latitude: "23.8103",
+            longitude: "90.4125",
+        },
+    });
+
+    assert.equal(result.query.latitude, 23.8103);
+    assert.equal(result.query.longitude, 90.4125);
+    assert.equal(result.query.radius, 5000);
+
+    assert.throws(() =>
+        nearbyPropertySearchSchema.parse({
+            query: {
+                latitude: "91",
+                longitude: "90",
+            },
+        })
+    );
+});
+

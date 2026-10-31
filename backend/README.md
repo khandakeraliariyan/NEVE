@@ -5,11 +5,9 @@ intelligence. It is built with Node.js, Express, MongoDB/Mongoose, Firebase
 Authentication, and optional Cloudflare R2 object storage.
 
 > **Implementation status:** this document describes the source currently in
-> this repository. Some features are present but not yet fully integrated.
-> In particular, importing the Express app currently fails because
-> `src/services/evidenceGraph.service.js` is empty while
-> `src/controllers/evidenceGraph.controller.js` imports functions from it.
-> Resolve that startup blocker before running the API.
+> this repository. Marketplace search, saved-property, preference, and
+> recommendation routes use the authenticated NEVE profile. Some unrelated
+> backend feature workflows still have integration gaps noted below.
 
 ## Contents
 
@@ -131,16 +129,17 @@ The server connects to MongoDB before listening. The health endpoint is:
 GET /api/v1/health
 ```
 
-It returns a JSON success response when the app is running. There are currently
-no test, lint, or build scripts defined in `package.json`. To check whether the
-Express app's modules can be loaded:
+It returns a JSON success response when the app is running. Run the backend tests with:
+
+```sh
+npm test
+```
+
+To check whether the Express app's modules can be loaded:
 
 ```sh
 node --input-type=module -e "import('./src/app.js')"
 ```
-
-The import check currently fails because the evidence-graph service is empty
-and does not export the functions its controller imports.
 
 ## Request lifecycle and security
 
@@ -157,17 +156,17 @@ and does not export the functions its controller imports.
 - `allowRoles(...)` loads the corresponding NEVE database user, checks that
   the account is active, enforces the requested role, and attaches the database
   record to `req.neveUser`.
-- Request validation uses Zod through `validateRequest`; the shared property
-  search schema validates search filters and pagination.
+- Request validation uses Zod through `validateRequest`; property list, recent,
+  search, and map endpoints validate their filters and pagination.
 - Unknown endpoints return JSON 404 responses. A central error handler logs
   errors and returns JSON error responses.
 - Private tenancy evidence uses signed object URLs and is restricted by the
   file-access handler to the uploader or an admin. Property-image reads are
   exposed for published properties.
 
-Authentication is not uniformly wired across all controllers: Firebase
-identity is stored on `req.user`, while the database user record is stored on
-`req.neveUser`. See [Current integration gaps](#current-integration-gaps).
+Firebase identity is stored on `req.user`, while the database user record is
+stored on `req.neveUser`. Marketplace routes that need a renter profile enforce
+the renter role and use `req.neveUser`.
 
 ## API routes
 
@@ -182,7 +181,7 @@ the feature inventory previously proposed.
 | `/api/v1/users` | `POST /profile`, `GET /me` | Authenticated profile creation and lookup |
 | `/api/v1/users` | `POST /me/favorites/:propertyId`, `GET /me/favorites`, `DELETE /me/favorites/:propertyId` | Renter favorites |
 | `/api/v1/users` | `POST /me/recently-viewed/:propertyId`, `GET /me/recently-viewed`, `DELETE /me/recently-viewed/:propertyId`, `DELETE /me/recently-viewed` | Renter recently viewed properties |
-| `/api/v1/properties` | `GET /`, `GET /search`, `GET /nearby`, `GET /:id`, `GET /:id/detail`, `GET /:id/costs`, `GET /:id/nearby`, `GET /:id/neighborhood-insights`, `POST /compare` | Public listing discovery, detail, nearby information, cost, and comparison |
+| `/api/v1/properties` | `GET /`, `GET /recent`, `GET /search`, `GET /nearby`, `GET /:id`, `GET /:id/detail`, `GET /:id/costs`, `GET /:id/nearby`, `GET /:id/neighborhood-insights`, `POST /compare` | Public listing discovery, detail, nearby information, cost, and comparison |
 | `/api/v1/properties` | `GET /mine`, `POST /`, `PATCH /:id`, `PATCH /:id/status` | Authenticated landlord or property-manager listing management |
 | `/api/v1/properties` | `POST /:id/view-event` | Authenticated renter view-event recording |
 | `/api/v1/properties` | `GET /:propertyId/details`, `GET /:propertyId/transparency` | Property detail/transparency router mounted before the main property router |
@@ -249,11 +248,24 @@ as noted below.
 
 ### Property discovery and comparison
 
-Property search filters by city, area, property type, rent range, and bedrooms.
-Supported sort values are `rent_asc`, `rent_desc`, and `newest`. Search uses
+Property list, `/search`, and map (`/nearby`) endpoints share filters for city,
+area, free-text query, property type, furnishing, rent range, bedroom range,
+availability date, lease-duration range, and amenities. `bedrooms` is the
+minimum bedroom count; `maxBedrooms` is its optional upper bound.
+`availableBy` includes properties whose availability date is on or before the
+requested date. `amenities` accepts a comma-separated value or repeated query
+parameters and requires every requested amenity to match. Supported sort
+values are `rent_asc`, `rent_desc`, `newest`, and `oldest`; nearby search orders
+by distance instead. `/recent` forces newest-first ordering. Search uses
 pagination with a maximum page size of 50. The public property endpoints also
 provide comparisons, rental-cost summaries, neighborhood information, and
 cached nearby-place data.
+
+Example:
+
+```text
+GET /api/v1/properties/search?city=Dhaka&minRent=10000&maxRent=30000&bedrooms=2&maxBedrooms=4&furnishing=furnished&availableBy=2026-12-01&minLeaseDurationMonths=6&amenities=elevator,parking&sort=rent_asc
+```
 
 ### Uploads and file privacy
 
@@ -280,32 +292,26 @@ specific shapes and pagination logic.
 
 These are known issues in the source at the time this README was written:
 
-1. **Startup blocker:** `src/services/evidenceGraph.service.js` is empty, but
-   `src/controllers/evidenceGraph.controller.js` imports
-   `findManageableProperty` and `attachEvidenceToClaim` from it. The app module
-   therefore cannot currently be imported successfully.
-2. **Identity mismatch:** `authenticateUser` sets Firebase claims on
-   `req.user`; `allowRoles` loads the database user into `req.neveUser`.
-   Upload and several saved-property, preference, and recommendation
-   controllers expect database IDs or roles on `req.user`, while their routes
-   do not call `allowRoles`. Those flows need consistent identity resolution
-   and role enforcement.
-3. **Inquiry status mismatch:** the landlord response controller accepts
+1. **Identity consistency:** authentication sets Firebase claims on
+   `req.user`; role middleware loads the database user into `req.neveUser`.
+   Core marketplace endpoints use the profile record, but remaining legacy
+   controllers should be checked for consistent identity handling.
+2. **Inquiry status mismatch:** the landlord response controller accepts
    `rejected`, but `Inquiry.status` does not include that value. Another
    inquiry handler uses `declined` and `responded`, so the supported workflow
    needs consolidation.
-4. **Viewing status mismatch:** viewing handlers use both `requested` with
+3. **Viewing status mismatch:** viewing handlers use both `requested` with
    `confirmed`/`declined` and `pending` with `approved`/`rejected`. The schema
    permits multiple variants, but the handlers do not consistently use the
    same state transitions.
-5. **Audit coverage:** audit logs are written for some admin moderation and
+4. **Audit coverage:** audit logs are written for some admin moderation and
    trust-summary actions, but report review at
    `PATCH /api/v1/property-reports/admin/:reportId` does not currently record
    an audit action.
-6. **Response and pagination consistency:** the shared helpers are not
+5. **Response and pagination consistency:** the shared helpers are not
    consistently used by all endpoints; clients should check each endpoint's
    controller for its exact response shape.
-7. **Documentation/config template:** there is no backend `.env.example` or
+6. **Documentation/config template:** there is no backend `.env.example` or
    Swagger configuration file in the current source tree.
 
 Treat these gaps as implementation work, not as supported behavior. Recheck
