@@ -2,7 +2,7 @@ import { getMatchedProperties } from "../services/propertyMatching.service.js";
 
 const getUserId = (req) => req.neveUser._id;
 
-export const getPersonalizedRecommendations = async (req, res) => {
+export const getPersonalizedRecommendations = async (req, res, next) => {
     try {
         const page = Number(req.query.page ?? 1);
         const limit = Number(req.query.limit ?? 10);
@@ -28,8 +28,7 @@ export const getPersonalizedRecommendations = async (req, res) => {
         if (!recommendations.hasPreferences) {
             return res.status(200).json({
                 message: "Set your renter preferences to receive recommendations.",
-                hasPreferences: false,
-                results: [],
+                ...recommendations,
             });
         }
 
@@ -38,10 +37,6 @@ export const getPersonalizedRecommendations = async (req, res) => {
             ...recommendations,
         });
     } catch (error) {
-        console.error("Personalized recommendations error:", error);
-
-        return res.status(500).json({
-            message: "Could not retrieve personalized recommendations.",
-        });
+        return next(error);
     }
 };

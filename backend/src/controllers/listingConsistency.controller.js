@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 import Property from "../models/Property.js";
 import ListingWarning from "../models/ListingWarning.js";
+import UploadedFile from "../models/UploadedFile.js";
+import { recordAdminAction } from "../services/adminAudit.service.js";
 
 import {
     detectListingInconsistencies,
@@ -10,7 +12,7 @@ import {
 const getUserId = (req) =>
     req.neveUser?._id ?? req.user?._id ?? req.user?.id;
 
-export const reviewListingConsistency = async (req, res) => {
+export const reviewListingConsistency = async (req, res, next) => {
     try {
         const { propertyId } = req.params;
 
@@ -31,7 +33,7 @@ export const reviewListingConsistency = async (req, res) => {
         const landlordId = property.landlord?._id || property.landlord;
 
         if (
-            req.user.role !== "admin" &&
+            req.neveUser?.role !== "admin" &&
             String(landlordId) !== String(getUserId(req))
         ) {
             return res.status(403).json({
@@ -39,7 +41,85 @@ export const reviewListingConsistency = async (req, res) => {
             });
         }
 
-        const detected = detectListingInconsistencies(property);
+        const rent = property.pricing?.monthlyRent;
+        const comparableFilter = {
+            _id: { $ne: property._id },
+            status: "published",
+            "address.city": property.address?.city,
+            propertyType: property.propertyType,
+            bedrooms: property.bedrooms,
+        };
+        const [comparables, listingsWithSameImages, imageFiles] =
+            await Promise.all([
+                rent > 0
+                    ? Property.find(comparableFilter)
+                          .select("pricing.monthlyRent")
+                          .limit(100)
+                          .lean()
+                    : Promise.resolve([]),
+                property.images?.length
+                    ? Property.find({
+                          _id: { $ne: property._id },
+                          status: "published",
+                          images: { $in: property.images },
+                      })
+                          .select("images")
+                          .limit(100)
+                          .lean()
+                    : Promise.resolve([]),
+                property.images?.length
+                    ? UploadedFile.find({
+                          _id: { $in: property.images },
+                          purpose: "property_image",
+                          status: "uploaded",
+                      })
+                          .select("imageFingerprint")
+                          .lean()
+                    : Promise.resolve([]),
+            ]);
+        const currentImageIds = new Set(
+            (property.images || []).map(String)
+        );
+        const sharedImageIds = new Set(
+            listingsWithSameImages.flatMap((listing) =>
+                (listing.images || [])
+                    .filter((imageId) => currentImageIds.has(String(imageId)))
+                    .map(String)
+            )
+        );
+        const fingerprints = [
+            ...new Set(
+                imageFiles
+                    .map((file) => file.imageFingerprint)
+                    .filter(Boolean)
+            ),
+        ];
+        const reusedFingerprintFiles = fingerprints.length
+            ? await UploadedFile.find({
+                  _id: { $nin: property.images },
+                  purpose: "property_image",
+                  status: "uploaded",
+                  imageFingerprint: { $in: fingerprints },
+                  property: { $ne: property._id },
+              })
+                  .select("imageFingerprint")
+                  .lean()
+            : [];
+        const reusedFingerprints = new Set(
+            reusedFingerprintFiles.map((file) => file.imageFingerprint)
+        );
+        const reusedImageCount = new Set([
+            ...[...sharedImageIds].map((imageId) => `image:${imageId}`),
+            ...[...reusedFingerprints].map(
+                (fingerprint) => `fingerprint:${fingerprint}`
+            ),
+        ]).size;
+        const detected = detectListingInconsistencies(property, {
+            comparableRents: comparables.map(
+                (candidate) => candidate.pricing?.monthlyRent
+            ),
+            reusedImageCount,
+        });
 
         // Refresh existing open warnings instead of creating duplicates
         // each time the consistency endpoint is called.
@@ -86,15 +166,11 @@ export const reviewListingConsistency = async (req, res) => {
                 "Warnings indicate possible inconsistencies and do not establish fraud or intentional misrepresentation.",
         });
     } catch (error) {
-        console.error("Listing consistency review error:", error);
-
-        return res.status(500).json({
-            message: "Could not review listing consistency.",
-        });
+        return next(error);
     }
 };
 
-export const updateListingWarningStatus = async (req, res) => {
+export const updateListingWarningStatus = async (req, res, next) => {
     try {
         const { warningId } = req.params;
         const { status } = req.body;
@@ -118,6 +194,12 @@ export const updateListingWarningStatus = async (req, res) => {
                     status,
                     reviewedBy: getUserId(req),
                     reviewedAt: new Date(),
+                    ...(status === "dismissed"
+                        ? {
+                              publiclyVisible: false,
+                              publicSummary: null,
+                          }
+                        : {}),
                 },
             },
             {
@@ -132,15 +214,21 @@ export const updateListingWarningStatus = async (req, res) => {
             });
         }
 
+        if (req.neveUser?.role === "admin") {
+            await recordAdminAction({
+                req,
+                action: "listing_warning_status_updated",
+                targetType: "listing_warning",
+                targetId: warning._id,
+                details: { newStatus: warning.status },
+            });
+        }
+
         return res.json({
             message: "Warning status updated.",
             warning,
         });
     } catch (error) {
-        console.error("Update listing warning error:", error);
-
-        return res.status(500).json({
-            message: "Could not update warning status.",
-        });
+        return next(error);
     }
 };

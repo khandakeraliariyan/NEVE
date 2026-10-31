@@ -62,6 +62,8 @@ export const getPropertyTrustSummary = async (req, res, next) => {
                 },
                 disclaimer:
                     "These summaries reflect recorded reviews and available information. They are not guarantees of property condition, ownership, or rental availability.",
+                depositSafety:
+                    "Before paying a deposit, verify the listing and the recipient, inspect the property when possible, and use a documented payment method. A listing or account verification is not a guarantee against fraud.",
                 claims,
                 warnings,
             },

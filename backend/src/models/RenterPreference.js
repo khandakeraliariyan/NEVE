@@ -42,6 +42,12 @@ const renterPreferenceSchema = new mongoose.Schema(
             default: [],
         },
 
+        furnishing: {
+            type: String,
+            enum: ["furnished", "semi_furnished", "unfurnished"],
+            default: null,
+        },
+
         amenities: {
             type: [String],
             default: [],

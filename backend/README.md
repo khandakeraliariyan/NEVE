@@ -376,10 +376,48 @@ routes and travel times are not currently provided.
 
 ### Trust, claims, and moderation
 
-Landlords can create property claims and attach evidence. Admins can review
-claims, reports, and consistency warnings. Public trust summaries are only
-returned for published properties and records marked publicly visible with
-approved statuses and a non-empty public summary.
+The landlord/admin consistency endpoint checks description-vs-field bedroom
+and monthly-rent mismatches, missing description/rent/location, amenity
+mismatches, unusual rents, and reused property photos. Unusual rent is flagged
+only when at least five published listings with the same city, property type,
+and bedroom count are available; the check compares against their median rent
+and flags values below half or above twice that median. Photo checks compare
+reused image uploads by provider ETag fingerprint when available and by shared
+uploaded-file ID. These heuristic flags request human review and do not prove
+fraud.
+
+Admins can check for potential duplicate listings. The response includes
+similarity signals for title, city/area, rent, property type, bedroom count,
+shared image uploads, and close coordinates. This score is a review heuristic,
+not a fraud probability. Rent mismatch detection only compares explicit
+monthly amounts in the description, not deposits or other currency amounts.
+
+Renter listing reports support duplicate, inaccurate-detail, suspicious-
+payment, misleading-photo, and unavailable-property concerns. Admin review of
+reports, warnings, and public trust summaries is audit-logged. Public trust
+summaries are only returned for published properties and records marked
+publicly visible with reviewed statuses and a non-empty public summary. The
+trust endpoint also includes a general deposit-safety notice. These controls
+do not independently verify property ownership, guarantee availability, or
+determine that fraud occurred.
+
+### Explainable property matching
+
+`GET /api/v1/recommendations` ranks up to the newest 500 published listings
+against the renter's saved preferences. Preferences include city/area,
+minimum/maximum rent, bedroom counts, property types, furnishing, and amenities.
+The endpoint returns an overall normalized match score, per-criterion scores
+and weights, explanations, matched reasons, shortfalls, and unknowns for
+missing listing information. Listings outside the requested rent range are
+reported separately in `outsideBudget`, not mixed into eligible results.
+Recommendations are recalculated from current preferences and listings on
+each request.
+
+`POST /api/v1/matching/recommendations` supports one-off explainable matching
+with rent, bedroom count, property type, furnishing, and amenity preferences.
+Its response includes reasons, shortfalls, and unknown listing data. Scores
+are deterministic preference comparisons, not guarantees of property
+suitability.
 
 ### Responses and pagination
 

@@ -58,6 +58,12 @@ const uploadedFileSchema = new mongoose.Schema(
             min: 1,
         },
 
+        imageFingerprint: {
+            type: String,
+            match: /^[a-f0-9]{32}$/,
+            index: { sparse: true },
+        },
+
         status: {
             type: String,
             enum: ["pending_upload", "uploaded"],

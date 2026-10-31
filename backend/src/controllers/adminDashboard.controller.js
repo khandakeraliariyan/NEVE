@@ -62,7 +62,10 @@ export const getAdminReports = async (req, res, next) => {
 
         const [reports, total] = await Promise.all([
             PropertyReport.find(filter)
-                .populate("property", "title rent city area status")
+                .populate(
+                    "property",
+                    "title pricing.monthlyRent address.area address.city status"
+                )
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
@@ -95,7 +98,10 @@ export const getAdminWarnings = async (req, res, next) => {
 
         const [warnings, total] = await Promise.all([
             ListingWarning.find(filter)
-                .populate("property", "title rent city area status")
+                .populate(
+                    "property",
+                    "title pricing.monthlyRent address.area address.city status"
+                )
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
@@ -128,7 +134,10 @@ export const getAdminClaims = async (req, res, next) => {
 
         const [claims, total] = await Promise.all([
             PropertyClaim.find(filter)
-                .populate("property", "title rent city area status")
+                .populate(
+                    "property",
+                    "title pricing.monthlyRent address.area address.city status"
+                )
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)

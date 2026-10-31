@@ -187,6 +187,13 @@ export const completeUpload = async (req, res) => {
             });
         }
 
+        if (file.purpose === "property_image") {
+            const etag = String(metadata.ETag || "").replaceAll('"', "");
+            file.imageFingerprint = /^[a-f0-9]{32}$/i.test(etag)
+                ? etag.toLowerCase()
+                : null;
+        }
+
         file.status = "uploaded";
         await file.save();
 
