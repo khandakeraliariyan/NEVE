@@ -79,10 +79,10 @@ export const respondToInquiry = async (req, res, next) => {
             });
         }
 
-        if (!["accepted", "rejected"].includes(status)) {
+        if (!["accepted", "declined"].includes(status)) {
             return res.status(400).json({
                 success: false,
-                message: "Status must be accepted or rejected.",
+                message: "Status must be accepted or declined.",
             });
         }
 
@@ -136,6 +136,7 @@ export const respondToInquiry = async (req, res, next) => {
                 $set: {
                     status,
                     landlordResponse: responseMessage.trim(),
+                    respondedAt: new Date(),
                 },
             },
             {

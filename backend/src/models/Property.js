@@ -130,6 +130,38 @@ const propertySchema = new mongoose.Schema(
             },
         },
 
+        videos: {
+            type: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "UploadedFile",
+                },
+            ],
+            default: [],
+            validate: {
+                validator(value) {
+                    return value.length <= 5;
+                },
+                message: "A maximum of 5 property videos is allowed",
+            },
+        },
+
+        floorPlans: {
+            type: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "UploadedFile",
+                },
+            ],
+            default: [],
+            validate: {
+                validator(value) {
+                    return value.length <= 5;
+                },
+                message: "A maximum of 5 floor plans is allowed",
+            },
+        },
+
         pricing: {
             monthlyRent: {
                 type: Number,

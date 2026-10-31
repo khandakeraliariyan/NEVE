@@ -102,6 +102,8 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `UPLOAD_URL_TTL_SECONDS` | No | `300`; integer from 60 to 3600 | Lifetime of signed upload URLs |
 | `MAX_PROPERTY_IMAGE_SIZE_MB` | No | `5`; positive number | Property-image upload limit |
 | `MAX_TENANCY_EVIDENCE_SIZE_MB` | No | `15`; positive number | Tenancy-evidence upload limit |
+| `MAX_PROPERTY_VIDEO_SIZE_MB` | No | `50`; positive number | Property-video upload limit |
+| `MAX_FLOOR_PLAN_SIZE_MB` | No | `10`; positive number | Floor-plan upload limit |
 | `OVERPASS_API_URL` | No | `https://overpass-api.de/api/interpreter` | Overpass endpoint for nearby-place data |
 | `NEVE_API_BASE_URL` | No | `http://localhost:5000/api/v1` | Configured API base URL |
 
@@ -195,7 +197,7 @@ the feature inventory previously proposed.
 | `/api/v1/property-reports` | `POST /`, `GET /my-reports`, `GET /admin`, `PATCH /admin/:reportId` | Authenticated reports; admin-only review endpoints |
 | `/api/v1/duplicate-listings` | `GET /:propertyId/duplicate-check` | Admin-only duplicate check |
 | `/api/v1/uploads` | `POST /presign`, `PATCH /:fileId/complete`, `GET /:fileId/access-url` | Authenticated upload and authorized file access |
-| `/api/v1/property-images` | `GET /:propertyId`, `POST /:propertyId/:fileId/attach`, `DELETE /:propertyId/:fileId` | Public images for published properties; authenticated image management |
+| `/api/v1/property-images` | `GET /:propertyId`, `POST /:propertyId/:fileId/attach`, `DELETE /:propertyId/:fileId` | Public listing media for published properties; authenticated media management |
 | `/api/v1/nearby-places` | `GET /:propertyId` | Nearby-place lookup |
 | `/api/v1/rental-costs` | `GET /:propertyId`, `PUT /:propertyId` | Rental-cost summary and update |
 | `/api/v1/saved-properties` | `GET /`, `POST /:propertyId`, `DELETE /:propertyId` | Authenticated saved properties |
@@ -221,9 +223,9 @@ Mongoose models currently defined in `src/models/`:
 | Model | Purpose |
 |---|---|
 | `User` | NEVE profile linked to a Firebase UID, role, account state, favorites, and recently viewed properties |
-| `Property` | Rental listing, location, amenities, images, pricing, availability, and publication status |
+| `Property` | Rental listing, location, amenities, images, videos, floor plans, pricing, availability, and publication status |
 | `Inquiry` | Renter inquiry, landlord response, and inquiry status |
-| `ViewingRequest` | Requested property viewing, participants, date, and status |
+| `ViewingRequest` | Requested property viewing, participants, date, and status (`requested`, `confirmed`, `declined`, `cancelled`, or `completed`) |
 | `Notification` | Recipient notifications and read state |
 | `PropertyReport` | Renter-submitted listing reports and administrative review |
 | `PropertyViewEvent` | Property-view event records |
@@ -272,8 +274,22 @@ GET /api/v1/properties/search?city=Dhaka&minRent=10000&maxRent=30000&bedrooms=2&
 Uploads use a two-step signed-URL workflow: request a URL, upload directly to
 R2, then call the completion endpoint. The backend checks purpose, MIME type,
 declared size, and stored object metadata. Property images accept JPEG, PNG,
-and WebP; tenancy evidence accepts PDF. File access is provided using short-
-lived signed download URLs.
+and WebP; property videos accept MP4 and WebM; floor plans accept PDF, JPEG,
+PNG, and WebP; tenancy evidence accepts PDF. Property media is attached to a
+listing after upload and is returned by the property detail and
+`/api/v1/property-images/:propertyId` endpoints as short-lived signed URLs.
+Each listing supports up to 20 images, 5 videos, and 5 floor plans.
+
+### Property details, costs, and contact
+
+`GET /api/v1/properties/:id/detail` and
+`GET /api/v1/properties/:propertyId/details` return the published listing's
+description, property type, location coordinates, bedrooms, bathrooms,
+floor, area, furnishing, amenities, house rules, availability, lease duration,
+landlord's public name/photo/role, and attached media. The response includes
+listed recurring costs and an estimated move-in total; optional itemized rental
+cost records are returned separately to avoid double counting. Renter inquiries
+and viewing requests are handled by the inquiries and viewings route groups.
 
 ### Trust, claims, and moderation
 

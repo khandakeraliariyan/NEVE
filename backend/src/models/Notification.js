@@ -13,6 +13,8 @@ const notificationSchema = new mongoose.Schema(
             type: String,
             enum: [
                 "viewing_request_received",
+                "viewing_request_confirmed",
+                "viewing_request_declined",
                 "viewing_request_approved",
                 "viewing_request_rejected",
             ],

@@ -175,7 +175,7 @@ export async function updateViewingRequest(req, res, next) {
         if (viewing.status !== "requested") {
             return res.status(409).json({
                 success: false,
-                message: "Only pending viewing requests can be confirmed or declined",
+                message: "Only requested viewings can be confirmed or declined",
             });
         }
 

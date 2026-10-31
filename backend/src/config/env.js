@@ -28,6 +28,14 @@ const envSchema = z.object({
         .number()
         .positive()
         .default(15),
+    MAX_PROPERTY_VIDEO_SIZE_MB: z.coerce
+        .number()
+        .positive()
+        .default(50),
+    MAX_FLOOR_PLAN_SIZE_MB: z.coerce
+        .number()
+        .positive()
+        .default(10),
     OVERPASS_API_URL: z
         .string()
         .url()

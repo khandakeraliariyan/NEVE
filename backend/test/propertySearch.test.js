@@ -6,6 +6,7 @@ import {
     propertySearchSchema,
 } from "../src/validators/common.validator.js";
 import { buildPropertySearchFilter } from "../src/services/propertySearch.service.js";
+import { buildRentalCostSummary } from "../src/services/propertyIntelligence.service.js";
 
 test("property search parses all marketplace filters", () => {
     const { query } = propertySearchSchema.parse({
@@ -104,3 +105,35 @@ test("nearby search validates its map center and radius", () => {
     );
 });
 
+test("property intelligence separates listed estimates from extra costs", () => {
+    const summary = buildRentalCostSummary(
+        {
+            monthlyRent: 20000,
+            monthlyServiceCharge: 1500,
+            estimatedMonthlyUtilities: 2500,
+            advanceRent: 20000,
+            oneTimeFees: 1000,
+            securityDeposit: 40000,
+        },
+        {
+            currency: "BDT",
+            items: [
+                {
+                    name: "Parking",
+                    amount: 500,
+                    type: "monthly",
+                },
+            ],
+            unknownCosts: ["Internet"],
+            updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        }
+    );
+
+    assert.equal(summary.monthly.knownRecurringCosts, 21500);
+    assert.equal(summary.monthly.estimatedAdditionalCosts, 2500);
+    assert.equal(summary.monthly.estimatedTotal, 24000);
+    assert.equal(summary.moveIn.listedUpfrontTotal, 61000);
+    assert.equal(summary.moveIn.estimatedTotal, 85000);
+    assert.equal(summary.additionalCosts.monthly.knownRecurringCosts, 500);
+    assert.deepEqual(summary.additionalCosts.unknownCosts, ["Internet"]);
+});

@@ -14,6 +14,19 @@ const uploadLimits = {
         mimeTypes: ["image/jpeg", "image/png", "image/webp"],
         maxBytes: env.MAX_PROPERTY_IMAGE_SIZE_MB * 1024 * 1024,
     },
+    property_video: {
+        mimeTypes: ["video/mp4", "video/webm"],
+        maxBytes: env.MAX_PROPERTY_VIDEO_SIZE_MB * 1024 * 1024,
+    },
+    floor_plan: {
+        mimeTypes: [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "application/pdf",
+        ],
+        maxBytes: env.MAX_FLOOR_PLAN_SIZE_MB * 1024 * 1024,
+    },
     tenancy_evidence: {
         mimeTypes: ["application/pdf"],
         maxBytes: env.MAX_TENANCY_EVIDENCE_SIZE_MB * 1024 * 1024,
