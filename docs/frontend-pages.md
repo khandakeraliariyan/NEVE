@@ -105,7 +105,7 @@ These block or limit specific pages. Each was confirmed in the code.
 | Received inquiries | `GET /inquiries/landlord` | `GET /inquiries/received` | Goes with the `/respond` flow |
 | Received viewings | `GET /viewings/landlord`, `PATCH /viewings/:viewingId/respond` | `GET /viewings/received`, `PATCH /viewings/:id` | Supports a `status` filter |
 | Property detail | `GET /properties/:id/detail` | Separate cost and image calls | Already includes costs and media, and saves requests |
-| Report review | `PATCH /admin/moderation/reports/:reportId/status` | `PATCH /property-reports/admin/:reportId` | Only the moderation route writes an audit log, though it takes no review note |
+| Report review | `PATCH /property-reports/admin/:reportId` | `PATCH /admin/moderation/reports/:reportId/status` | Also saves a review note, and writes an audit log |
 | Public trust summaries | `/admin/trust-approval/*` | `/admin/moderation/*/public-visibility` | Checks that the record has been reviewed first |
 
 ---
@@ -782,7 +782,7 @@ Review queue with reason, details, reporter and listing. Set status to `pending`
 `resolved`, `dismissed`. Includes a duplicate check that shows similarity signals, described
 as a review aid and not as a fraud probability.
 
-**API:** `GET /admin/dashboard/reports`, `PATCH /admin/moderation/reports/:reportId/status`,
+**API:** `GET /admin/dashboard/reports`, `PATCH /property-reports/admin/:reportId`, with `{ status, reviewNote }`,
 `GET /duplicate-listings/:propertyId/duplicate-check`
 
 ### Listing warnings
