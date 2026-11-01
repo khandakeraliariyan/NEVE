@@ -29,6 +29,16 @@ import {
     reviewConditionEntry,
     updateMaintenanceRequest,
 } from "../controllers/tenancyOperations.controller.js";
+import {
+    addCaseEvidence,
+    createTenancyCase,
+    getTenancyCase,
+    listTenancyCases,
+    removeCaseEvidence,
+    revokeTenancyCaseShare,
+    shareTenancyCase,
+    updateTenancyCaseStatus,
+} from "../controllers/tenancyCase.controller.js";
 
 const router = express.Router();
 
@@ -49,6 +59,30 @@ router.patch(
     "/agreements/:agreementId/property-manager",
     allowRoles("renter", "landlord"),
     assignPropertyManager
+);
+router.get("/agreements/:agreementId/cases", listTenancyCases);
+router.post(
+    "/agreements/:agreementId/cases",
+    allowRoles("renter", "landlord"),
+    createTenancyCase
+);
+router.get("/cases/:caseId", getTenancyCase);
+router.post("/cases/:caseId/evidence", addCaseEvidence);
+router.delete("/cases/:caseId/evidence/:fileId", removeCaseEvidence);
+router.post(
+    "/cases/:caseId/shares",
+    allowRoles("renter", "landlord"),
+    shareTenancyCase
+);
+router.delete(
+    "/cases/:caseId/shares/:userId",
+    allowRoles("renter", "landlord"),
+    revokeTenancyCaseShare
+);
+router.patch(
+    "/cases/:caseId/status",
+    allowRoles("renter", "landlord"),
+    updateTenancyCaseStatus
 );
 router.post(
     "/agreements/:agreementId/condition-reports/:stage",

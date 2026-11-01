@@ -18,23 +18,36 @@ export function isAgreementParticipant(agreement, userId) {
     );
 }
 
-export function canManageAgreement(agreement, userId) {
+export function canManageAgreement(agreement, userId, userRole) {
     const id = String(userId);
     return (
         String(agreement.renter) === id ||
         String(agreement.landlord) === id ||
-        String(agreement.assignedPropertyManager ?? "") === id
+        (userRole === "property_manager" &&
+            String(agreement.assignedPropertyManager ?? "") === id)
     );
 }
 
-export async function findAccessibleAgreement(agreementId, userId) {
+export async function findAccessibleAgreement(
+    agreementId,
+    userId,
+    userRole
+) {
     return TenancyAgreement.findOne({
         _id: agreementId,
         $or: [
             { renter: userId },
             { landlord: userId },
-            { assignedPropertyManager: userId },
-            { sharedWith: { $elemMatch: { user: userId, revokedAt: null } } },
+            ...(userRole === "property_manager"
+                ? [{ assignedPropertyManager: userId }]
+                : []),
+            ...(["mediator", "legal_reviewer"].includes(userRole)
+                ? [{
+                    sharedWith: {
+                        $elemMatch: { user: userId, revokedAt: null },
+                    },
+                }]
+                : []),
         ],
     });
 }
@@ -67,7 +80,11 @@ export function appendAuditEvent(
     }
 }
 
-export async function findAgreementForEvidenceFile(fileId, userId) {
+export async function findAgreementForEvidenceFile(
+    fileId,
+    userId,
+    userRole
+) {
     const agreement = await TenancyAgreement.findOne({
         $and: [
             {
@@ -81,12 +98,19 @@ export async function findAgreementForEvidenceFile(fileId, userId) {
                 $or: [
                     { renter: userId },
                     { landlord: userId },
-                    { assignedPropertyManager: userId },
-                    {
-                        sharedWith: {
-                            $elemMatch: { user: userId, revokedAt: null },
-                        },
-                    },
+                    ...(userRole === "property_manager"
+                        ? [{ assignedPropertyManager: userId }]
+                        : []),
+                    ...(["mediator", "legal_reviewer"].includes(userRole)
+                        ? [{
+                            sharedWith: {
+                                $elemMatch: {
+                                    user: userId,
+                                    revokedAt: null,
+                                },
+                            },
+                        }]
+                        : []),
                 ],
             },
         ],
@@ -101,7 +125,11 @@ export async function findAgreementForEvidenceFile(fileId, userId) {
     }).select("agreement");
 
     if (link) {
-        const agreement = await findAccessibleAgreement(link.agreement, userId);
+        const agreement = await findAccessibleAgreement(
+            link.agreement,
+            userId,
+            userRole
+        );
         if (agreement) return agreement;
     }
 
@@ -111,7 +139,8 @@ export async function findAgreementForEvidenceFile(fileId, userId) {
     if (conditionReport) {
         const agreement = await findAccessibleAgreement(
             conditionReport.agreement,
-            userId
+            userId,
+            userRole
         );
         if (agreement) return agreement;
     }
@@ -123,6 +152,10 @@ export async function findAgreementForEvidenceFile(fileId, userId) {
         ],
     }).select("agreement");
     return maintenanceRequest
-        ? findAccessibleAgreement(maintenanceRequest.agreement, userId)
+        ? findAccessibleAgreement(
+            maintenanceRequest.agreement,
+            userId,
+            userRole
+        )
         : null;
 }

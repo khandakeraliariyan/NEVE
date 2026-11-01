@@ -125,7 +125,8 @@ test("assigned property managers can manage only their assigned agreement", () =
         sharedWith: [],
     };
 
-    assert.equal(canManageAgreement(agreement, manager), true);
+    assert.equal(canManageAgreement(agreement, manager, "property_manager"), true);
+    assert.equal(canManageAgreement(agreement, manager, "renter"), false);
     assert.equal(isAgreementParticipant(agreement, manager), true);
     assert.equal(canManageAgreement(agreement, other), false);
 });

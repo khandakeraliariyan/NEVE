@@ -66,8 +66,20 @@ const uploadedFileSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ["pending_upload", "uploaded"],
+            enum: ["pending_upload", "uploaded", "deletion_pending"],
             default: "pending_upload",
+            index: true,
+        },
+
+        retentionUntil: {
+            type: Date,
+            default: null,
+            index: true,
+        },
+
+        legalHold: {
+            type: Boolean,
+            default: false,
             index: true,
         },
     },

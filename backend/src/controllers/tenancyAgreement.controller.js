@@ -13,6 +13,7 @@ import {
     findAccessibleAgreement,
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
+import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
 
 const userId = (req) => req.neveUser._id;
 const validId = mongoose.isValidObjectId;
@@ -68,7 +69,8 @@ const getAccessibleAgreement = async (req, res) => {
 
     const agreement = await findAccessibleAgreement(
         req.params.agreementId,
-        userId(req)
+        userId(req),
+        req.neveUser.role
     );
 
     if (!agreement) {
@@ -88,6 +90,19 @@ const saveAuditedChange = async (
 ) => {
     appendAuditEvent(agreement, userId(req), action, targetType, targetId);
     await agreement.save();
+    await recordSensitiveAccess({
+        actor: userId(req),
+        action,
+        resourceType: "agreement",
+        resourceId: agreement._id,
+        agreement: agreement._id,
+        outcome: "completed",
+        details: {
+            targetType,
+            targetId: targetId ? String(targetId) : null,
+        },
+        ipAddress: req.ip,
+    });
 };
 
 const findUploadedEvidence = async (fileId, actorId) => {
@@ -234,8 +249,16 @@ export async function listTenancyAgreements(req, res, next) {
             $or: [
                 { renter: id },
                 { landlord: id },
-                { assignedPropertyManager: id },
-                { sharedWith: { $elemMatch: { user: id, revokedAt: null } } },
+                ...(req.neveUser.role === "property_manager"
+                    ? [{ assignedPropertyManager: id }]
+                    : []),
+                ...(["mediator", "legal_reviewer"].includes(req.neveUser.role)
+                    ? [{
+                        sharedWith: {
+                            $elemMatch: { user: id, revokedAt: null },
+                        },
+                    }]
+                    : []),
             ],
         };
         const [agreements, total] = await Promise.all([
@@ -253,6 +276,18 @@ export async function listTenancyAgreements(req, res, next) {
                 .lean(),
             TenancyAgreement.countDocuments(filter),
         ]);
+        await Promise.all(
+            agreements.map((agreement) =>
+                recordSensitiveAccess({
+                    actor: id,
+                    action: "tenancy_agreement_listed",
+                    resourceType: "agreement",
+                    resourceId: agreement._id,
+                    agreement: agreement._id,
+                    ipAddress: req.ip,
+                })
+            )
+        );
 
         setPrivateResponse(res);
         return res.json({
@@ -486,7 +521,8 @@ export async function updateAgreementObligation(req, res, next) {
     try {
         const agreement = await findAccessibleAgreement(
             req.params.agreementId,
-            userId(req)
+            userId(req),
+            req.neveUser.role
         );
         if (!agreement) {
             return res.status(404).json({
@@ -494,7 +530,7 @@ export async function updateAgreementObligation(req, res, next) {
                 message: "Agreement not found.",
             });
         }
-        if (!canManageAgreement(agreement, userId(req))) {
+        if (!canManageAgreement(agreement, userId(req), req.neveUser.role)) {
             return res.status(403).json({
                 success: false,
                 message: "Only agreement participants or the assigned property manager can update obligations.",

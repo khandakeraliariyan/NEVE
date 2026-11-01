@@ -13,7 +13,14 @@ const router = express.Router();
 
 router.use(
     authenticateUser,
-    allowRoles("renter", "landlord", "property_manager", "admin")
+    allowRoles(
+        "renter",
+        "landlord",
+        "property_manager",
+        "mediator",
+        "legal_reviewer",
+        "admin"
+    )
 );
 
 router.post("/presign", requestUploadUrl);

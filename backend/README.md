@@ -163,9 +163,11 @@ node --input-type=module -e "import('./src/app.js')"
 - Unknown endpoints return JSON 404 responses. A central error handler logs
   errors and returns JSON error responses.
 - Tenancy documents use signed object URLs. Access is limited to the uploader,
-  the two participants on the associated inquiry/agreement, or a mediator or
-  legal reviewer explicitly shared on that agreement. Admin role alone does
-  not grant access to tenancy evidence.
+  agreement participants and assigned managers, or a reviewer explicitly
+  shared on the agreement/case. Case shares expose only the selected evidence
+  on that case. Admin role alone does not grant access to tenancy evidence.
+  Sensitive document, case, and agreement accesses are recorded separately
+  from the bounded agreement audit trail.
 
 Firebase identity is stored on `req.user`, while the database user record is
 stored on `req.neveUser`. Marketplace routes that need a renter profile enforce
@@ -206,10 +208,12 @@ the feature inventory previously proposed.
 | `/api/v1/listing-consistency` | `GET /:propertyId`, `PATCH /warnings/:warningId` | Listing consistency check and warning status |
 | `/api/v1/evidence-graph` | `POST /properties/:propertyId/claims`, `POST /properties/:propertyId/claims/:claimId/evidence`, `GET /properties/:propertyId`, `PATCH /claims/:claimId/review` | Authenticated evidence and claim operations; review is admin-only |
 | `/api/v1/evidence-graph` | `PATCH /properties/:propertyId/evidence/:linkId` | Property owner/admin updates an evidence relationship; changes are retained in link history |
-| `/api/v1/tenancy` | `POST /agreements`, `GET /agreements`, `GET /agreements/:agreementId`, `PATCH /agreements/:agreementId/status` | Inquiry-linked agreement records; accessible only to participants or explicitly shared reviewers |
+| `/api/v1/tenancy` | `POST /agreements`, `GET /agreements`, `GET /agreements/:agreementId`, `PATCH /agreements/:agreementId/status` | Inquiry-linked agreement records; accessible to participants, assigned managers, or explicitly shared reviewers |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses`, `POST /agreements/:agreementId/obligations`, `PATCH /agreements/:agreementId/obligations/:obligationId`, `POST /agreements/:agreementId/payments` | Manual clause annotations, obligations, and BDT payment/receipt records |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph` | Case-scoped evidence graph; participants and explicitly shared reviewers can inspect or update relationship assessments |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a mediator or legal reviewer |
+| `/api/v1/tenancy` | `GET /agreements/:agreementId/cases`, `POST /agreements/:agreementId/cases`, `GET /cases/:caseId`, `POST /cases/:caseId/evidence`, `DELETE /cases/:caseId/evidence/:fileId`, `PATCH /cases/:caseId/status` | Private dispute cases with agreement-linked evidence; participants manage cases, assigned reviewers have read-only scope |
+| `/api/v1/tenancy` | `POST /cases/:caseId/shares`, `DELETE /cases/:caseId/shares/:userId` | Participants share/revoke a case and its selected evidence with a mediator or legal reviewer |
 | `/api/v1/tenancy` | `PATCH /agreements/:agreementId/property-manager` | Participants assign or unassign an active property manager for that agreement |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/condition-reports/:stage`, `POST /agreements/:agreementId/condition-reports/:reportId/entries`, `GET /agreements/:agreementId/condition-reports`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/reviews`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/corrections`, `GET /agreements/:agreementId/condition-comparison` | Room condition and utility-meter move-in/out records, participant review, preserved corrections, and comparison |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/maintenance-requests`, `GET /maintenance-requests`, `PATCH /maintenance-requests/:requestId/progress` | Case-scoped repair requests, responsibilities, progress, status, and private evidence |
@@ -217,6 +221,9 @@ the feature inventory previously proposed.
 | `/api/v1/admin/dashboard` | `GET /overview`, `GET /reports`, `GET /warnings`, `GET /claims`, `GET /communication-reports` | Admin dashboard and communication-report review queue |
 | `/api/v1/admin/moderation` | `PATCH /reports/:reportId/status`, `PATCH /communication-reports/:reportId/status`, `PATCH /warnings/:warningId/status`, `PATCH /warnings/:warningId/public-visibility`, `PATCH /claims/:claimId/review`, `PATCH /claims/:claimId/public-visibility` | Admin moderation |
 | `/api/v1/admin/audit-logs` | `GET /` | Admin audit-log query |
+| `/api/v1/privacy` | `GET /export`, `GET /documents/deletion-requests`, `POST /documents/:fileId/deletion-requests` | Authenticated personal-data export and private document deletion requests |
+| `/api/v1/admin/privacy` | `GET /deletion-requests`, `PATCH /deletion-requests/:requestId`, `GET /retention-due`, `PATCH /files/:fileId/retention`, `GET /access-logs` | Admin review of private-document deletion, retention/legal holds, and sensitive access history |
+| `/api/v1/admin/ai-evaluations` | `POST /runs`, `GET /runs`, `GET /runs/:runId` | Admin-only benchmark metric submission and review |
 | `/api/v1/admin/trust-approval` | `PATCH /claims/:claimId/public-summary`, `PATCH /warnings/:warningId/public-summary` | Admin approval/revocation of public trust summaries |
 | `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId` | Property reviews |
 | `/api/v1/review-moderation` | `POST /:reviewId/reports`, `GET /reports`, `PATCH /reports/:reportId`, `PATCH /:reviewId/moderation` | Review reports and moderation |
@@ -241,7 +248,7 @@ Mongoose models currently defined in `src/models/`:
 | `Notification` | Recipient notifications, read state, and deduplicated matching-listing alerts |
 | `PropertyReport` | Renter-submitted listing reports and administrative review |
 | `PropertyViewEvent` | Property-view event records |
-| `UploadedFile` | R2 object metadata, uploader, purpose, and upload state |
+| `UploadedFile` | Private/public R2 object metadata, uploader, purpose, upload state, retention date, and legal-hold flag |
 | `RentalCost` | Itemized rental costs and unknown-cost notes |
 | `SavedProperty` | Unique renter/property bookmarks |
 | `RenterPreference` | Search preferences used for recommendations |
@@ -253,6 +260,10 @@ Mongoose models currently defined in `src/models/`:
 | `TenancyEvidenceLink` | Evidence-graph edges from agreement nodes to private files, including relationship history |
 | `ConditionReport` | Move-in/move-out room and meter records with append-only corrections, photos, and participant review events |
 | `MaintenanceRequest` | Agreement-scoped repair requests, responsibility, status, attached evidence, and progress history |
+| `TenancyCase` | Agreement-scoped dispute cases, individually selected evidence files, and revocable reviewer access |
+| `SensitiveAccessLog` | Append-only actor/action records for sensitive agreement, case, file, and privacy access |
+| `DocumentDeletionRequest` | Auditable review lifecycle for deleting private tenancy documents |
+| `AIEvaluationRun` | Versioned OCR/reasoning evaluation metrics, failure rates, latency, cost, and per-case aggregate counts |
 | `AdminAuditLog` | Administrative actions and target records |
 | `Review` | Property ratings, comments, and moderation state |
 | `ReviewReport` | Reports about reviews |
@@ -395,8 +406,9 @@ Agreement documents are shared with the inquiry participants. Participants
 may grant or revoke read-only access for an active mediator or legal reviewer
 on that agreement only. Private download URLs are short-lived; access requests
 and agreement changes append actor/action records to a bounded 100-event
-audit trail. Agreement metadata and evidence use private, no-store cache
-headers. The case Evidence Graph returns agreement, clause, obligation,
+agreement audit trail and the separate sensitive-access log. Agreement
+metadata and evidence use private, no-store cache headers. The case Evidence
+Graph returns agreement, clause, obligation,
 payment, message, event, and evidence-link nodes; relationship assessments
 retain a bounded history and are not treated as verified facts.
 
@@ -411,6 +423,87 @@ Jurisdiction defaults to Bangladesh as metadata. Bangladesh-specific legal
 source retrieval, automated extraction, generated plain-language explanations,
 and editable legal wording are not implemented. `plainLanguageNote` is an
 optional user-authored annotation, not model-generated legal guidance.
+
+### Security, privacy, and dispute support
+
+Participants can create a dispute case with `POST
+/api/v1/tenancy/agreements/:agreementId/cases`, attach files already linked to
+that agreement, and share the case with an active mediator or legal reviewer.
+Case-only reviewers can view that case and request short-lived access URLs for
+its selected evidence; they cannot browse the agreement, other cases, or
+unselected files. Participants can revoke the share or remove evidence while
+retaining its removal history. The older agreement-wide share route remains
+available when participants intentionally grant broader read-only access.
+Already-issued signed URLs remain usable until their five-minute expiry even
+if a share is revoked.
+
+Sensitive agreement, case, and file access, plus privacy and deletion actions,
+are recorded in `SensitiveAccessLog`. Admins can inspect these events at
+`GET /api/v1/admin/privacy/access-logs`; admin status by itself does not
+authorize access to private tenancy files.
+
+`GET /api/v1/privacy/export` returns a private JSON export of the current
+profile and associated preferences, saved listings, inquiries/messages,
+viewings, reports, notifications, tenancy records, and authorized file
+metadata. File content is not embedded in the JSON; use the documented
+authenticated file-access endpoint for each file that remains authorized.
+
+An uploader can request deletion of a private tenancy document through
+`POST /api/v1/privacy/documents/:fileId/deletion-requests` and check its status
+with `GET /api/v1/privacy/documents/deletion-requests`. An admin approves or
+rejects requests using `/api/v1/admin/privacy/deletion-requests`. Approval
+deletes the R2 object and metadata only when the file is unreferenced, its
+retention date has passed, and it is not under legal hold. Admins set or clear
+retention dates and legal holds with `PATCH
+/api/v1/admin/privacy/files/:fileId/retention`; overdue records are listed at
+`GET /api/v1/admin/privacy/retention-due`. The backend does not invent a legal
+retention duration or automatically purge documents: a retention policy and
+admin review are required.
+
+### AI reliability and evaluation
+
+The admin-only `POST /api/v1/admin/ai-evaluations/runs` endpoint records
+benchmark results for `ocr`, `agreement_extraction`,
+`evidence_link_accuracy`, `missing_information`, `legal_citation`, and
+`suspicious_listing`. Each run is tagged with model and dataset versions and
+tracks failures, latency, and cost. Reasoning tasks calculate micro precision,
+recall, F1, and exact-match rate. Suspicious-listing runs additionally
+calculate false-positive rate, treating the `suspicious` label as positive;
+all tasks include a failure rate.
+OCR is evaluated separately using Unicode character error rate (CER).
+`GET /runs` and `GET /runs/:runId` list aggregate and per-case metrics.
+
+Submit expected/predicted label arrays for reasoning tasks, or reference and
+predicted text for OCR. Optional per-case `latencyMs` and `costUsd` values
+provide aggregate mean/p95 latency and cost. For `suspicious_listing`, the
+positive label is `suspicious`; an empty expected/predicted array represents a
+negative result. Example request:
+
+```json
+{
+  "task": "suspicious_listing",
+  "modelName": "listing-reviewer",
+  "modelVersion": "2026-01",
+  "datasetName": "review-fixtures",
+  "datasetVersion": "1",
+  "cases": [
+    {
+      "caseId": "fixture-001",
+      "expected": [],
+      "predicted": ["suspicious"],
+      "latencyMs": 42,
+      "costUsd": 0.0007
+    }
+  ]
+}
+```
+
+Raw labels and text are used only during the request;
+stored case identifiers are salted hashes and stored results contain metrics
+only. This API records externally produced benchmark outputs; it does not run
+OCR, AI models, legal retrieval, or evaluations against live renter data.
+Administrators are responsible for using consented, appropriately protected
+benchmark datasets.
 
 ### Move-in and move-out condition records
 
@@ -582,8 +675,9 @@ These are known issues in the source at the time this README was written:
    Swagger configuration file in the current source tree.
 7. **External agreement intelligence:** OCR, automated clause extraction,
    AI-generated explanations or wording, and legal-source retrieval require
-   an external provider and are not implemented. Agreement clause notes remain
-   user-entered.
+   an external provider and are not implemented. The evaluation API records
+   benchmark metrics but does not invoke those providers. Agreement clause
+   notes remain user-entered.
 
 Treat these gaps as implementation work, not as supported behavior. Recheck
 this section after the corresponding code has been corrected.

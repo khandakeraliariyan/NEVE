@@ -22,6 +22,7 @@ const adminAuditLogSchema = new mongoose.Schema(
                 "listing_warning",
                 "property_claim",
                 "communication_report",
+                "ai_evaluation",
             ],
         },
         targetId: {

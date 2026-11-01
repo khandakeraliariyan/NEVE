@@ -32,6 +32,9 @@ import adminDashboardRoutes from "./routes/adminDashboard.routes.js";
 import adminModerationRoutes from "./routes/adminModeration.routes.js";
 import adminAuditRoutes from "./routes/adminAudit.routes.js";
 import adminTrustApprovalRoutes from "./routes/adminTrustApproval.routes.js";
+import privacyRoutes from "./routes/privacy.routes.js";
+import adminPrivacyRoutes from "./routes/adminPrivacy.routes.js";
+import aiEvaluationRoutes from "./routes/aiEvaluation.routes.js";
 
 const app = express();
 
@@ -114,6 +117,9 @@ app.use("/api/v1/admin/dashboard", adminDashboardRoutes);
 app.use("/api/v1/admin/moderation", adminModerationRoutes);
 app.use("/api/v1/admin/audit-logs", adminAuditRoutes);
 app.use("/api/v1/admin/trust-approval", adminTrustApprovalRoutes);
+app.use("/api/v1/privacy", privacyRoutes);
+app.use("/api/v1/admin/privacy", adminPrivacyRoutes);
+app.use("/api/v1/admin/ai-evaluations", aiEvaluationRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {

@@ -12,6 +12,7 @@ import {
     findAccessibleAgreement,
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
+import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
 
 const isValidId = mongoose.isValidObjectId;
 const actorId = (req) => req.neveUser._id;
@@ -39,18 +40,34 @@ async function getAgreement(
     }
     const agreement = participantOnly
         ? await findParticipantAgreement(req.params.agreementId, actorId(req))
-        : await findAccessibleAgreement(req.params.agreementId, actorId(req));
+        : await findAccessibleAgreement(
+            req.params.agreementId,
+            actorId(req),
+            req.neveUser.role
+        );
     if (!agreement) {
         res.status(404).json({ success: false, message: "Agreement not found." });
         return null;
     }
-    if (!readOnly && !canManageAgreement(agreement, actorId(req))) {
+    if (
+        !readOnly &&
+        !canManageAgreement(agreement, actorId(req), req.neveUser.role)
+    ) {
         res.status(403).json({
             success: false,
             message: "Only agreement participants or the assigned property manager can change these records.",
         });
         return null;
     }
+    await recordSensitiveAccess({
+        actor: actorId(req),
+        action: "tenancy_agreement_accessed",
+        resourceType: "agreement",
+        resourceId: agreement._id,
+        agreement: agreement._id,
+        details: { method: req.method },
+        ipAddress: req.ip,
+    });
     return agreement;
 }
 
@@ -69,6 +86,22 @@ function appendAgreementAudit(agreement, actor, action, targetType, targetId) {
     if (agreement.auditTrail.length > 100) {
         agreement.auditTrail.splice(0, agreement.auditTrail.length - 100);
     }
+}
+
+async function logAgreementEvent(req, agreement, action, targetType, targetId) {
+    return recordSensitiveAccess({
+        actor: actorId(req),
+        action,
+        resourceType: "agreement",
+        resourceId: agreement._id,
+        agreement: agreement._id,
+        outcome: "completed",
+        details: {
+            targetType,
+            targetId: targetId ? String(targetId) : null,
+        },
+        ipAddress: req.ip,
+    });
 }
 
 async function getOwnedEvidenceFiles(fileIds, userId) {
@@ -171,6 +204,8 @@ export async function assignPropertyManager(req, res, next) {
         const agreement = await getAgreement(req, res, { participantOnly: true });
         if (!agreement) return;
         const { managerId = null } = req.body ?? {};
+        let auditAction = "property_manager_unassigned";
+        let auditTargetId = null;
 
         if (managerId === null) {
             agreement.assignedPropertyManager = null;
@@ -204,6 +239,8 @@ export async function assignPropertyManager(req, res, next) {
             agreement.assignedPropertyManager = manager._id;
             agreement.propertyManagerAssignedBy = actorId(req);
             agreement.propertyManagerAssignedAt = new Date();
+            auditAction = "property_manager_assigned";
+            auditTargetId = manager._id;
             appendAgreementAudit(
                 agreement,
                 actorId(req),
@@ -214,6 +251,13 @@ export async function assignPropertyManager(req, res, next) {
         }
 
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            auditAction,
+            "property_manager",
+            auditTargetId
+        );
         await agreement.populate(
             "assignedPropertyManager",
             "displayName photoURL role"
@@ -257,6 +301,13 @@ export async function createConditionReport(req, res, next) {
             report._id
         );
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            `${stage}_condition_report_created`,
+            "condition_report",
+            report._id
+        );
         privateResponse(res);
         return res.status(201).json({ success: true, data: report });
     } catch (error) {
@@ -343,6 +394,13 @@ export async function addConditionEntry(req, res, next) {
             report._id
         );
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            "condition_entry_added",
+            "condition_report",
+            report._id
+        );
         privateResponse(res);
         return res.status(201).json({
             success: true,
@@ -413,6 +471,13 @@ export async function correctConditionEntry(req, res, next) {
             report._id
         );
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            "condition_entry_corrected",
+            "condition_report",
+            report._id
+        );
         privateResponse(res);
         return res.status(201).json({
             success: true,
@@ -477,6 +542,13 @@ export async function reviewConditionEntry(req, res, next) {
             report._id
         );
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            `condition_entry_${decision}`,
+            "condition_report",
+            report._id
+        );
         privateResponse(res);
         return res.json({ success: true, data: entry });
     } catch (error) {
@@ -500,6 +572,13 @@ export async function getConditionComparison(req, res, next) {
             "agreement"
         );
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            "condition_report_comparison_viewed",
+            "condition_report",
+            null
+        );
         privateResponse(res);
         return res.json({
             success: true,
@@ -534,6 +613,13 @@ export async function listConditionReports(req, res, next) {
             "agreement"
         );
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            "condition_reports_viewed",
+            "condition_report",
+            null
+        );
         privateResponse(res);
         return res.json({
             success: true,
@@ -563,7 +649,8 @@ async function getAccessibleRequest(req, res) {
     }
     const agreement = await findAccessibleAgreement(
         request.agreement,
-        actorId(req)
+        actorId(req),
+        req.neveUser.role
     );
     if (!agreement) {
         res.status(404).json({
@@ -572,7 +659,7 @@ async function getAccessibleRequest(req, res) {
         });
         return null;
     }
-    if (!canManageAgreement(agreement, actorId(req))) {
+    if (!canManageAgreement(agreement, actorId(req), req.neveUser.role)) {
         res.status(403).json({
             success: false,
             message: "Only agreement participants or the assigned property manager can update maintenance requests.",
@@ -656,6 +743,13 @@ export async function createMaintenanceRequest(req, res, next) {
             request._id
         );
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            "maintenance_request_submitted",
+            "maintenance_request",
+            request._id
+        );
         privateResponse(res);
         return res.status(201).json({
             success: true,
@@ -687,8 +781,19 @@ export async function listMaintenanceRequests(req, res, next) {
             $or: [
                 { renter: actorId(req) },
                 { landlord: actorId(req) },
-                { assignedPropertyManager: actorId(req) },
-                { sharedWith: { $elemMatch: { user: actorId(req), revokedAt: null } } },
+                ...(req.neveUser.role === "property_manager"
+                    ? [{ assignedPropertyManager: actorId(req) }]
+                    : []),
+                ...(["mediator", "legal_reviewer"].includes(req.neveUser.role)
+                    ? [{
+                        sharedWith: {
+                            $elemMatch: {
+                                user: actorId(req),
+                                revokedAt: null,
+                            },
+                        },
+                    }]
+                    : []),
             ],
         }).select("_id");
         const agreementIds = agreements.map((agreement) => agreement._id);
@@ -712,6 +817,21 @@ export async function listMaintenanceRequests(req, res, next) {
                 .lean(),
             MaintenanceRequest.countDocuments(filter),
         ]);
+        const accessedAgreementIds = [
+            ...new Set(requests.map((request) => String(request.agreement))),
+        ];
+        await Promise.all(
+            accessedAgreementIds.map((agreementId) =>
+                recordSensitiveAccess({
+                    actor: actorId(req),
+                    action: "maintenance_requests_listed",
+                    resourceType: "agreement",
+                    resourceId: agreementId,
+                    agreement: agreementId,
+                    ipAddress: req.ip,
+                })
+            )
+        );
         privateResponse(res);
         return res.json({
             success: true,
@@ -849,6 +969,13 @@ export async function updateMaintenanceRequest(req, res, next) {
             request._id
         );
         await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            "maintenance_request_updated",
+            "maintenance_request",
+            request._id
+        );
         privateResponse(res);
         return res.json({ success: true, data: request });
     } catch (error) {

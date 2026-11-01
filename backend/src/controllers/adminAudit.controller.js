@@ -25,6 +25,8 @@ export const getAdminAuditLogs = async (req, res, next) => {
                 "property_report",
                 "listing_warning",
                 "property_claim",
+                "communication_report",
+                "ai_evaluation",
             ];
 
             if (!allowedTypes.includes(req.query.targetType)) {

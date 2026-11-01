@@ -18,6 +18,8 @@ import {
     deleteStoredObject,
 } from "../services/fileUpload.service.js";
 import { canManageProperty } from "../services/propertyAccess.service.js";
+import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
+import { findSharedCaseForEvidenceFile } from "../services/tenancyCase.service.js";
 
 const getUserId = (req) => req.neveUser?._id;
 
@@ -258,10 +260,21 @@ export const getFileAccessUrl = async (req, res) => {
         }
 
         const agreement = file.purpose === "tenancy_evidence"
-            ? await findAgreementForEvidenceFile(file._id, getUserId(req))
+            ? await findAgreementForEvidenceFile(
+                file._id,
+                getUserId(req),
+                req.neveUser.role
+            )
+            : null;
+        const sharedCase = file.purpose === "tenancy_evidence"
+            ? await findSharedCaseForEvidenceFile(
+                file._id,
+                getUserId(req),
+                req.neveUser.role
+            )
             : null;
         const allowed = file.purpose === "tenancy_evidence"
-            ? isUploader || Boolean(agreement)
+            ? isUploader || Boolean(agreement) || Boolean(sharedCase)
             : isAdmin ||
                 isUploader ||
                 (propertyMediaFields[file.purpose] && isPropertyOwner);
@@ -286,6 +299,17 @@ export const getFileAccessUrl = async (req, res) => {
         const url = await createDownloadUrl(file.storageKey);
 
         res.set("Cache-Control", "private, no-store");
+        await recordSensitiveAccess({
+            actor: getUserId(req),
+            action: "file_access_url_issued",
+            resourceType: "file",
+            resourceId: file._id,
+            agreement: agreement?._id ?? sharedCase?.agreement ?? null,
+            details: sharedCase
+                ? { caseId: String(sharedCase._id), purpose: file.purpose }
+                : { purpose: file.purpose },
+            ipAddress: req.ip,
+        });
         return res.json({
             fileId: file._id,
             url,
