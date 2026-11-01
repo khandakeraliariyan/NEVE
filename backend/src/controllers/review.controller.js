@@ -6,6 +6,8 @@ import ViewingRequest from "../models/ViewingRequest.js";
 
 const PAGE_LIMIT = 20;
 
+export const REVIEW_ELIGIBLE_VIEWING_STATUSES = ["confirmed", "completed"];
+
 function validateReviewInput(rating, comment) {
     if (
         !Number.isInteger(rating) ||
@@ -149,7 +151,7 @@ export async function createReview(req, res, next) {
         const eligibleViewing = await ViewingRequest.findOne({
             property: property._id,
             renter: req.neveUser._id,
-            status: "approved"
+            status: { $in: REVIEW_ELIGIBLE_VIEWING_STATUSES }
         }).select("_id");
 
         if (!eligibleViewing) {

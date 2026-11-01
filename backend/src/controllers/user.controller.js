@@ -1,4 +1,39 @@
 import User from "../models/User.js";
+import { buildUserLookupFilter } from "../services/userLookup.service.js";
+
+// GET /api/v1/users/lookup?type=manager|reviewer&q=
+// Finds active staff to assign or share with. Never returns contact details.
+export async function lookupUsers(req, res, next) {
+    try {
+        const limit = Number(req.query.limit ?? 10);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
+            return res.status(400).json({
+                success: false,
+                message: "Limit must be between 1 and 20.",
+            });
+        }
+
+        const { filter, error } = buildUserLookupFilter({
+            type: req.query.type,
+            q: req.query.q,
+            requesterId: req.neveUser._id,
+        });
+        if (error) {
+            return res.status(400).json({ success: false, message: error });
+        }
+
+        const users = await User.find(filter)
+            .select("displayName photoURL role")
+            .sort({ displayName: 1 })
+            .limit(limit)
+            .lean();
+
+        res.set("Cache-Control", "private, no-store");
+        return res.status(200).json({ success: true, data: users });
+    } catch (error) {
+        next(error);
+    }
+}
 
 export async function createProfile(req, res, next) {
     try {

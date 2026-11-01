@@ -19,6 +19,7 @@ const notificationSchema = new mongoose.Schema(
                 "viewing_request_rejected",
                 "inquiry_message_received",
                 "matching_listing_available",
+                "tenancy_case_shared",
             ],
             required: true,
         },
@@ -51,6 +52,11 @@ const notificationSchema = new mongoose.Schema(
         relatedInquiry: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Inquiry",
+            default: null,
+        },
+        relatedCase: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TenancyCase",
             default: null,
         },
 

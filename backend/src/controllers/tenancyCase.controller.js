@@ -3,8 +3,10 @@ import TenancyAgreement from "../models/TenancyAgreement.js";
 import TenancyCase from "../models/TenancyCase.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
+import { createNotification } from "../services/notification.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
 import {
+    buildSharedCaseFilter,
     findCaseForUser,
     isEvidenceForAgreement,
 } from "../services/tenancyCase.service.js";
@@ -119,6 +121,81 @@ export async function listTenancyCases(req, res, next) {
         return res.json({
             success: true,
             data: cases,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// Cases shared directly with a reviewer, who may not have agreement access.
+export async function listSharedTenancyCases(req, res, next) {
+    try {
+        const page = Number(req.query.page ?? 1);
+        const limit = Number(req.query.limit ?? 20);
+        if (
+            !Number.isInteger(page) ||
+            page < 1 ||
+            !Number.isInteger(limit) ||
+            limit < 1 ||
+            limit > 100
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Page must be positive and limit must be between 1 and 100.",
+            });
+        }
+
+        const { filter, error } = buildSharedCaseFilter({
+            userId: req.neveUser._id,
+            status: req.query.status,
+        });
+        if (error) {
+            return res.status(400).json({ success: false, message: error });
+        }
+
+        const [cases, total] = await Promise.all([
+            TenancyCase.find(filter)
+                .select("-sharedWith")
+                .populate("createdBy", "displayName role")
+                .populate(
+                    "evidence.file",
+                    "originalName mimeType sizeBytes status"
+                )
+                .sort({ updatedAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .lean(),
+            TenancyCase.countDocuments(filter),
+        ]);
+        await Promise.all(
+            cases.map((tenancyCase) =>
+                recordSensitiveAccess({
+                    actor: req.neveUser._id,
+                    action: "tenancy_case_listed",
+                    resourceType: "case",
+                    resourceId: tenancyCase._id,
+                    agreement: tenancyCase.agreement,
+                    details: { scope: "shared_case" },
+                    ipAddress: req.ip,
+                })
+            )
+        );
+
+        setPrivateResponse(res);
+        return res.json({
+            success: true,
+            data: cases.map((tenancyCase) => ({
+                ...tenancyCase,
+                evidence: tenancyCase.evidence.filter(
+                    (entry) => entry.removedAt === null
+                ),
+            })),
             pagination: {
                 page,
                 limit,
@@ -407,10 +484,27 @@ export async function shareTenancyCase(req, res, next) {
             outcome: "completed",
             ipAddress: req.ip,
         });
+
+        // Keep case details out of the text, as it outlives a revoked share.
+        let notificationStatus = "created";
+        try {
+            await createNotification({
+                recipient: reviewer._id,
+                type: "tenancy_case_shared",
+                title: "A tenancy case was shared with you",
+                message: "You have read-only access to a tenancy case and its selected evidence.",
+                relatedCase: tenancyCase._id,
+            });
+        } catch (error) {
+            console.error("Create case share notification error:", error);
+            notificationStatus = "failed";
+        }
+
         setPrivateResponse(res);
         return res.status(201).json({
             success: true,
             message: "Read-only access granted to this case and its selected evidence.",
+            notificationStatus,
         });
     } catch (error) {
         next(error);

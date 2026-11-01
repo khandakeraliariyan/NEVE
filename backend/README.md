@@ -29,7 +29,7 @@ frontend work.
 | 4 | **Neve True Cost of Renting** | **Implemented** | Upfront and monthly estimates, itemized charges, assumptions, and supplied/calculated/estimated labels, including explicit unknowns. |
 | 5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate and consistency heuristics, renter reports, human review, and reviewed public summaries. Signals are not verification or fraud findings; identity/ownership checks are absent. |
 | 6 | **Neve Smart Choice — Explainable Property Matching** | **Partial** | Deterministic preference matching with scores, reasons, shortfalls, missing-data indicators, and saved-search alerts. This is not AI and does not include every planned preference, such as commute destinations or walking distance. |
-| 7 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewings, availability workflows, in-app notifications, saved-search alerts, and suspicious-message reporting. Email/push alerts are absent; inquiry and viewing status workflows have known inconsistencies. |
+| 7 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewings, availability workflows, in-app notifications, saved-search alerts, and suspicious-message reporting. Email/push alerts are absent; inquiries have two separate status flows, and viewings can't yet be marked completed. |
 | 8 | **Neve Agreement & Trust** | **Partial** | Private agreement uploads, manually entered clauses, obligations, payment/receipt records, and agreement sharing. OCR/extraction, generated explanations or wording, and legal-source retrieval are not implemented. |
 | 9 | **Neve Evidence Graph** | **Partial** | Typed evidence links, confidence and relationship history, deterministic missing/conflict/uncertainty flags, and a traceable JSON report. AI-proposed links, legal-source links, and hash-based tamper evidence are absent; analysis does not verify facts or liability. |
 | 10 | **Neve Move-In & Move-Out Records** | **Implemented** | Room and meter entries, photos, participant reviews, append-only corrections, and move-in/out comparisons. Comparisons report recorded differences; they do not assign fault. |
@@ -77,12 +77,13 @@ backend/
 │   ├── server.js              # Database connection and HTTP server startup
 │   ├── config/                # Environment, MongoDB, Firebase, and R2 setup
 │   ├── controllers/           # HTTP handlers
-│   ├── middleware/            # Authentication, roles, and validation
+│   ├── middleware/            # Authentication, roles, rate limits, and validation
 │   ├── models/                # Mongoose schemas
 │   ├── routes/                # Express routers
 │   ├── services/              # Business logic and integrations
 │   ├── utils/                 # API response and pagination helpers
 │   └── validators/            # Zod schemas
+├── test/                      # Node test runner suites
 ├── secrets/                   # Local credentials; excluded from Git
 ├── package.json
 └── .gitignore
@@ -183,9 +184,12 @@ node --input-type=module -e "import('./src/app.js')"
 - All API routes are mounted under `/api/v1`.
 - Helmet adds standard security headers; the Express `x-powered-by` header is
   disabled.
-- A general rate limiter allows up to 100 requests per 15-minute window.
-  Authentication, user, and upload groups have additional 20-request
-  per-15-minute limiters.
+- CORS runs before rate limiting, so preflight requests aren't counted and
+  browsers can read `429` responses.
+- A general rate limiter allows up to 100 requests per 15-minute window, not
+  counting uploads. Authentication and user groups have additional 20-request
+  per-15-minute limiters. Uploads have their own 120-request limiter, enough
+  for a full listing's 30 media files at two requests each.
 - CORS allows the configured `CLIENT_URL`, credentials, and the methods and
   headers configured in `src/app.js`.
 - JSON request bodies are limited to 1 MB.
@@ -219,6 +223,7 @@ the feature inventory previously proposed.
 | `/api/v1/health` | `GET /` | Public health check |
 | `/api/v1/auth` | `GET /me` | Authenticated current-user lookup |
 | `/api/v1/users` | `POST /profile`, `GET /me` | Authenticated profile creation and lookup |
+| `/api/v1/users` | `GET /lookup?type=manager\|reviewer&q=&limit=` | Renter/landlord search for active property managers or reviewers to assign or share with. Matches part of a name or a full email, and returns only ID, name, photo, and role |
 | `/api/v1/users` | `POST /me/favorites/:propertyId`, `GET /me/favorites`, `DELETE /me/favorites/:propertyId` | Renter favorites |
 | `/api/v1/users` | `POST /me/recently-viewed/:propertyId`, `GET /me/recently-viewed`, `DELETE /me/recently-viewed/:propertyId`, `DELETE /me/recently-viewed` | Renter recently viewed properties |
 | `/api/v1/properties` | `GET /`, `GET /recent`, `GET /search`, `GET /nearby`, `GET /:id`, `GET /:id/detail`, `GET /:id/costs`, `GET /:id/nearby`, `GET /:id/neighborhood-insights`, `POST /compare` | Public listing discovery, detail, nearby information, cost, and comparison |
@@ -245,10 +250,11 @@ the feature inventory previously proposed.
 | `/api/v1/evidence-graph` | `POST /properties/:propertyId/claims`, `POST /properties/:propertyId/claims/:claimId/evidence`, `GET /properties/:propertyId`, `PATCH /claims/:claimId/review` | Authenticated evidence and claim operations; review is admin-only |
 | `/api/v1/evidence-graph` | `PATCH /properties/:propertyId/evidence/:linkId` | Property owner/admin updates an evidence relationship; changes are retained in link history |
 | `/api/v1/tenancy` | `POST /agreements`, `GET /agreements`, `GET /agreements/:agreementId`, `PATCH /agreements/:agreementId/status` | Inquiry-linked agreement records; accessible to participants, assigned managers, or explicitly shared reviewers |
-| `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses`, `POST /agreements/:agreementId/obligations`, `PATCH /agreements/:agreementId/obligations/:obligationId`, `POST /agreements/:agreementId/payments` | Manual clause annotations, obligations, and BDT payment/receipt records |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses`, `POST /agreements/:agreementId/obligations`, `PATCH /agreements/:agreementId/obligations/:obligationId`, `POST /agreements/:agreementId/payments`, `PATCH /agreements/:agreementId/payments/:paymentId` | Manual clause annotations, obligations, and BDT payment/receipt records |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph`, `GET /agreements/:agreementId/evidence-report` | Traceable evidence graph and downloadable JSON report; access follows agreement permissions |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a mediator or legal reviewer |
 | `/api/v1/tenancy` | `GET /agreements/:agreementId/cases`, `POST /agreements/:agreementId/cases`, `GET /cases/:caseId`, `POST /cases/:caseId/evidence`, `DELETE /cases/:caseId/evidence/:fileId`, `PATCH /cases/:caseId/status` | Private dispute cases with agreement-linked evidence; participants manage cases, assigned reviewers have read-only scope |
+| `/api/v1/tenancy` | `GET /cases?status=&page=&limit=` | Mediator/legal reviewer list of cases shared directly with them; removed evidence and other shares are omitted |
 | `/api/v1/tenancy` | `POST /cases/:caseId/shares`, `DELETE /cases/:caseId/shares/:userId` | Participants share/revoke a case and its selected evidence with a mediator or legal reviewer |
 | `/api/v1/tenancy` | `PATCH /agreements/:agreementId/property-manager` | Participants assign or unassign an active property manager for that agreement |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/condition-reports/:stage`, `POST /agreements/:agreementId/condition-reports/:reportId/entries`, `GET /agreements/:agreementId/condition-reports`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/reviews`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/corrections`, `GET /agreements/:agreementId/condition-comparison` | Room condition and utility-meter move-in/out records, participant review, preserved corrections, and comparison |
@@ -261,7 +267,7 @@ the feature inventory previously proposed.
 | `/api/v1/admin/privacy` | `GET /deletion-requests`, `PATCH /deletion-requests/:requestId`, `GET /retention-due`, `PATCH /files/:fileId/retention`, `GET /access-logs` | Admin review of private-document deletion, retention/legal holds, and sensitive access history |
 | `/api/v1/admin/ai-evaluations` | `POST /runs`, `GET /runs`, `GET /runs/:runId` | Admin-only benchmark metric submission and review |
 | `/api/v1/admin/trust-approval` | `PATCH /claims/:claimId/public-summary`, `PATCH /warnings/:warningId/public-summary` | Admin approval/revocation of public trust summaries |
-| `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId` | Property reviews |
+| `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId` | Property reviews; posting requires a `confirmed` or `completed` viewing of that property |
 | `/api/v1/review-moderation` | `POST /:reviewId/reports`, `GET /reports`, `PATCH /reports/:reportId`, `PATCH /:reviewId/moderation` | Review reports and moderation |
 | `/api/v1/landlord/dashboard` | `GET /properties`, `GET /performance` | Landlord/property-manager listing dashboard and analytics for owned or assigned listings |
 | `/api/v1/landlord/dashboard` | `GET /tenancies` | Property-manager assigned tenancies, lease dates, open obligations, and maintenance summary |
@@ -281,7 +287,7 @@ Mongoose models currently defined in `src/models/`:
 | `InquiryMessage` | Private inquiry-thread messages with sender/recipient and read receipt |
 | `CommunicationReport` | Participant-submitted suspicious-message reports and admin review state |
 | `ViewingRequest` | Requested property viewing, participants, date, and status (`requested`, `confirmed`, `declined`, `cancelled`, or `completed`) |
-| `Notification` | Recipient notifications, read state, and deduplicated matching-listing alerts |
+| `Notification` | Recipient notifications, read state, deduplicated matching-listing alerts, and case-share alerts |
 | `PropertyReport` | Renter-submitted listing reports and administrative review |
 | `PropertyViewEvent` | Property-view event records |
 | `UploadedFile` | Private/public R2 object metadata, uploader, purpose, upload state, retention date, and legal-hold flag |
@@ -307,8 +313,8 @@ Mongoose models currently defined in `src/models/`:
 
 Properties use the statuses `draft`, `published`, and `paused`. Review, report,
 warning, claim, inquiry, viewing, agreement, and upload statuses are defined
-separately in their schemas; some legacy inquiry and viewing workflows still
-have inconsistent transitions as noted below.
+separately in their schemas; see [Current integration gaps](#current-integration-gaps)
+for the remaining inquiry and viewing workflow issues.
 
 ## Feature notes
 
@@ -474,8 +480,10 @@ optional user-authored annotation, not model-generated legal guidance.
 Participants can create a dispute case with `POST
 /api/v1/tenancy/agreements/:agreementId/cases`, attach files already linked to
 that agreement, and share the case with an active mediator or legal reviewer.
-Case-only reviewers can view that case and request short-lived access URLs for
-its selected evidence; they cannot browse the agreement, other cases, or
+Sharing notifies the reviewer in-app, and the response reports
+`notificationStatus`. Case-only reviewers can find shared cases with
+`GET /api/v1/tenancy/cases`, view them, and request short-lived access URLs for
+their selected evidence; they cannot browse the agreement, other cases, or
 unselected files. Participants can revoke the share or remove evidence while
 retaining its removal history. The older agreement-wide share route remains
 available when participants intentionally grant broader read-only access.
@@ -590,9 +598,9 @@ assigns them with `PATCH /api/v1/properties/:propertyId/managers` using
 that access. Assignment history is retained. Assigned managers can update
 listing details and availability, upload/attach media, update cost disclosures,
 review listing consistency, manage inquiries and viewings, and see analytics.
-Managers can access assignment details through
-`GET /api/v1/properties/:propertyId/managers`; only the listing owner can
-assign or revoke managers. They cannot assign other managers. Dashboard and
+Only the listing owner can view assignments through
+`GET /api/v1/properties/:propertyId/managers` or assign and revoke managers, so
+managers cannot assign other managers. Dashboard and
 listing-performance queries include listings they own or currently manage. Property manager listing access
 is separate from agreement assignment; an agreement manager must be explicitly
 assigned on that agreement as well. Managers can view listing performance at
@@ -708,28 +716,30 @@ specific shapes and pagination logic.
 
 These are known issues in the source at the time this README was written:
 
-1. **Identity consistency:** authentication sets Firebase claims on
-   `req.user`; role middleware loads the database user into `req.neveUser`.
-   Core marketplace endpoints use the profile record, but remaining legacy
-   controllers should be checked for consistent identity handling.
-2. **Inquiry status mismatch:** the landlord response controller accepts
-   `rejected`, but `Inquiry.status` does not include that value. Another
-   inquiry handler uses `declined` and `responded`, so the supported workflow
-   needs consolidation.
-3. **Viewing status mismatch:** viewing handlers use both `requested` with
-   `confirmed`/`declined` and `pending` with `approved`/`rejected`. The schema
-   permits multiple variants, but the handlers do not consistently use the
-   same state transitions.
-4. **Audit coverage:** audit logs are written for some admin moderation and
-   trust-summary actions, but report review at
-   `PATCH /api/v1/property-reports/admin/:reportId` does not currently record
-   an audit action.
-5. **Response and pagination consistency:** the shared helpers are not
+1. **Role assignment:** every new profile is created as `renter`, and no endpoint
+   changes a role or an account's active state. Landlord, property-manager,
+   reviewer, and admin accounts currently require a direct database edit.
+2. **Profile editing:** users can create and read a profile, but no endpoint
+   updates the name, photo, or phone number.
+3. **Inquiry status flows:** `PATCH /api/v1/inquiries/:inquiryId/respond` accepts
+   `accepted` or `declined`, and only from `pending`.
+   `PATCH /api/v1/inquiries/:id` separately accepts `acknowledged`, `responded`,
+   or `closed`. The supported workflow needs consolidation.
+4. **Viewing completion:** handlers use `requested`, `confirmed`, `declined`, and
+   `cancelled`, but none sets the schema's `completed` status.
+5. **Property-manager messaging:** managers can list and answer inquiries for
+   listings they manage, but inquiry message threads are limited to the renter
+   and landlord.
+6. **Unpublished listing lookup:** `GET /api/v1/properties/:id` returns published
+   listings only, so owners and managers must find drafts and paused listings
+   through the paginated `GET /api/v1/properties/mine` or
+   `GET /api/v1/landlord/dashboard/properties`.
+7. **Response and pagination consistency:** the shared helpers are not
    consistently used by all endpoints; clients should check each endpoint's
    controller for its exact response shape.
-6. **Documentation/config template:** there is no backend `.env.example` or
+8. **Documentation/config template:** there is no backend `.env.example` or
    Swagger configuration file in the current source tree.
-7. **External agreement intelligence:** OCR, automated clause extraction,
+9. **External agreement intelligence:** OCR, automated clause extraction,
    AI-generated explanations or wording, and legal-source retrieval require
    an external provider and are not implemented. The evaluation API records
    benchmark metrics but does not invoke those providers. Agreement clause
@@ -737,3 +747,6 @@ These are known issues in the source at the time this README was written:
 
 Treat these gaps as implementation work, not as supported behavior. Recheck
 this section after the corresponding code has been corrected.
+
+The pages a frontend needs for this API are listed in
+[`docs/frontend-pages.md`](../docs/frontend-pages.md).

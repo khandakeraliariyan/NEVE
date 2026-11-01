@@ -7,6 +7,7 @@ export const createNotification = async ({
     message,
     relatedProperty = null,
     relatedViewingRequest = null,
+    relatedCase = null,
 }) => {
     if (!recipient) {
         throw new Error("Notification recipient is required.");
@@ -19,5 +20,6 @@ export const createNotification = async ({
         message,
         relatedProperty,
         relatedViewingRequest,
+        relatedCase,
     });
 };
