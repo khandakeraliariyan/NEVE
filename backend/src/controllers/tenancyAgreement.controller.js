@@ -7,6 +7,7 @@ import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import { analyzeAgreementEvidence } from "../services/evidenceGraphAnalysis.service.js";
+import { buildAgreementEvidenceReport } from "../services/evidenceReport.service.js";
 import {
     appendAuditEvent,
     canManageAgreement,
@@ -1172,6 +1173,67 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             disclaimer:
                 "User-entered records and links are not independently verified and do not determine legal liability.",
         });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getAgreementEvidenceReport(req, res, next) {
+    try {
+        const agreement = await getAccessibleAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+
+        await saveAuditedChange(agreement, req, "evidence_report_generated");
+        const [messages, messageCount, links] = await Promise.all([
+            InquiryMessage.find({ inquiry: agreement.inquiry })
+                .populate("sender", "displayName role")
+                .sort({ createdAt: 1 })
+                .limit(501)
+                .lean(),
+            InquiryMessage.countDocuments({ inquiry: agreement.inquiry }),
+            TenancyEvidenceLink.find({ agreement: agreement._id })
+                .populate(
+                    "uploadedFile",
+                    "originalName mimeType sizeBytes status"
+                )
+                .populate("linkedBy", "displayName role")
+                .sort({ createdAt: 1 })
+                .lean(),
+        ]);
+        const includedMessages = messages.slice(0, 500);
+        const fileIds = [
+            agreement.documentFile,
+            ...agreement.obligations
+                .map((obligation) => obligation.evidenceFile)
+                .filter(Boolean),
+            ...agreement.payments
+                .map((payment) => payment.receiptFile)
+                .filter(Boolean),
+            ...links.map((link) => link.uploadedFile?._id ?? link.uploadedFile),
+        ];
+        const files = await UploadedFile.find({
+            _id: { $in: [...new Set(fileIds.map(String))] },
+        })
+            .select("originalName mimeType sizeBytes status")
+            .lean();
+        const report = buildAgreementEvidenceReport({
+            agreement,
+            links,
+            files,
+            messages: includedMessages,
+            generatedAt: new Date(),
+            messageCount,
+            messageLimit: 500,
+        });
+
+        setPrivateResponse(res);
+        res.set(
+            "Content-Disposition",
+            `attachment; filename="neve-evidence-report-${agreement._id}.json"`
+        );
+        return res.json({ success: true, data: report });
     } catch (error) {
         next(error);
     }

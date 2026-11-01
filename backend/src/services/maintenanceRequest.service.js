@@ -14,6 +14,33 @@ const STATUS_TRANSITIONS = {
     cancelled: [],
 };
 
+export function buildMaintenanceSearchFilter(query) {
+    if (query === undefined) {
+        return { filter: {} };
+    }
+    if (typeof query !== "string" || query.trim().length > 120) {
+        return {
+            error: "q must be a text search of at most 120 characters.",
+        };
+    }
+    const value = query.trim();
+    if (!value) {
+        return { filter: {} };
+    }
+    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const search = new RegExp(escaped, "i");
+    return {
+        filter: {
+            $or: [
+                { title: search },
+                { description: search },
+                { category: search },
+                { "history.message": search },
+            ],
+        },
+    };
+}
+
 export function canTransitionMaintenanceStatus(currentStatus, nextStatus) {
     return (
         currentStatus === nextStatus ||

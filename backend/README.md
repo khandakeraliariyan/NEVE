@@ -204,19 +204,20 @@ the feature inventory previously proposed.
 | `/api/v1/nearby-places` | `GET /:propertyId` | Nearby-place lookup for a published property |
 | `/api/v1/rental-costs` | `GET /:propertyId`, `PUT /:propertyId` | Rental-cost summary and update |
 | `/api/v1/saved-properties` | `GET /`, `POST /:propertyId`, `DELETE /:propertyId` | Authenticated saved properties |
+| `/api/v1/saved-searches` | `GET /`, `POST /`, `GET /:searchId`, `PATCH /:searchId`, `DELETE /:searchId` | Renter-owned saved searches and matching-alert opt-in |
 | `/api/v1/renter-preferences` | `GET /`, `PUT /` | Authenticated preference read/update, including matching-alert opt-in |
 | `/api/v1/listing-consistency` | `GET /:propertyId`, `PATCH /warnings/:warningId` | Listing consistency check and warning status |
 | `/api/v1/evidence-graph` | `POST /properties/:propertyId/claims`, `POST /properties/:propertyId/claims/:claimId/evidence`, `GET /properties/:propertyId`, `PATCH /claims/:claimId/review` | Authenticated evidence and claim operations; review is admin-only |
 | `/api/v1/evidence-graph` | `PATCH /properties/:propertyId/evidence/:linkId` | Property owner/admin updates an evidence relationship; changes are retained in link history |
 | `/api/v1/tenancy` | `POST /agreements`, `GET /agreements`, `GET /agreements/:agreementId`, `PATCH /agreements/:agreementId/status` | Inquiry-linked agreement records; accessible to participants, assigned managers, or explicitly shared reviewers |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses`, `POST /agreements/:agreementId/obligations`, `PATCH /agreements/:agreementId/obligations/:obligationId`, `POST /agreements/:agreementId/payments` | Manual clause annotations, obligations, and BDT payment/receipt records |
-| `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph` | Case-scoped evidence graph; participants and explicitly shared reviewers can inspect or update relationship assessments |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph`, `GET /agreements/:agreementId/evidence-report` | Traceable evidence graph and downloadable JSON report; access follows agreement permissions |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a mediator or legal reviewer |
 | `/api/v1/tenancy` | `GET /agreements/:agreementId/cases`, `POST /agreements/:agreementId/cases`, `GET /cases/:caseId`, `POST /cases/:caseId/evidence`, `DELETE /cases/:caseId/evidence/:fileId`, `PATCH /cases/:caseId/status` | Private dispute cases with agreement-linked evidence; participants manage cases, assigned reviewers have read-only scope |
 | `/api/v1/tenancy` | `POST /cases/:caseId/shares`, `DELETE /cases/:caseId/shares/:userId` | Participants share/revoke a case and its selected evidence with a mediator or legal reviewer |
 | `/api/v1/tenancy` | `PATCH /agreements/:agreementId/property-manager` | Participants assign or unassign an active property manager for that agreement |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/condition-reports/:stage`, `POST /agreements/:agreementId/condition-reports/:reportId/entries`, `GET /agreements/:agreementId/condition-reports`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/reviews`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/corrections`, `GET /agreements/:agreementId/condition-comparison` | Room condition and utility-meter move-in/out records, participant review, preserved corrections, and comparison |
-| `/api/v1/tenancy` | `POST /agreements/:agreementId/maintenance-requests`, `GET /maintenance-requests`, `PATCH /maintenance-requests/:requestId/progress` | Case-scoped repair requests, responsibilities, progress, status, and private evidence |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/maintenance-requests`, `GET /maintenance-requests?q=...`, `PATCH /maintenance-requests/:requestId/progress` | Authorized repair history search across request details and progress messages; responsibilities, status, and private evidence |
 | `/api/v1/property-trust` | `GET /:propertyId` | Public trust summaries for published properties |
 | `/api/v1/admin/dashboard` | `GET /overview`, `GET /reports`, `GET /warnings`, `GET /claims`, `GET /communication-reports` | Admin dashboard and communication-report review queue |
 | `/api/v1/admin/moderation` | `PATCH /reports/:reportId/status`, `PATCH /communication-reports/:reportId/status`, `PATCH /warnings/:warningId/status`, `PATCH /warnings/:warningId/public-visibility`, `PATCH /claims/:claimId/review`, `PATCH /claims/:claimId/public-visibility` | Admin moderation |
@@ -251,6 +252,7 @@ Mongoose models currently defined in `src/models/`:
 | `UploadedFile` | Private/public R2 object metadata, uploader, purpose, upload state, retention date, and legal-hold flag |
 | `RentalCost` | Itemized rental costs and unknown-cost notes |
 | `SavedProperty` | Unique renter/property bookmarks |
+| `SavedSearch` | Renter-owned saved search criteria, alert opt-in, and bounded per-renter slots |
 | `RenterPreference` | Search preferences used for recommendations |
 | `NearbyPlaceCache` | Cached nearby-place data |
 | `ListingWarning` | Listing-consistency warnings and public summaries |
@@ -418,6 +420,14 @@ contradictory relationships, and unassessed or low-confidence links. Evidence
 links accept an optional confidence value from 0 to 1. These checks use
 structured records and participant assessments only; uploaded files are not
 analyzed, and flags do not verify facts or determine liability.
+
+`GET /api/v1/tenancy/agreements/:agreementId/evidence-report` returns the
+same agreement-scoped records as a downloadable JSON report, including source
+file metadata, clause and payment records, inquiry messages, relationship
+history, audit events, and deterministic analysis flags. Message history is
+capped at 500 entries; the report marks whether it was truncated. File contents
+are not embedded, and report generation is recorded in the agreement audit
+trail and sensitive-access log.
 
 Jurisdiction defaults to Bangladesh as metadata. Bangladesh-specific legal
 source retrieval, automated extraction, generated plain-language explanations,
@@ -627,7 +637,18 @@ whose deterministic preference score is at least 70% and whose known rent is
 not outside their budget. Notifications are deduplicated per renter/property.
 The publish response includes `matchingAlerts.status` and delivery counts, or
 reports `failed` if notification delivery could not be completed. Email, push,
-scheduled digests, and multiple independently saved searches are not included.
+and scheduled digests are not included.
+
+Renters can save, update, list, and delete up to 20 named searches at
+`/api/v1/saved-searches`. Searches support text, city, area, property type,
+furnishing, rent and bedroom ranges, availability date, lease-duration ranges,
+and amenities. Alerts can be individually disabled. A newly published listing
+must satisfy every selected saved-search criterion to trigger an in-app alert;
+the existing preference-based score alerts continue to work, and notifications
+remain deduplicated per renter/property. Alerts are generated when a listing
+is first published or republished; existing per-property notifications prevent
+duplicate deliveries. Newly saved or edited searches are not matched
+retroactively against already published listings.
 
 ### Suspicious communication reports
 

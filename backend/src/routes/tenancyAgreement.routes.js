@@ -6,6 +6,7 @@ import {
     addAgreementPayment,
     createTenancyAgreement,
     getAgreementEvidenceGraph,
+    getAgreementEvidenceReport,
     getTenancyAgreement,
     listTenancyAgreements,
     revokeAgreementShare,
@@ -118,6 +119,10 @@ router.patch(
     updateMaintenanceRequest
 );
 router.get("/agreements/:agreementId/evidence-graph", getAgreementEvidenceGraph);
+router.get(
+    "/agreements/:agreementId/evidence-report",
+    getAgreementEvidenceReport
+);
 router.post(
     "/agreements/:agreementId/evidence-links",
     allowRoles("renter", "landlord"),

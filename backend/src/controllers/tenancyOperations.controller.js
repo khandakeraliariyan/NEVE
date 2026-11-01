@@ -5,7 +5,10 @@ import TenancyAgreement from "../models/TenancyAgreement.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import { compareConditionReports } from "../services/conditionReport.service.js";
-import { canTransitionMaintenanceStatus } from "../services/maintenanceRequest.service.js";
+import {
+    buildMaintenanceSearchFilter,
+    canTransitionMaintenanceStatus,
+} from "../services/maintenanceRequest.service.js";
 import {
     appendAuditEvent,
     canManageAgreement,
@@ -777,6 +780,13 @@ export async function listMaintenanceRequests(req, res, next) {
                 message: "Page must be positive and limit must be between 1 and 100.",
             });
         }
+        const search = buildMaintenanceSearchFilter(req.query.q);
+        if (search.error) {
+            return res.status(400).json({
+                success: false,
+                message: search.error,
+            });
+        }
         const agreements = await TenancyAgreement.find({
             $or: [
                 { renter: actorId(req) },
@@ -798,6 +808,7 @@ export async function listMaintenanceRequests(req, res, next) {
         }).select("_id");
         const agreementIds = agreements.map((agreement) => agreement._id);
         const filter = { agreement: { $in: agreementIds } };
+        Object.assign(filter, search.filter);
         if (req.query.status !== undefined) {
             if (!requestStatuses.includes(req.query.status)) {
                 return res.status(400).json({
