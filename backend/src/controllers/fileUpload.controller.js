@@ -17,6 +17,7 @@ import {
     createDownloadUrl,
     deleteStoredObject,
 } from "../services/fileUpload.service.js";
+import { canManageProperty } from "../services/propertyAccess.service.js";
 
 const getUserId = (req) => req.neveUser?._id;
 
@@ -88,11 +89,9 @@ export const requestUploadUrl = async (req, res) => {
                 return res.status(404).json({ message: "Property not found." });
             }
 
-            const landlordId = property.landlord?._id || property.landlord;
-
             if (
                 req.neveUser.role !== "admin" &&
-                String(landlordId) !== String(userId)
+                !(await canManageProperty(property, userId))
             ) {
                 return res.status(403).json({
                     message: "You cannot upload media for this property.",
@@ -254,8 +253,7 @@ export const getFileAccessUrl = async (req, res) => {
             );
 
             if (property) {
-                const landlordId = property.landlord?._id || property.landlord;
-                isPropertyOwner = String(landlordId) === userId;
+                isPropertyOwner = await canManageProperty(property, userId);
             }
         }
 

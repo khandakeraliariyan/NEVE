@@ -20,7 +20,7 @@ router.use(authenticateUser);
 // Landlord or admin can review a property they are authorized to manage.
 router.get(
     "/:propertyId",
-    allowRoles("landlord", "admin"),
+    allowRoles("landlord", "property_manager", "admin"),
     reviewListingConsistency
 );
 

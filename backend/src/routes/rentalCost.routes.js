@@ -15,7 +15,7 @@ router.get("/:propertyId", getPropertyRentalCost);
 router.put(
   "/:propertyId",
   authenticateUser,
-  allowRoles("landlord", "admin"),
+  allowRoles("landlord", "property_manager", "admin"),
   updatePropertyRentalCost
 );
 

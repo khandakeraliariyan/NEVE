@@ -185,7 +185,7 @@ the feature inventory previously proposed.
 | `/api/v1/users` | `POST /me/favorites/:propertyId`, `GET /me/favorites`, `DELETE /me/favorites/:propertyId` | Renter favorites |
 | `/api/v1/users` | `POST /me/recently-viewed/:propertyId`, `GET /me/recently-viewed`, `DELETE /me/recently-viewed/:propertyId`, `DELETE /me/recently-viewed` | Renter recently viewed properties |
 | `/api/v1/properties` | `GET /`, `GET /recent`, `GET /search`, `GET /nearby`, `GET /:id`, `GET /:id/detail`, `GET /:id/costs`, `GET /:id/nearby`, `GET /:id/neighborhood-insights`, `POST /compare` | Public listing discovery, detail, nearby information, cost, and comparison |
-| `/api/v1/properties` | `GET /mine`, `POST /`, `PATCH /:id`, `PATCH /:id/status` | Authenticated landlord or property-manager listing management |
+| `/api/v1/properties` | `GET /mine`, `POST /`, `PATCH /:id`, `PATCH /:id/status`, `GET /:id/managers`, `PATCH /:id/managers` | Landlord/property-manager listing management; owners list, assign, or revoke property-manager access |
 | `/api/v1/properties` | `POST /:id/view-event` | Authenticated renter view-event recording |
 | `/api/v1/properties` | `GET /:propertyId/details`, `GET /:propertyId/transparency` | Property detail/transparency router mounted before the main property router |
 | `/api/v1/inquiries` | `POST /`, `GET /mine`, `GET /:inquiryId/messages`, `POST /:inquiryId/messages`, `POST /:inquiryId/messages/:messageId/report` | Renter inquiries, participant-only message threads, and message reporting |
@@ -210,6 +210,9 @@ the feature inventory previously proposed.
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses`, `POST /agreements/:agreementId/obligations`, `PATCH /agreements/:agreementId/obligations/:obligationId`, `POST /agreements/:agreementId/payments` | Manual clause annotations, obligations, and BDT payment/receipt records |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph` | Case-scoped evidence graph; participants and explicitly shared reviewers can inspect or update relationship assessments |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a mediator or legal reviewer |
+| `/api/v1/tenancy` | `PATCH /agreements/:agreementId/property-manager` | Participants assign or unassign an active property manager for that agreement |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/condition-reports/:stage`, `POST /agreements/:agreementId/condition-reports/:reportId/entries`, `GET /agreements/:agreementId/condition-reports`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/reviews`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/corrections`, `GET /agreements/:agreementId/condition-comparison` | Room condition and utility-meter move-in/out records, participant review, preserved corrections, and comparison |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/maintenance-requests`, `GET /maintenance-requests`, `PATCH /maintenance-requests/:requestId/progress` | Case-scoped repair requests, responsibilities, progress, status, and private evidence |
 | `/api/v1/property-trust` | `GET /:propertyId` | Public trust summaries for published properties |
 | `/api/v1/admin/dashboard` | `GET /overview`, `GET /reports`, `GET /warnings`, `GET /claims`, `GET /communication-reports` | Admin dashboard and communication-report review queue |
 | `/api/v1/admin/moderation` | `PATCH /reports/:reportId/status`, `PATCH /communication-reports/:reportId/status`, `PATCH /warnings/:warningId/status`, `PATCH /warnings/:warningId/public-visibility`, `PATCH /claims/:claimId/review`, `PATCH /claims/:claimId/public-visibility` | Admin moderation |
@@ -217,7 +220,8 @@ the feature inventory previously proposed.
 | `/api/v1/admin/trust-approval` | `PATCH /claims/:claimId/public-summary`, `PATCH /warnings/:warningId/public-summary` | Admin approval/revocation of public trust summaries |
 | `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId` | Property reviews |
 | `/api/v1/review-moderation` | `POST /:reviewId/reports`, `GET /reports`, `PATCH /reports/:reportId`, `PATCH /:reviewId/moderation` | Review reports and moderation |
-| `/api/v1/landlord/dashboard` | `GET /properties`, `GET /performance` | Landlord dashboard |
+| `/api/v1/landlord/dashboard` | `GET /properties`, `GET /performance` | Landlord/property-manager listing dashboard and analytics for owned or assigned listings |
+| `/api/v1/landlord/dashboard` | `GET /tenancies` | Property-manager assigned tenancies, lease dates, open obligations, and maintenance summary |
 
 For exact role checks and request/response fields, see the corresponding
 router, controller, validator, and model under `src/`.
@@ -229,7 +233,7 @@ Mongoose models currently defined in `src/models/`:
 | Model | Purpose |
 |---|---|
 | `User` | NEVE profile linked to a Firebase UID, role, account state, favorites, and recently viewed properties |
-| `Property` | Rental listing, location, amenities, images, videos, floor plans, pricing, availability, and publication status |
+| `Property` | Rental listing, location, amenities, images, videos, floor plans, pricing, availability, publication status, and property-manager assignments |
 | `Inquiry` | Renter inquiry, landlord response, and inquiry status |
 | `InquiryMessage` | Private inquiry-thread messages with sender/recipient and read receipt |
 | `CommunicationReport` | Participant-submitted suspicious-message reports and admin review state |
@@ -247,6 +251,8 @@ Mongoose models currently defined in `src/models/`:
 | `EvidenceLink` | Links uploaded files to claims and records their relationship |
 | `TenancyAgreement` | Inquiry-linked agreement metadata, manual clause annotations, obligations, payment entries, limited case sharing, and a bounded audit trail |
 | `TenancyEvidenceLink` | Evidence-graph edges from agreement nodes to private files, including relationship history |
+| `ConditionReport` | Move-in/move-out room and meter records with append-only corrections, photos, and participant review events |
+| `MaintenanceRequest` | Agreement-scoped repair requests, responsibility, status, attached evidence, and progress history |
 | `AdminAuditLog` | Administrative actions and target records |
 | `Review` | Property ratings, comments, and moderation state |
 | `ReviewReport` | Reports about reviews |
@@ -405,6 +411,56 @@ Jurisdiction defaults to Bangladesh as metadata. Bangladesh-specific legal
 source retrieval, automated extraction, generated plain-language explanations,
 and editable legal wording are not implemented. `plainLanguageNote` is an
 optional user-authored annotation, not model-generated legal guidance.
+
+### Move-in and move-out condition records
+
+For each agreement, create one `move_in` and one `move_out` report. Add
+room-condition entries (room, fixture/item, condition, notes, optional photos)
+and utility-meter entries (electricity, gas, or water reading and unit).
+Entries can be confirmed or disputed by agreement participants and the
+assigned property manager. Corrections append a new entry that references the
+original; prior entries are preserved. `GET .../condition-reports` returns the
+record history and reviews. `GET .../condition-comparison` compares the latest
+entry for each room/item or meter and reports recorded differences only; it
+does not identify when damage occurred or assign responsibility. Photo
+attachments must first be uploaded as private tenancy evidence.
+
+### Maintenance and repairs
+
+Agreement participants can submit case-scoped repair requests with category,
+priority, description, responsibility, and optional private evidence. The
+participants and assigned property manager can list requests and append
+progress updates, status changes, responsibility updates, and completion
+evidence. Updates and evidence references are retained in request history and
+the agreement audit trail. Cancelled requests cannot be changed; only the
+requester or assigned property manager may cancel. Uploaded evidence remains
+private to its uploader and users authorized for the associated agreement.
+
+### Property-manager tools
+
+Landlords or renters can explicitly assign an active property-manager account
+to an agreement through
+`PATCH /api/v1/tenancy/agreements/:agreementId/property-manager`, or send
+`{"managerId": null}` to unassign it. Assignment and removal are audit-logged.
+An assigned manager can access that agreement's records, update obligation
+status/notes, create and review condition entries, manage maintenance
+progress, and access attached evidence. Mediators and legal reviewers retain
+read-only access when explicitly shared. Managers can also manage their own
+listings and can manage another landlord's listing only after the landlord
+assigns them with `PATCH /api/v1/properties/:propertyId/managers` using
+`{"managerId":"...","action":"assign"}`. Use `"action":"revoke"` to remove
+that access. Assignment history is retained. Assigned managers can update
+listing details and availability, upload/attach media, update cost disclosures,
+review listing consistency, manage inquiries and viewings, and see analytics.
+Managers can access assignment details through
+`GET /api/v1/properties/:propertyId/managers`; only the listing owner can
+assign or revoke managers. They cannot assign other managers. Dashboard and
+listing-performance queries include listings they own or currently manage. Property manager listing access
+is separate from agreement assignment; an agreement manager must be explicitly
+assigned on that agreement as well. Managers can view listing performance at
+`/api/v1/landlord/dashboard`; their
+assigned tenancy summary and counts are available at
+`GET /api/v1/landlord/dashboard/tenancies`.
 
 ### Neighborhood intelligence
 

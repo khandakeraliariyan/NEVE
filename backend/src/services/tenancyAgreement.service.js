@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import TenancyAgreement from "../models/TenancyAgreement.js";
+import ConditionReport from "../models/ConditionReport.js";
+import MaintenanceRequest from "../models/MaintenanceRequest.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
 
 export function isAgreementParticipant(agreement, userId) {
@@ -7,11 +9,21 @@ export function isAgreementParticipant(agreement, userId) {
     return (
         String(agreement.renter) === id ||
         String(agreement.landlord) === id ||
+        String(agreement.assignedPropertyManager ?? "") === id ||
         agreement.sharedWith.some(
             (entry) =>
                 String(entry.user) === id &&
                 entry.revokedAt === null
         )
+    );
+}
+
+export function canManageAgreement(agreement, userId) {
+    const id = String(userId);
+    return (
+        String(agreement.renter) === id ||
+        String(agreement.landlord) === id ||
+        String(agreement.assignedPropertyManager ?? "") === id
     );
 }
 
@@ -21,6 +33,7 @@ export async function findAccessibleAgreement(agreementId, userId) {
         $or: [
             { renter: userId },
             { landlord: userId },
+            { assignedPropertyManager: userId },
             { sharedWith: { $elemMatch: { user: userId, revokedAt: null } } },
         ],
     });
@@ -68,6 +81,7 @@ export async function findAgreementForEvidenceFile(fileId, userId) {
                 $or: [
                     { renter: userId },
                     { landlord: userId },
+                    { assignedPropertyManager: userId },
                     {
                         sharedWith: {
                             $elemMatch: { user: userId, revokedAt: null },
@@ -86,7 +100,29 @@ export async function findAgreementForEvidenceFile(fileId, userId) {
         uploadedFile: fileId,
     }).select("agreement");
 
-    return link
-        ? findAccessibleAgreement(link.agreement, userId)
+    if (link) {
+        const agreement = await findAccessibleAgreement(link.agreement, userId);
+        if (agreement) return agreement;
+    }
+
+    const conditionReport = await ConditionReport.findOne({
+        "entries.photos": fileId,
+    }).select("agreement");
+    if (conditionReport) {
+        const agreement = await findAccessibleAgreement(
+            conditionReport.agreement,
+            userId
+        );
+        if (agreement) return agreement;
+    }
+
+    const maintenanceRequest = await MaintenanceRequest.findOne({
+        $or: [
+            { evidenceFiles: fileId },
+            { "history.evidenceFiles": fileId },
+        ],
+    }).select("agreement");
+    return maintenanceRequest
+        ? findAccessibleAgreement(maintenanceRequest.agreement, userId)
         : null;
 }

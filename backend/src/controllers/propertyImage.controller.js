@@ -4,6 +4,7 @@ import Property from "../models/Property.js";
 import UploadedFile from "../models/UploadedFile.js";
 
 import { createDownloadUrl } from "../services/fileUpload.service.js";
+import { canManageProperty } from "../services/propertyAccess.service.js";
 
 const mediaFields = {
   property_image: { field: "images", label: "image", max: 20 },
@@ -27,11 +28,9 @@ async function findManageableProperty(propertyId, req) {
     return { error: "NOT_FOUND" };
   }
 
-  const landlordId = property.landlord?._id || property.landlord;
-
   if (
     getUserRole(req) !== "admin" &&
-    String(landlordId) !== String(getUserId(req))
+    !(await canManageProperty(property, getUserId(req)))
   ) {
     return { error: "FORBIDDEN" };
   }

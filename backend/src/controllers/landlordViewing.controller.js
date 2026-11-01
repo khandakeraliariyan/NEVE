@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import ViewingRequest from "../models/ViewingRequest.js";
 import Property from "../models/Property.js";
 import { createNotification } from "../services/notification.service.js";
+import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 
 // GET /api/v1/viewings/landlord
 export const getLandlordViewingRequests = async (req, res, next) => {
@@ -38,10 +39,9 @@ export const getLandlordViewingRequests = async (req, res, next) => {
             });
         }
 
-        // Find only properties owned by the authenticated landlord.
-        const propertyIds = await Property.find({
-            landlord: req.neveUser._id,
-        }).distinct("_id");
+        const propertyIds = await Property.find(
+            manageablePropertyFilter(req.neveUser._id)
+        ).distinct("_id");
 
         const filter = {
             property: { $in: propertyIds },
@@ -122,7 +122,7 @@ export const respondToViewingRequest = async (req, res, next) => {
         // Verify ownership through the property itself.
         const property = await Property.findOne({
             _id: viewingRequest.property,
-            landlord: req.neveUser._id,
+            ...manageablePropertyFilter(req.neveUser._id),
         }).select("_id");
 
         if (!property) {

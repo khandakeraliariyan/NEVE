@@ -6,6 +6,8 @@ import {
     getPropertySort,
 } from "../services/propertySearch.service.js";
 import { notifyRentersOfMatchingProperty } from "../services/matchingAlert.service.js";
+import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
+import User from "../models/User.js";
 
 const editableFields = [
     "title",
@@ -105,13 +107,141 @@ export async function getRecentProperties(req, res, next) {
 export async function getMyProperties(req, res, next) {
     try {
         const properties = await Property.find({
-            landlord: req.neveUser._id,
+            ...manageablePropertyFilter(req.neveUser._id),
         }).sort({ createdAt: -1 });
 
         return res.status(200).json({
             success: true,
             count: properties.length,
             properties,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function updatePropertyManagers(req, res, next) {
+    try {
+        const { id } = req.params;
+        const { managerId, action } = req.body ?? {};
+        if (
+            !mongoose.isValidObjectId(id) ||
+            !mongoose.isValidObjectId(managerId) ||
+            !["assign", "revoke"].includes(action)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "A valid managerId and assign/revoke action are required.",
+            });
+        }
+
+        const property = await Property.findOne({
+            _id: id,
+            landlord: req.neveUser._id,
+        }).select("+managerAssignments");
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Property not found or you are not its owner.",
+            });
+        }
+
+        if (action === "assign") {
+            const manager = await User.findOne({
+                _id: managerId,
+                role: "property_manager",
+                isActive: true,
+            }).select("_id");
+            if (!manager) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Active property manager not found.",
+                });
+            }
+            const existing = property.managerAssignments.find(
+                (assignment) =>
+                    String(assignment.manager) === String(managerId) &&
+                    assignment.revokedAt === null
+            );
+            if (existing) {
+                return res.status(409).json({
+                    success: false,
+                    message: "This manager is already assigned to the property.",
+                });
+            }
+            const activeCount = property.managerAssignments.filter(
+                (assignment) => assignment.revokedAt === null
+            ).length;
+            if (activeCount >= 10) {
+                return res.status(409).json({
+                    success: false,
+                    message: "A property can have at most 10 active managers.",
+                });
+            }
+            property.managerAssignments.push({
+                manager: manager._id,
+                assignedBy: req.neveUser._id,
+                assignedAt: new Date(),
+                revokedAt: null,
+            });
+        } else {
+            const assignment = property.managerAssignments.find(
+                (entry) =>
+                    String(entry.manager) === String(managerId) &&
+                    entry.revokedAt === null
+            );
+            if (!assignment) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Active property manager assignment not found.",
+                });
+            }
+            assignment.revokedAt = new Date();
+        }
+
+        await property.save();
+        return res.json({
+            success: true,
+            message:
+                action === "assign"
+                    ? "Property manager assigned."
+                    : "Property manager assignment revoked.",
+            managerAssignments: property.managerAssignments,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getPropertyManagers(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID.",
+            });
+        }
+        const property = await Property.findOne({
+            _id: id,
+            landlord: req.neveUser._id,
+        })
+            .select("+managerAssignments")
+            .populate(
+                "managerAssignments.manager managerAssignments.assignedBy",
+                "displayName photoURL role"
+            )
+            .lean();
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Property not found or you are not its owner.",
+            });
+        }
+        return res.json({
+            success: true,
+            propertyId: property._id,
+            managerAssignments: property.managerAssignments,
         });
     } catch (error) {
         next(error);
@@ -178,18 +308,11 @@ export async function updateProperty(req, res, next) {
             });
         }
 
-        const property = await Property.findOneAndUpdate(
-            {
-                _id: id,
-                landlord: req.neveUser._id,
-                status: { $in: ["draft", "published", "paused"] },
-            },
-            { $set: data },
-            {
-                new: true,
-                runValidators: true,
-            }
-        );
+        const property = await Property.findOne({
+            _id: id,
+            ...manageablePropertyFilter(req.neveUser._id),
+            status: { $in: ["draft", "published", "paused"] },
+        });
 
         if (!property) {
             return res.status(404).json({
@@ -197,6 +320,8 @@ export async function updateProperty(req, res, next) {
                 message: "Property not found or you do not own it",
             });
         }
+        Object.assign(property, data);
+        await property.save();
 
         return res.status(200).json({
             success: true,
@@ -238,7 +363,7 @@ export async function updatePropertyStatus(req, res, next) {
 
         const property = await Property.findOne({
             _id: id,
-            landlord: req.neveUser._id,
+            ...manageablePropertyFilter(req.neveUser._id),
         });
 
         if (!property) {

@@ -62,14 +62,14 @@ router.post(
 router.get(
     "/landlord",
     authenticateUser,
-    allowRoles("landlord"),
+    allowRoles("landlord", "property_manager"),
     getNewLandlordInquiries
 );
 
 router.patch(
     "/:inquiryId/respond",
     authenticateUser,
-    allowRoles("landlord"),
+    allowRoles("landlord", "property_manager"),
     respondToInquiry
 );
 

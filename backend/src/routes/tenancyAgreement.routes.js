@@ -17,13 +17,72 @@ import {
 } from "../controllers/tenancyAgreement.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
+import {
+    addConditionEntry,
+    assignPropertyManager,
+    correctConditionEntry,
+    createConditionReport,
+    createMaintenanceRequest,
+    getConditionComparison,
+    listConditionReports,
+    listMaintenanceRequests,
+    reviewConditionEntry,
+    updateMaintenanceRequest,
+} from "../controllers/tenancyOperations.controller.js";
 
 const router = express.Router();
 
-router.use(authenticateUser, allowRoles("renter", "landlord", "mediator", "legal_reviewer"));
+router.use(
+    authenticateUser,
+    allowRoles(
+        "renter",
+        "landlord",
+        "property_manager",
+        "mediator",
+        "legal_reviewer"
+    )
+);
 
 router.post("/agreements", allowRoles("renter", "landlord"), createTenancyAgreement);
 router.get("/agreements", listTenancyAgreements);
+router.patch(
+    "/agreements/:agreementId/property-manager",
+    allowRoles("renter", "landlord"),
+    assignPropertyManager
+);
+router.post(
+    "/agreements/:agreementId/condition-reports/:stage",
+    createConditionReport
+);
+router.post(
+    "/agreements/:agreementId/condition-reports/:reportId/entries",
+    addConditionEntry
+);
+router.post(
+    "/agreements/:agreementId/condition-reports/:reportId/entries/:entryId/corrections",
+    correctConditionEntry
+);
+router.post(
+    "/agreements/:agreementId/condition-reports/:reportId/entries/:entryId/reviews",
+    reviewConditionEntry
+);
+router.get(
+    "/agreements/:agreementId/condition-comparison",
+    getConditionComparison
+);
+router.get(
+    "/agreements/:agreementId/condition-reports",
+    listConditionReports
+);
+router.get("/maintenance-requests", listMaintenanceRequests);
+router.post(
+    "/agreements/:agreementId/maintenance-requests",
+    createMaintenanceRequest
+);
+router.patch(
+    "/maintenance-requests/:requestId/progress",
+    updateMaintenanceRequest
+);
 router.get("/agreements/:agreementId/evidence-graph", getAgreementEvidenceGraph);
 router.post(
     "/agreements/:agreementId/evidence-links",
@@ -46,7 +105,7 @@ router.post(
 );
 router.patch(
     "/agreements/:agreementId/obligations/:obligationId",
-    allowRoles("renter", "landlord"),
+    allowRoles("renter", "landlord", "property_manager"),
     updateAgreementObligation
 );
 router.post(

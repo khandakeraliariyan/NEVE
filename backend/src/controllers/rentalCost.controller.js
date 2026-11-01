@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Property from "../models/Property.js";
 import RentalCost from "../models/RentalCost.js";
 import { buildRentalCostSummary } from "../services/propertyIntelligence.service.js";
+import { canManageProperty } from "../services/propertyAccess.service.js";
 
 const getUserId = (req) => req.neveUser?._id || req.user?._id || req.user?.id;
 const getUserRole = (req) => req.neveUser?.role || req.user?.role;
@@ -29,11 +30,9 @@ export const updatePropertyRentalCost = async (req, res, next) => {
             });
         }
 
-        const landlordId = property.landlord?._id || property.landlord;
-
         if (
             getUserRole(req) !== "admin" &&
-            String(landlordId) !== String(getUserId(req))
+            !(await canManageProperty(property, getUserId(req)))
         ) {
             return res.status(403).json({
                 success: false,

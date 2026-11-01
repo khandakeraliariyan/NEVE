@@ -8,6 +8,7 @@ import { recordAdminAction } from "../services/adminAudit.service.js";
 import {
     detectListingInconsistencies,
 } from "../services/listingConsistency.service.js";
+import { canManageProperty } from "../services/propertyAccess.service.js";
 
 const getUserId = (req) =>
     req.neveUser?._id ?? req.user?._id ?? req.user?.id;
@@ -30,11 +31,9 @@ export const reviewListingConsistency = async (req, res, next) => {
             });
         }
 
-        const landlordId = property.landlord?._id || property.landlord;
-
         if (
             req.neveUser?.role !== "admin" &&
-            String(landlordId) !== String(getUserId(req))
+            !(await canManageProperty(property, getUserId(req)))
         ) {
             return res.status(403).json({
                 message: "You cannot review this property's consistency.",

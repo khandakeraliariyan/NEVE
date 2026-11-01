@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Property from "../models/Property.js";
 import Inquiry from "../models/Inquiry.js";
 import PropertyViewEvent from "../models/PropertyViewEvent.js";
+import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 
 function parseDate(value, fieldName) {
     if (value === undefined) return undefined;
@@ -42,7 +43,7 @@ export async function getLandlordPerformance(req, res, next) {
             req.neveUser._id.toString()
         );
 
-        const propertyFilter = { landlord: landlordId };
+        const propertyFilter = manageablePropertyFilter(landlordId);
 
         const properties = await Property.find(propertyFilter)
             .select("_id title status")

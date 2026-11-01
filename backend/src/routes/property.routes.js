@@ -5,9 +5,11 @@ import {
     getProperties,
     getRecentProperties,
     getMyProperties,
+    getPropertyManagers,
     getPropertyById,
     getPropertyDetail,
     updateProperty,
+    updatePropertyManagers,
     updatePropertyStatus,
 } from "../controllers/property.controller.js";
 
@@ -95,6 +97,20 @@ router.patch(
     authenticateUser,
     allowRoles("landlord", "property_manager"),
     updatePropertyStatus
+);
+
+router.patch(
+    "/:id/managers",
+    authenticateUser,
+    allowRoles("landlord"),
+    updatePropertyManagers
+);
+
+router.get(
+    "/:id/managers",
+    authenticateUser,
+    allowRoles("landlord"),
+    getPropertyManagers
 );
 
 export default router;
