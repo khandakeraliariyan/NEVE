@@ -8,9 +8,44 @@ Authentication, and optional Cloudflare R2 object storage.
 > this repository. Marketplace search, saved-property, preference, and
 > recommendation routes use the authenticated NEVE profile. Some unrelated
 > backend feature workflows still have integration gaps noted below.
+>
+> **Project scope:** the complete Neve feature set is retained below, including
+> features that are planned or only partially implemented. Status labels refer
+> to backend functionality only; they do not imply that frontend screens,
+> external providers, production deployment, or legal review are complete.
+
+## Project feature coverage
+
+This catalog preserves the feature scope from the Neve Project Master
+Document. "Partial" means some backend workflows exist, but one or more
+requirements still depend on missing functionality, external services, or
+frontend work.
+
+| # | Project feature | Backend status | Implemented backend scope and remaining gaps |
+|---|---|---|---|
+| 1 | **Neve Discover — Rental Marketplace** | **Mostly implemented** | Listing search/filtering, recent listings, favorites, comparisons, saved searches and alerts, and suspicious/inaccurate listing reports. List/map view switching is frontend behavior. |
+| 2 | **Neve Property Intelligence** | **Mostly implemented** | Listing details and media, cost disclosures, landlord/manager profiles, inquiries, and viewing requests. Identity and property-ownership verification are not implemented. |
+| 3 | **Neve Neighborhood Intelligence** | **Partial** | OpenStreetMap nearby places, categories, caching, source/freshness metadata, and straight-line distances. No walking/driving routes or travel times; interactive maps are frontend behavior. |
+| 4 | **Neve True Cost of Renting** | **Implemented** | Upfront and monthly estimates, itemized charges, assumptions, and supplied/calculated/estimated labels, including explicit unknowns. |
+| 5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate and consistency heuristics, renter reports, human review, and reviewed public summaries. Signals are not verification or fraud findings; identity/ownership checks are absent. |
+| 6 | **Neve Smart Choice — Explainable Property Matching** | **Partial** | Deterministic preference matching with scores, reasons, shortfalls, missing-data indicators, and saved-search alerts. This is not AI and does not include every planned preference, such as commute destinations or walking distance. |
+| 7 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewings, availability workflows, in-app notifications, saved-search alerts, and suspicious-message reporting. Email/push alerts are absent; inquiry and viewing status workflows have known inconsistencies. |
+| 8 | **Neve Agreement & Trust** | **Partial** | Private agreement uploads, manually entered clauses, obligations, payment/receipt records, and agreement sharing. OCR/extraction, generated explanations or wording, and legal-source retrieval are not implemented. |
+| 9 | **Neve Evidence Graph** | **Partial** | Typed evidence links, confidence and relationship history, deterministic missing/conflict/uncertainty flags, and a traceable JSON report. AI-proposed links, legal-source links, and hash-based tamper evidence are absent; analysis does not verify facts or liability. |
+| 10 | **Neve Move-In & Move-Out Records** | **Implemented** | Room and meter entries, photos, participant reviews, append-only corrections, and move-in/out comparisons. Comparisons report recorded differences; they do not assign fault. |
+| 11 | **Neve Maintenance & Repair** | **Mostly implemented** | Repair requests, private evidence, status/progress history, responsibility, and authorized searchable maintenance records. A complete repair assignment workflow is not present. |
+| 12 | **Neve Property Manager** | **Mostly implemented** | Assigned listing and tenancy access, availability, inquiry/viewing/maintenance workflows, obligations, and dashboards. Property and tenancy assignments are separate; some workflow inconsistencies remain. |
+| 13 | **Neve Security, Privacy & Dispute Support** | **Partial** | Role-based access, private files, scoped case sharing, sensitive-access logs, export, deletion requests, retention dates, and legal holds. Retention purges are not automatic; backup workflows and hash-linked audit history are not implemented. |
+| 14 | **Neve AI Reliability & Evaluation** | **Partial** | Admin APIs record and report submitted OCR/reasoning benchmark metrics, including failures, latency, costs, and suspicious-listing false positives. The backend does not run OCR/AI or create live evaluation results. |
+
+This table is a backend implementation snapshot, not a feature-completion
+claim for the whole product. For endpoint details and workflow limitations,
+see [API routes](#api-routes), [Feature notes](#feature-notes), and
+[Current integration gaps](#current-integration-gaps).
 
 ## Contents
 
+- [Project feature coverage](#project-feature-coverage)
 - [Technology](#technology)
 - [Project structure](#project-structure)
 - [Requirements](#requirements)
