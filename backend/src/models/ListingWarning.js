@@ -14,6 +14,8 @@ const listingWarningSchema = new mongoose.Schema(
             enum: [
                 "bedroom_mismatch",
                 "rent_mismatch",
+                "unusual_rent",
+                "repeated_images",
                 "amenity_mismatch",
                 "missing_description",
                 "missing_rent",

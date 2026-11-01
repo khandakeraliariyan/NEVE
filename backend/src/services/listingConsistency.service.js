@@ -29,11 +29,9 @@ function findBedroomMismatch(description, bedrooms) {
 function findRentMismatch(description, rent) {
     if (!description || !Number.isFinite(rent)) return null;
 
-    // Match explicit monthly rent amounts such as:
-    // "Rent: 20,000 BDT/month" or "৳20,000 per month".
     const matches = [
         ...description.matchAll(
-            /(?:৳|BDT\s*)\s*([\d,]+)(?:\s*(?:\/\s*month|per\s+month|monthly))?/gi
+            /(?:৳|BDT\s*)\s*([\d,]+)\s*(?:\/\s*month|per\s+month|monthly)\b/gi
         ),
     ];
 
@@ -99,9 +97,70 @@ function findAmenityMismatch(description, amenities = []) {
     return warnings;
 }
 
-export function detectListingInconsistencies(property) {
+function findUnusualRent(rent, comparableRents = []) {
+    const validRents = comparableRents
+        .filter((amount) => Number.isFinite(amount) && amount > 0)
+        .sort((first, second) => first - second);
+
+    if (
+        !Number.isFinite(rent) ||
+        rent <= 0 ||
+        validRents.length < 5
+    ) {
+        return null;
+    }
+
+    const middle = Math.floor(validRents.length / 2);
+    const median =
+        validRents.length % 2 === 0
+            ? (validRents[middle - 1] + validRents[middle]) / 2
+            : validRents[middle];
+
+    if (rent >= median * 0.5 && rent <= median * 2) {
+        return null;
+    }
+
+    return {
+        type: "unusual_rent",
+        severity: "medium",
+        message:
+            "The listed rent is substantially different from comparable published listings and should be reviewed.",
+        evidence: {
+            structuredValue: rent,
+            descriptionValue: {
+                comparableMedian: median,
+                comparableCount: validRents.length,
+                lowerReviewThreshold: median * 0.5,
+                upperReviewThreshold: median * 2,
+            },
+        },
+    };
+}
+
+function findRepeatedImages(reusedImageCount) {
+    if (!Number.isInteger(reusedImageCount) || reusedImageCount <= 0) {
+        return null;
+    }
+
+    return {
+        type: "repeated_images",
+        severity: "medium",
+        message:
+            "One or more uploaded photos are also attached to another published listing and should be reviewed.",
+        evidence: {
+            structuredValue: reusedImageCount,
+            descriptionValue: null,
+        },
+    };
+}
+
+export function detectListingInconsistencies(
+    property,
+    { comparableRents = [], reusedImageCount = 0 } = {}
+) {
     const warnings = [];
     const description = property.description || "";
+    const rent = property.pricing?.monthlyRent;
 
     const bedroomWarning = findBedroomMismatch(
         description,
@@ -110,9 +169,15 @@ export function detectListingInconsistencies(property) {
 
     if (bedroomWarning) warnings.push(bedroomWarning);
 
-    const rentWarning = findRentMismatch(description, property.rent);
+    const rentWarning = findRentMismatch(description, rent);
 
     if (rentWarning) warnings.push(rentWarning);
+    const unusualRentWarning = findUnusualRent(rent, comparableRents);
+
+    if (unusualRentWarning) warnings.push(unusualRentWarning);
+    const repeatedImagesWarning = findRepeatedImages(reusedImageCount);
+
+    if (repeatedImagesWarning) warnings.push(repeatedImagesWarning);
 
     warnings.push(
         ...findAmenityMismatch(description, property.amenities || [])
@@ -130,27 +195,29 @@ export function detectListingInconsistencies(property) {
         });
     }
 
-    if (!Number.isFinite(property.rent) || property.rent <= 0) {
+    if (!Number.isFinite(rent) || rent <= 0) {
         warnings.push({
             type: "missing_rent",
             severity: "high",
             message: "The property does not have a valid positive rent amount.",
             evidence: {
-                structuredValue: property.rent ?? null,
+                structuredValue: rent ?? null,
                 descriptionValue: null,
             },
         });
     }
 
-    if (!property.city || !property.area) {
+    const city = property.address?.city;
+    const area = property.address?.area;
+    if (!city || !area) {
         warnings.push({
             type: "missing_location",
             severity: "medium",
             message: "The property is missing a city or area value.",
             evidence: {
                 structuredValue: {
-                    city: property.city ?? null,
-                    area: property.area ?? null,
+                    city: city ?? null,
+                    area: area ?? null,
                 },
                 descriptionValue: null,
             },

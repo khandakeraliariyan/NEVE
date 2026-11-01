@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Inquiry from "../models/Inquiry.js";
 import Property from "../models/Property.js";
+import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 
 // GET /api/v1/inquiries/landlord
 export const getLandlordInquiries = async (req, res, next) => {
@@ -23,10 +24,9 @@ export const getLandlordInquiries = async (req, res, next) => {
             });
         }
 
-        // Find only properties owned by this landlord.
-        const propertyIds = await Property.find({
-            landlord: req.neveUser._id,
-        }).distinct("_id");
+        const propertyIds = await Property.find(
+            manageablePropertyFilter(req.neveUser._id)
+        ).distinct("_id");
 
         const filter = {
             property: { $in: propertyIds },
@@ -41,7 +41,7 @@ export const getLandlordInquiries = async (req, res, next) => {
 
         const [inquiries, total] = await Promise.all([
             Inquiry.find(filter)
-                .populate("renter", "displayName email phoneNumber")
+                .populate("renter", "displayName photoURL")
                 .populate("property", "title address pricing status")
                 .sort({ createdAt: -1 })
                 .skip(skip)
@@ -79,10 +79,10 @@ export const respondToInquiry = async (req, res, next) => {
             });
         }
 
-        if (!["accepted", "rejected"].includes(status)) {
+        if (!["accepted", "declined"].includes(status)) {
             return res.status(400).json({
                 success: false,
-                message: "Status must be accepted or rejected.",
+                message: "Status must be accepted or declined.",
             });
         }
 
@@ -105,10 +105,10 @@ export const respondToInquiry = async (req, res, next) => {
             });
         }
 
-        // Verify the inquiry's property belongs to this landlord.
+        // Verify the property is owned by or assigned to this user.
         const property = await Property.findOne({
             _id: inquiry.property,
-            landlord: req.neveUser._id,
+            ...manageablePropertyFilter(req.neveUser._id),
         }).select("_id");
 
         if (!property) {
@@ -136,6 +136,7 @@ export const respondToInquiry = async (req, res, next) => {
                 $set: {
                     status,
                     landlordResponse: responseMessage.trim(),
+                    respondedAt: new Date(),
                 },
             },
             {
@@ -143,7 +144,7 @@ export const respondToInquiry = async (req, res, next) => {
                 runValidators: true,
             }
         )
-            .populate("renter", "displayName email")
+            .populate("renter", "displayName photoURL")
             .populate("property", "title address");
 
         if (!updatedInquiry) {

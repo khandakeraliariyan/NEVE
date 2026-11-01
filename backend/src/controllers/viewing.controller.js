@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import ViewingRequest from "../models/ViewingRequest.js";
 import { createNotification } from "../services/notification.service.js";
 import { findPubliclyAvailableProperty } from "../services/propertyAvailability.service.js";
+import Property from "../models/Property.js";
+import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 
 export async function createViewingRequest(req, res, next) {
     try {
@@ -111,8 +113,11 @@ export async function getMyViewingRequests(req, res, next) {
 
 export async function getLandlordViewingRequests(req, res, next) {
     try {
+        const propertyIds = await Property.find(
+            manageablePropertyFilter(req.neveUser._id)
+        ).distinct("_id");
         const viewings = await ViewingRequest.find({
-            landlord: req.neveUser._id,
+            property: { $in: propertyIds },
         })
             .populate("property", "title address")
             .populate("renter", "displayName photoURL")
@@ -160,9 +165,12 @@ export async function updateViewingRequest(req, res, next) {
             });
         }
 
+        const propertyIds = await Property.find(
+            manageablePropertyFilter(req.neveUser._id)
+        ).distinct("_id");
         const viewing = await ViewingRequest.findOne({
             _id: id,
-            landlord: req.neveUser._id,
+            property: { $in: propertyIds },
         });
 
         if (!viewing) {
@@ -175,7 +183,7 @@ export async function updateViewingRequest(req, res, next) {
         if (viewing.status !== "requested") {
             return res.status(409).json({
                 success: false,
-                message: "Only pending viewing requests can be confirmed or declined",
+                message: "Only requested viewings can be confirmed or declined",
             });
         }
 

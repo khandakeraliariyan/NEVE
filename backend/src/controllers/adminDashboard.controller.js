@@ -3,6 +3,7 @@ import Property from "../models/Property.js";
 import PropertyReport from "../models/PropertyReport.js";
 import ListingWarning from "../models/ListingWarning.js";
 import PropertyClaim from "../models/PropertyClaim.js";
+import CommunicationReport from "../models/CommunicationReport.js";
 
 const getPagination = (query) => {
     const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
@@ -23,6 +24,7 @@ export const getAdminOverview = async (req, res, next) => {
             pendingReports,
             openWarnings,
             unreviewedClaims,
+            pendingCommunicationReports,
         ] = await Promise.all([
             Property.countDocuments(),
             Property.countDocuments({ status: "published" }),
@@ -31,6 +33,9 @@ export const getAdminOverview = async (req, res, next) => {
             }),
             ListingWarning.countDocuments({ status: "open" }),
             PropertyClaim.countDocuments({ status: "unreviewed" }),
+            CommunicationReport.countDocuments({
+                status: { $in: ["pending", "in_review"] },
+            }),
         ]);
 
         return res.status(200).json({
@@ -44,6 +49,7 @@ export const getAdminOverview = async (req, res, next) => {
                     pendingReports,
                     openWarnings,
                     unreviewedClaims,
+                    pendingCommunicationReports,
                 },
             },
         });
@@ -62,7 +68,10 @@ export const getAdminReports = async (req, res, next) => {
 
         const [reports, total] = await Promise.all([
             PropertyReport.find(filter)
-                .populate("property", "title rent city area status")
+                .populate(
+                    "property",
+                    "title pricing.monthlyRent address.area address.city status"
+                )
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
@@ -95,7 +104,10 @@ export const getAdminWarnings = async (req, res, next) => {
 
         const [warnings, total] = await Promise.all([
             ListingWarning.find(filter)
-                .populate("property", "title rent city area status")
+                .populate(
+                    "property",
+                    "title pricing.monthlyRent address.area address.city status"
+                )
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
@@ -128,7 +140,10 @@ export const getAdminClaims = async (req, res, next) => {
 
         const [claims, total] = await Promise.all([
             PropertyClaim.find(filter)
-                .populate("property", "title rent city area status")
+                .populate(
+                    "property",
+                    "title pricing.monthlyRent address.area address.city status"
+                )
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)

@@ -4,6 +4,13 @@ import Property from "../models/Property.js";
 import UploadedFile from "../models/UploadedFile.js";
 
 import { createDownloadUrl } from "../services/fileUpload.service.js";
+import { canManageProperty } from "../services/propertyAccess.service.js";
+
+const mediaFields = {
+  property_image: { field: "images", label: "image", max: 20 },
+  property_video: { field: "videos", label: "video", max: 5 },
+  floor_plan: { field: "floorPlans", label: "floor plan", max: 5 },
+};
 
 const getUserId = (req) =>
   req.neveUser?._id || req.user?._id || req.user?.id;
@@ -21,11 +28,9 @@ async function findManageableProperty(propertyId, req) {
     return { error: "NOT_FOUND" };
   }
 
-  const landlordId = property.landlord?._id || property.landlord;
-
   if (
     getUserRole(req) !== "admin" &&
-    String(landlordId) !== String(getUserId(req))
+    !(await canManageProperty(property, getUserId(req)))
   ) {
     return { error: "FORBIDDEN" };
   }
@@ -60,13 +65,13 @@ export const attachPropertyImage = async (req, res) => {
     const file = await UploadedFile.findOne({
       _id: fileId,
       property: result.property._id,
-      purpose: "property_image",
+      purpose: { $in: Object.keys(mediaFields) },
       status: "uploaded",
     });
 
     if (!file) {
       return res.status(404).json({
-        message: "Confirmed property image not found.",
+        message: "Confirmed property media not found.",
       });
     }
 
@@ -76,26 +81,36 @@ export const attachPropertyImage = async (req, res) => {
       String(file.uploadedBy) !== String(getUserId(req))
     ) {
       return res.status(403).json({
-        message: "You cannot attach another user's image.",
+        message: "You cannot attach another user's media.",
       });
     }
 
-    const imageIds = result.property.images || [];
+    const media = mediaFields[file.purpose];
+    const mediaIds = result.property[media.field] || [];
 
     if (
-      imageIds.some((id) => String(id) === String(file._id))
+      mediaIds.some((id) => String(id) === String(file._id))
     ) {
-      return res.json({ message: "Image is already attached." });
+      return res.json({ message: `This ${media.label} is already attached.` });
     }
 
-    result.property.images = [...imageIds, file._id];
+    if (mediaIds.length >= media.max) {
+      return res.status(409).json({
+        message: `A property can have at most ${media.max} ${media.label}${
+          media.max === 1 ? "" : "s"
+        }.`,
+      });
+    }
+
+    result.property[media.field] = [...mediaIds, file._id];
     await result.property.save();
 
     return res.status(200).json({
-      message: "Property image attached successfully.",
+      message: `Property ${media.label} attached successfully.`,
       propertyId: result.property._id,
-      imageId: file._id,
-      imageCount: result.property.images.length,
+      fileId: file._id,
+      purpose: file.purpose,
+      mediaCount: result.property[media.field].length,
     });
   } catch (error) {
     console.error("Attach property image error:", error);
@@ -130,18 +145,17 @@ export const removePropertyImage = async (req, res) => {
     }
 
     const property = result.property;
-    const existingImages = property.images || [];
-    const imageExists = existingImages.some(
-      (id) => String(id) === String(fileId)
+    const media = Object.values(mediaFields).find(({ field }) =>
+      (property[field] || []).some((id) => String(id) === String(fileId))
     );
 
-    if (!imageExists) {
+    if (!media) {
       return res.status(404).json({
-        message: "Image is not attached to this property.",
+        message: "Media is not attached to this property.",
       });
     }
 
-    property.images = existingImages.filter(
+    property[media.field] = property[media.field].filter(
       (id) => String(id) !== String(fileId)
     );
 
@@ -151,9 +165,9 @@ export const removePropertyImage = async (req, res) => {
     // A separate cleanup process can delete unused objects safely later.
 
     return res.json({
-      message: "Image removed from property.",
+      message: "Media removed from property.",
       propertyId: property._id,
-      imageCount: property.images.length,
+      mediaCount: property[media.field].length,
     });
   } catch (error) {
     console.error("Remove property image error:", error);
@@ -163,7 +177,7 @@ export const removePropertyImage = async (req, res) => {
   }
 };
 
-export const getPropertyImages = async (req, res) => {
+export const getPropertyImages = async (req, res, next) => {
   try {
     const { propertyId } = req.params;
 
@@ -174,10 +188,20 @@ export const getPropertyImages = async (req, res) => {
     const property = await Property.findOne({
       _id: propertyId,
       status: "published",
-    }).populate({
-      path: "images",
-      select: "purpose status originalName mimeType sizeBytes storageKey",
-    });
+    }).populate([
+      {
+        path: "images",
+        select: "purpose status originalName mimeType sizeBytes storageKey",
+      },
+      {
+        path: "videos",
+        select: "purpose status originalName mimeType sizeBytes storageKey",
+      },
+      {
+        path: "floorPlans",
+        select: "purpose status originalName mimeType sizeBytes storageKey",
+      },
+    ]);
 
     if (!property) {
       return res.status(404).json({
@@ -185,31 +209,38 @@ export const getPropertyImages = async (req, res) => {
       });
     }
 
-    const images = await Promise.all(
-      (property.images || [])
-        .filter(
-          (file) =>
-            file &&
-            file.purpose === "property_image" &&
-            file.status === "uploaded"
-        )
-        .map(async (file) => ({
-          id: file._id,
-          name: file.originalName,
-          mimeType: file.mimeType,
-          sizeBytes: file.sizeBytes,
-          url: await createDownloadUrl(file.storageKey),
-        }))
-    );
+    const mapPublicMedia = async (files, purpose) =>
+      Promise.all(
+        (files || [])
+          .filter(
+            (file) =>
+              file &&
+              file.purpose === purpose &&
+              file.status === "uploaded"
+          )
+          .map(async (file) => ({
+            id: file._id,
+            name: file.originalName,
+            mimeType: file.mimeType,
+            sizeBytes: file.sizeBytes,
+            url: await createDownloadUrl(file.storageKey),
+            expiresInSeconds: 300,
+          }))
+      );
+
+    const [images, videos, floorPlans] = await Promise.all([
+      mapPublicMedia(property.images, "property_image"),
+      mapPublicMedia(property.videos, "property_video"),
+      mapPublicMedia(property.floorPlans, "floor_plan"),
+    ]);
 
     return res.json({
       propertyId: property._id,
       images,
+      videos,
+      floorPlans,
     });
   } catch (error) {
-    console.error("Get property images error:", error);
-    return res.status(500).json({
-      message: "Could not retrieve property images.",
-    });
+    next(error);
   }
 };

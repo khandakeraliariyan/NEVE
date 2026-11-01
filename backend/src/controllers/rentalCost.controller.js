@@ -2,46 +2,56 @@ import mongoose from "mongoose";
 
 import Property from "../models/Property.js";
 import RentalCost from "../models/RentalCost.js";
-import { calculateRentalCost } from "../services/rentalCost.service.js";
+import { buildRentalCostSummary } from "../services/propertyIntelligence.service.js";
+import { canManageProperty } from "../services/propertyAccess.service.js";
 
 const getUserId = (req) => req.neveUser?._id || req.user?._id || req.user?.id;
 const getUserRole = (req) => req.neveUser?.role || req.user?.role;
 
-export const updatePropertyRentalCost = async (req, res) => {
+export const updatePropertyRentalCost = async (req, res, next) => {
     try {
         const { propertyId } = req.params;
 
         if (!mongoose.isValidObjectId(propertyId)) {
-            return res.status(400).json({ message: "Invalid property ID." });
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID.",
+            });
         }
 
-        const property = await Property.findById(propertyId).select("landlord");
+        const property = await Property.findById(propertyId).select(
+            "landlord pricing"
+        );
 
         if (!property) {
-            return res.status(404).json({ message: "Property not found." });
+            return res.status(404).json({
+                success: false,
+                message: "Property not found.",
+            });
         }
-
-        const landlordId = property.landlord?._id || property.landlord;
 
         if (
             getUserRole(req) !== "admin" &&
-            String(landlordId) !== String(getUserId(req))
+            !(await canManageProperty(property, getUserId(req)))
         ) {
             return res.status(403).json({
+                success: false,
                 message: "You cannot update costs for this property.",
             });
         }
 
-        const { items, unknownCosts = [] } = req.body;
+        const { items, unknownCosts = [] } = req.body ?? {};
 
         if (!Array.isArray(items) || !Array.isArray(unknownCosts)) {
             return res.status(400).json({
+                success: false,
                 message: "items and unknownCosts must be arrays.",
             });
         }
 
         if (items.length > 50 || unknownCosts.length > 20) {
             return res.status(400).json({
+                success: false,
                 message: "Too many cost items or unknown-cost entries.",
             });
         }
@@ -68,6 +78,7 @@ export const updatePropertyRentalCost = async (req, res) => {
                     typeof item.required !== "boolean")
             ) {
                 return res.status(400).json({
+                    success: false,
                     message: "One or more cost items are invalid.",
                 });
             }
@@ -82,6 +93,7 @@ export const updatePropertyRentalCost = async (req, res) => {
             )
         ) {
             return res.status(400).json({
+                success: false,
                 message:
                     "Each unknown-cost entry must be a non-empty string of up to 100 characters.",
             });
@@ -106,17 +118,14 @@ export const updatePropertyRentalCost = async (req, res) => {
             }
         );
 
-        return res.json({
+        return res.status(200).json({
+            success: true,
             message: "Rental costs updated successfully.",
-            costs: calculateRentalCost(record),
+            costs: buildRentalCostSummary(property.pricing, record),
             updatedAt: record.updatedAt,
         });
     } catch (error) {
-        console.error("Update rental costs error:", error);
-
-        return res.status(500).json({
-            message: "Could not update rental costs.",
-        });
+        return next(error);
     }
 };
 
@@ -144,9 +153,7 @@ export async function getRentalCost(req, res, next) {
         }
 
         const record = await RentalCost.findOne({ property: property._id }).lean();
-        const costs = record
-            ? calculateRentalCost(record)
-            : calculateRentalCost({ items: [] });
+        const costs = buildRentalCostSummary(property.pricing, record);
 
         return res.status(200).json({
             success: true,
@@ -161,47 +168,42 @@ export async function getRentalCost(req, res, next) {
     }
 }
 
-export const getPropertyRentalCost = async (req, res) => {
+export const getPropertyRentalCost = async (req, res, next) => {
     try {
         const { propertyId } = req.params;
 
         if (!mongoose.isValidObjectId(propertyId)) {
-            return res.status(400).json({ message: "Invalid property ID." });
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID.",
+            });
         }
 
         const property = await Property.findOne({
             _id: propertyId,
             status: "published",
-        }).select("_id");
+        }).select("_id pricing");
 
         if (!property) {
-            return res.status(404).json({ message: "Property not found." });
+            return res.status(404).json({
+                success: false,
+                message: "Property not found.",
+            });
         }
 
         const record = await RentalCost.findOne({
             property: property._id,
         }).lean();
 
-        if (!record) {
-            return res.json({
-                propertyId: property._id,
-                costs: null,
-                message:
-                    "The landlord has not provided a rental cost breakdown yet.",
-            });
-        }
-
-        return res.json({
+        return res.status(200).json({
+            success: true,
             propertyId: property._id,
-            costs: calculateRentalCost(record),
-            items: record.items,
-            updatedAt: record.updatedAt,
+            costs: buildRentalCostSummary(property.pricing, record),
+            items: record?.items ?? [],
+            updatedAt: record?.updatedAt ?? null,
+            additionalCostBreakdownProvided: Boolean(record),
         });
     } catch (error) {
-        console.error("Get rental costs error:", error);
-
-        return res.status(500).json({
-            message: "Could not retrieve rental costs.",
-        });
+        return next(error);
     }
 };

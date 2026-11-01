@@ -7,14 +7,21 @@ import ListingWarning from "../models/ListingWarning.js";
 import PropertyClaim from "../models/PropertyClaim.js";
 
 import { createDownloadUrl } from "../services/fileUpload.service.js";
-import { calculateRentalCost } from "../services/rentalCost.service.js";
+import { buildRentalCostSummary } from "../services/propertyIntelligence.service.js";
+import {
+    getPropertyCoordinates,
+    isNearbyCacheFresh,
+    normalizeNeighborhoodPlace,
+} from "../services/neighborhood.service.js";
 
 const NEARBY_CATEGORIES = [
-    "school",
-    "hospital",
+    "healthcare",
+    "education",
+    "groceries",
     "transport",
-    "supermarket",
-    "park",
+    "banking",
+    "recreation",
+    "food",
 ];
 
 function countByCategory(places) {
@@ -31,7 +38,7 @@ function countByCategory(places) {
     return counts;
 }
 
-export const getPropertyDetails = async (req, res) => {
+export const getPropertyDetails = async (req, res, next) => {
     try {
         const { propertyId } = req.params;
 
@@ -45,12 +52,24 @@ export const getPropertyDetails = async (req, res) => {
         const property = await Property.findOne({
             _id: propertyId,
             status: "published",
-        })
-            .populate({
+        }).populate([
+            {
+                path: "landlord",
+                select: "displayName photoURL role createdAt",
+            },
+            {
                 path: "images",
                 select: "purpose status originalName mimeType sizeBytes storageKey",
-            })
-            .lean();
+            },
+            {
+                path: "videos",
+                select: "purpose status originalName mimeType sizeBytes storageKey",
+            },
+            {
+                path: "floorPlans",
+                select: "purpose status originalName mimeType sizeBytes storageKey",
+            },
+        ]);
 
         if (!property) {
             return res.status(404).json({
@@ -58,80 +77,121 @@ export const getPropertyDetails = async (req, res) => {
             });
         }
 
-        // Only confirmed property images are included.
-        const images = await Promise.all(
-            (property.images || [])
-                .filter(
-                    (file) =>
-                        file &&
-                        file.purpose === "property_image" &&
-                        file.status === "uploaded"
-                )
-                .map(async (file) => ({
-                    id: file._id,
-                    name: file.originalName,
-                    mimeType: file.mimeType,
-                    sizeBytes: file.sizeBytes,
-                    url: await createDownloadUrl(file.storageKey),
-                    expiresInSeconds: 300,
-                }))
-        );
+        const publicMedia = async (files, purpose) =>
+            Promise.all(
+                (files || [])
+                    .filter(
+                        (file) =>
+                            file &&
+                            file.purpose === purpose &&
+                            file.status === "uploaded"
+                    )
+                    .map(async (file) => ({
+                        id: file._id,
+                        name: file.originalName,
+                        mimeType: file.mimeType,
+                        sizeBytes: file.sizeBytes,
+                        url: await createDownloadUrl(file.storageKey),
+                        expiresInSeconds: 300,
+                    }))
+            );
+
+        const [images, videos, floorPlans] = await Promise.all([
+            publicMedia(property.images, "property_image"),
+            publicMedia(property.videos, "property_video"),
+            publicMedia(property.floorPlans, "floor_plan"),
+        ]);
 
         const [costRecord, nearbyCache] = await Promise.all([
             RentalCost.findOne({ property: property._id }).lean(),
             NearbyPlaceCache.findOne({ property: property._id }).lean(),
         ]);
 
-        const places = nearbyCache?.places || [];
+        const places = (nearbyCache?.places || []).map(
+            normalizeNeighborhoodPlace
+        );
+        const coordinates = getPropertyCoordinates(property);
+        const cacheFresh =
+            coordinates !== null &&
+            isNearbyCacheFresh(nearbyCache, {
+                ...coordinates,
+                radius: 100,
+            });
 
         const nearbyPlaces = {
             available: Boolean(nearbyCache),
+            cacheFresh,
             fetchedAt: nearbyCache?.fetchedAt ?? null,
+            radiusMeters: nearbyCache?.radiusMeters ?? null,
+            cacheCenter:
+                Number.isFinite(nearbyCache?.centerLatitude) &&
+                Number.isFinite(nearbyCache?.centerLongitude)
+                    ? {
+                          latitude: nearbyCache.centerLatitude,
+                          longitude: nearbyCache.centerLongitude,
+                      }
+                    : null,
+            provider: nearbyCache ? "OpenStreetMap" : null,
+            attribution: nearbyCache
+                ? "© OpenStreetMap contributors"
+                : null,
             places,
             counts: countByCategory(places),
         };
 
+        const rentalCosts = buildRentalCostSummary(
+            property.pricing,
+            costRecord
+        );
+
         return res.status(200).json({
+            success: true,
             message: "Property details retrieved successfully.",
 
             property: {
                 id: property._id,
-                title: property.title ?? null,
-                description: property.description ?? null,
-                propertyType: property.propertyType ?? null,
-                rent: property.pricing?.monthlyRent ?? null,
-                bedrooms: property.bedrooms ?? null,
-                bathrooms: property.bathrooms ?? null,
-                area: property.address?.area ?? null,
-                city: property.address?.city ?? null,
-                address: property.address ?? null,
-                location: property.location ?? null,
+                title: property.title,
+                description: property.description,
+                propertyType: property.propertyType,
+                address: {
+                    area: property.address?.area ?? null,
+                    city: property.address?.city ?? null,
+                    country: property.address?.country ?? null,
+                },
+                coordinates,
+                areaSqft: property.areaSqft ?? null,
+                floor: property.floor ?? null,
+                bedrooms: property.bedrooms,
+                bathrooms: property.bathrooms,
+                furnishing: property.furnishing,
                 amenities: property.amenities ?? [],
+                houseRules: property.houseRules ?? [],
                 images,
+                videos,
+                floorPlans,
+                availabilityDate: property.availabilityDate ?? null,
+                leaseDurationMonths: property.leaseDurationMonths ?? null,
+                status: property.status,
                 createdAt: property.createdAt ?? null,
                 updatedAt: property.updatedAt ?? null,
             },
 
-            rentalCosts: costRecord
+            landlord: property.landlord
                 ? {
-                      available: true,
-                      ...calculateRentalCost(costRecord),
-                      items: costRecord.items,
-                      updatedAt: costRecord.updatedAt,
+                      id: property.landlord._id,
+                      displayName: property.landlord.displayName,
+                      photoURL: property.landlord.photoURL,
+                      role: property.landlord.role,
+                      memberSince: property.landlord.createdAt,
                   }
-                : {
-                      available: false,
-                      message: "Rental cost breakdown has not been provided.",
-                  },
+                : null,
+
+            rentalCosts,
 
             nearbyPlaces,
         });
     } catch (error) {
-        console.error("Get property details error:", error);
-
-        return res.status(500).json({
-            message: "Could not retrieve property details.",
-        });
+        next(error);
     }
 };
 

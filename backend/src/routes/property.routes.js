@@ -3,10 +3,13 @@ import { Router } from "express";
 import {
     createProperty,
     getProperties,
+    getRecentProperties,
     getMyProperties,
+    getPropertyManagers,
     getPropertyById,
     getPropertyDetail,
     updateProperty,
+    updatePropertyManagers,
     updatePropertyStatus,
 } from "../controllers/property.controller.js";
 
@@ -20,12 +23,20 @@ import { recordPropertyViewEvent } from "../controllers/propertyViewEvent.contro
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 import { validateRequest } from "../middleware/validateRequest.js";
-import { propertySearchSchema } from "../validators/common.validator.js";
+import {
+    nearbyPropertySearchSchema,
+    propertySearchSchema,
+} from "../validators/common.validator.js";
 
 const router = Router();
 
 // Public routes
-router.get("/", getProperties);
+router.get("/", validateRequest(propertySearchSchema), getProperties);
+router.get(
+    "/recent",
+    validateRequest(propertySearchSchema),
+    getRecentProperties
+);
 
 // Keep this route before /:id
 router.get(
@@ -43,7 +54,11 @@ router.get(
     searchProperties
 );
 
-router.get("/nearby", searchNearbyProperties);
+router.get(
+    "/nearby",
+    validateRequest(nearbyPropertySearchSchema),
+    searchNearbyProperties
+);
 
 router.get("/:id/costs", getRentalCost);
 router.get("/:id/nearby", getNearbyPlaces);
@@ -82,6 +97,20 @@ router.patch(
     authenticateUser,
     allowRoles("landlord", "property_manager"),
     updatePropertyStatus
+);
+
+router.patch(
+    "/:id/managers",
+    authenticateUser,
+    allowRoles("landlord"),
+    updatePropertyManagers
+);
+
+router.get(
+    "/:id/managers",
+    authenticateUser,
+    allowRoles("landlord"),
+    getPropertyManagers
 );
 
 export default router;

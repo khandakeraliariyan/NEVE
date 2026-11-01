@@ -63,14 +63,14 @@ router.patch(
 router.get(
     "/landlord",
     authenticateUser,
-    allowRoles("landlord"),
+    allowRoles("landlord", "property_manager"),
     getDedicatedLandlordViewingRequests
 );
 
 router.patch(
     "/:viewingId/respond",
     authenticateUser,
-    allowRoles("landlord"),
+    allowRoles("landlord", "property_manager"),
     respondToViewingRequest
 );
 

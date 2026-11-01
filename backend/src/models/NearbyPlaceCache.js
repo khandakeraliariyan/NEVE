@@ -14,23 +14,54 @@ const nearbyPlaceCacheSchema = new mongoose.Schema(
       {
         osmId: { type: String, required: true },
         name: { type: String, default: "Unnamed place" },
+        subcategory: { type: String, default: null },
         category: {
           type: String,
           enum: [
-            "school",
-            "hospital",
+            "healthcare",
+            "education",
+            "groceries",
             "transport",
-            "supermarket",
-            "park",
+            "banking",
+            "recreation",
+            "food",
             "other",
           ],
           required: true,
         },
+        osmType: {
+          type: String,
+          enum: ["node", "way", "relation"],
+          default: null,
+        },
         latitude: { type: Number, required: true },
         longitude: { type: Number, required: true },
         distanceMeters: { type: Number, required: true },
+        distanceKm: { type: Number, required: true },
       },
     ],
+
+    radiusMeters: {
+      type: Number,
+      min: 100,
+      max: 5000,
+      default: 5000,
+      required: true,
+    },
+
+    centerLatitude: {
+      type: Number,
+      min: -90,
+      max: 90,
+      default: null,
+    },
+
+    centerLongitude: {
+      type: Number,
+      min: -180,
+      max: 180,
+      default: null,
+    },
 
     fetchedAt: {
       type: Date,

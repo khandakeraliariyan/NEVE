@@ -1,6 +1,6 @@
 import RenterPreference from "../models/RenterPreference.js";
 
-const getUserId = (req) => req.user?._id || req.user?.id;
+const getUserId = (req) => req.neveUser._id;
 
 const allowedFields = [
     "cities",
@@ -9,7 +9,21 @@ const allowedFields = [
     "maxRent",
     "bedrooms",
     "propertyTypes",
+    "furnishing",
     "amenities",
+    "alertsEnabled",
+];
+
+const PROPERTY_TYPES = [
+    "apartment",
+    "house",
+    "room",
+    "shared_accommodation",
+];
+const FURNISHING_TYPES = [
+    "furnished",
+    "semi_furnished",
+    "unfurnished",
 ];
 
 export const getRenterPreferences = async (req, res) => {
@@ -26,7 +40,9 @@ export const getRenterPreferences = async (req, res) => {
                 maxRent: null,
                 bedrooms: [],
                 propertyTypes: [],
+                furnishing: null,
                 amenities: [],
+                alertsEnabled: true,
             },
         });
     } catch (error) {
@@ -60,6 +76,15 @@ export const updateRenterPreferences = async (req, res) => {
 
         const updates = {};
 
+        if (body.alertsEnabled !== undefined) {
+            if (typeof body.alertsEnabled !== "boolean") {
+                return res.status(400).json({
+                    message: "alertsEnabled must be a boolean.",
+                });
+            }
+            updates.alertsEnabled = body.alertsEnabled;
+        }
+
         for (const key of ["cities", "areas", "propertyTypes", "amenities"]) {
             if (body[key] !== undefined) {
                 if (
@@ -81,6 +106,34 @@ export const updateRenterPreferences = async (req, res) => {
                     ...new Set(body[key].map((value) => value.trim())),
                 ];
             }
+        }
+
+        if (body.propertyTypes !== undefined) {
+            const invalidTypes = updates.propertyTypes.filter(
+                (value) => !PROPERTY_TYPES.includes(value)
+            );
+
+            if (invalidTypes.length > 0) {
+                return res.status(400).json({
+                    message: "propertyTypes contains an unsupported value.",
+                    allowedValues: PROPERTY_TYPES,
+                });
+            }
+        }
+
+        if (body.furnishing !== undefined) {
+            if (
+                body.furnishing !== null &&
+                !FURNISHING_TYPES.includes(body.furnishing)
+            ) {
+                return res.status(400).json({
+                    message:
+                        "furnishing must be a supported furnishing value or null.",
+                    allowedValues: FURNISHING_TYPES,
+                });
+            }
+
+            updates.furnishing = body.furnishing;
         }
 
         if (body.bedrooms !== undefined) {

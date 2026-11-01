@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 import SavedProperty from "../models/SavedProperty.js";
 import Property from "../models/Property.js";
+import { getPagination, buildPagination } from "../utils/pagination.js";
 
-const getUserId = (req) => req.user?._id || req.user?.id;
+const getUserId = (req) => req.neveUser._id;
 
 export const saveProperty = async (req, res) => {
     try {
@@ -90,32 +91,25 @@ export const unsaveProperty = async (req, res) => {
 
 export const getSavedProperties = async (req, res) => {
     try {
-        const page = Number(req.query.page ?? 1);
-        const limit = Number(req.query.limit ?? 10);
+        const { page, limit, skip } = getPagination(req.validated.query);
 
-        if (
-            !Number.isInteger(page) ||
-            page < 1 ||
-            !Number.isInteger(limit) ||
-            limit < 1 ||
-            limit > 50
-        ) {
-            return res.status(400).json({
-                message: "Invalid pagination. Limit must be between 1 and 50.",
-            });
-        }
-
-        const savedEntries = await SavedProperty.find({
-            renter: getUserId(req),
-        })
-            .sort({ createdAt: -1 })
-            .populate({
-                path: "property",
-                match: { status: "published" },
-            })
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .lean();
+        const filter = { renter: getUserId(req) };
+        const [savedEntries, total] = await Promise.all([
+            SavedProperty.find(filter)
+                .sort({ createdAt: -1 })
+                .populate({
+                    path: "property",
+                    match: { status: "published" },
+                    populate: {
+                        path: "landlord",
+                        select: "displayName photoURL",
+                    },
+                })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            SavedProperty.countDocuments(filter),
+        ]);
 
         const properties = savedEntries
             .filter((entry) => entry.property)
@@ -126,11 +120,7 @@ export const getSavedProperties = async (req, res) => {
 
         return res.json({
             results: properties,
-            pagination: {
-                page,
-                limit,
-                totalReturned: properties.length,
-            },
+            pagination: buildPagination({ page, limit, total }),
         });
     } catch (error) {
         console.error("Get saved properties error:", error);

@@ -18,7 +18,12 @@ const uploadedFileSchema = new mongoose.Schema(
 
         purpose: {
             type: String,
-            enum: ["property_image", "tenancy_evidence"],
+            enum: [
+                "property_image",
+                "property_video",
+                "floor_plan",
+                "tenancy_evidence",
+            ],
             required: true,
         },
 
@@ -42,6 +47,8 @@ const uploadedFileSchema = new mongoose.Schema(
                 "image/png",
                 "image/webp",
                 "application/pdf",
+                "video/mp4",
+                "video/webm",
             ],
         },
 
@@ -51,10 +58,28 @@ const uploadedFileSchema = new mongoose.Schema(
             min: 1,
         },
 
+        imageFingerprint: {
+            type: String,
+            match: /^[a-f0-9]{32}$/,
+            index: { sparse: true },
+        },
+
         status: {
             type: String,
-            enum: ["pending_upload", "uploaded"],
+            enum: ["pending_upload", "uploaded", "deletion_pending"],
             default: "pending_upload",
+            index: true,
+        },
+
+        retentionUntil: {
+            type: Date,
+            default: null,
+            index: true,
+        },
+
+        legalHold: {
+            type: Boolean,
+            default: false,
             index: true,
         },
     },

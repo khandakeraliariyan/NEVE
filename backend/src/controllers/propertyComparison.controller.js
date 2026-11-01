@@ -1,7 +1,14 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
 import NearbyPlaceCache from "../models/NearbyPlaceCache.js";
+import RentalCost from "../models/RentalCost.js";
 import { buildPropertyComparison } from "../services/propertyComparison.service.js";
+import { buildRentalCostSummary } from "../services/propertyIntelligence.service.js";
+import {
+    getPropertyCoordinates,
+    isNearbyCacheFresh,
+    normalizeNeighborhoodPlace,
+} from "../services/neighborhood.service.js";
 
 export async function compareProperties(req, res, next) {
     try {
@@ -67,28 +74,60 @@ export async function compareProperties(req, res, next) {
         }
 
         const comparison = buildPropertyComparison(orderedProperties);
-        const nearbyCaches = await NearbyPlaceCache.find({
-            property: { $in: uniqueIds },
-        }).lean();
+        const [nearbyCaches, rentalCostRecords] = await Promise.all([
+            NearbyPlaceCache.find({
+                property: { $in: uniqueIds },
+            }).lean(),
+            RentalCost.find({
+                property: { $in: uniqueIds },
+            }).lean(),
+        ]);
         const nearbyCacheByProperty = new Map(
             nearbyCaches.map((cache) => [String(cache.property), cache])
+        );
+        const rentalCostsByProperty = new Map(
+            rentalCostRecords.map((record) => [
+                String(record.property),
+                record,
+            ])
         );
 
         const comparisonWithNearbyPlaces = comparison.map((property) => {
             const cache = nearbyCacheByProperty.get(String(property.id));
-            const places = cache?.places ?? [];
+            const places = (cache?.places ?? []).map(
+                normalizeNeighborhoodPlace
+            );
             const countNearby = (category) =>
                 places.filter((place) => place.category === category).length;
+            const sourceProperty = propertiesById.get(String(property.id));
+            const coordinates = getPropertyCoordinates(sourceProperty);
+            const rentalCost = rentalCostsByProperty.get(
+                String(property.id)
+            );
+            const cacheFresh =
+                coordinates !== null &&
+                isNearbyCacheFresh(cache, {
+                    ...coordinates,
+                    radius: 100,
+                });
 
             return {
                 ...property,
+                rentalCosts: buildRentalCostSummary(
+                    sourceProperty.pricing,
+                    rentalCost
+                ),
                 nearbyPlaces: {
-                    school: countNearby("school"),
-                    hospital: countNearby("hospital"),
+                    healthcare: countNearby("healthcare"),
+                    education: countNearby("education"),
+                    groceries: countNearby("groceries"),
                     transport: countNearby("transport"),
-                    supermarket: countNearby("supermarket"),
-                    park: countNearby("park"),
+                    banking: countNearby("banking"),
+                    recreation: countNearby("recreation"),
+                    food: countNearby("food"),
                     cacheAvailable: Boolean(cache),
+                    cacheFresh,
+                    radiusMeters: cache?.radiusMeters ?? null,
                     fetchedAt: cache?.fetchedAt ?? null,
                 },
             };

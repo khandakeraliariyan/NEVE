@@ -69,12 +69,12 @@ export const cancelMyViewingRequest = async (req, res, next) => {
             });
         }
 
-        // The renter can update only their own pending request.
+        // The renter can update only their own unconfirmed request.
         const updatedRequest = await ViewingRequest.findOneAndUpdate(
             {
                 _id: viewingId,
                 renter: req.neveUser._id,
-                status: "pending",
+                status: "requested",
             },
             {
                 $set: {
@@ -96,7 +96,7 @@ export const cancelMyViewingRequest = async (req, res, next) => {
         }
 
         // Determine whether the request is missing, belongs to someone else,
-        // or is no longer pending. Do not reveal another renter's request.
+        // or is no longer requested. Do not reveal another renter's request.
         const ownRequest = await ViewingRequest.findOne({
             _id: viewingId,
             renter: req.neveUser._id,
@@ -111,7 +111,7 @@ export const cancelMyViewingRequest = async (req, res, next) => {
 
         return res.status(409).json({
             success: false,
-            message: "Only pending viewing requests can be cancelled.",
+            message: "Only requested viewings can be cancelled.",
         });
     } catch (error) {
         next(error);

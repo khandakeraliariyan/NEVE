@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import Inquiry from "../models/Inquiry.js";
+import Property from "../models/Property.js";
+import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 import { findPubliclyAvailableProperty } from "../services/propertyAvailability.service.js";
 
 export async function createInquiry(req, res, next) {
@@ -78,8 +80,11 @@ export async function getMyInquiries(req, res, next) {
 
 export async function getLandlordInquiries(req, res, next) {
     try {
+        const propertyIds = await Property.find(
+            manageablePropertyFilter(req.neveUser._id)
+        ).distinct("_id");
         const inquiries = await Inquiry.find({
-            landlord: req.neveUser._id,
+            property: { $in: propertyIds },
         })
             .populate("property", "title address pricing status")
             .populate("renter", "displayName photoURL")
@@ -145,11 +150,26 @@ export async function updateInquiry(req, res, next) {
             updates.respondedAt = new Date();
         }
 
+        const inquiryRecord = await Inquiry.findById(id).select("property");
+        if (!inquiryRecord) {
+            return res.status(404).json({
+                success: false,
+                message: "Inquiry not found",
+            });
+        }
+        const manageableProperty = await Property.exists({
+            _id: inquiryRecord.property,
+            ...manageablePropertyFilter(req.neveUser._id),
+        });
+        if (!manageableProperty) {
+            return res.status(404).json({
+                success: false,
+                message: "Inquiry not found",
+            });
+        }
+
         const inquiry = await Inquiry.findOneAndUpdate(
-            {
-                _id: id,
-                landlord: req.neveUser._id,
-            },
+            { _id: id, property: inquiryRecord.property },
             { $set: updates },
             { new: true, runValidators: true }
         );

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
 import PropertyReport from "../models/PropertyReport.js";
+import { recordAdminAction } from "../services/adminAudit.service.js";
 
 const VALID_REASONS = [
     "duplicate_listing",
@@ -217,24 +218,7 @@ export const reviewPropertyReport = async (req, res, next) => {
             });
         }
 
-        const report = await PropertyReport.findByIdAndUpdate(
-            reportId,
-            {
-                $set: {
-                    status,
-                    reviewNote: reviewNote.trim(),
-                    reviewedBy: req.neveUser._id,
-                    reviewedAt: new Date(),
-                },
-            },
-            {
-                new: true,
-                runValidators: true,
-            }
-        )
-            .populate("property", "title address status landlord")
-            .populate("reporter", "displayName email")
-            .populate("reviewedBy", "displayName email");
+        const report = await PropertyReport.findById(reportId);
 
         if (!report) {
             return res.status(404).json({
@@ -242,6 +226,28 @@ export const reviewPropertyReport = async (req, res, next) => {
                 message: "Property report not found.",
             });
         }
+
+        const previousStatus = report.status;
+        report.status = status;
+        report.reviewNote = reviewNote.trim();
+        report.reviewedBy = req.neveUser._id;
+        report.reviewedAt = new Date();
+        await report.save();
+
+        await recordAdminAction({
+            req,
+            action: "property_report_reviewed",
+            targetType: "property_report",
+            targetId: report._id,
+            details: {
+                previousStatus,
+                newStatus: report.status,
+            },
+        });
+
+        await report.populate("property", "title address status landlord");
+        await report.populate("reporter", "displayName email");
+        await report.populate("reviewedBy", "displayName email");
 
         return res.status(200).json({
             success: true,

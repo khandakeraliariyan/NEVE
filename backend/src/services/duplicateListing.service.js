@@ -1,4 +1,5 @@
 import Property from "../models/Property.js";
+import UploadedFile from "../models/UploadedFile.js";
 
 const normalizeText = (value = "") =>
     String(value)
@@ -38,11 +39,15 @@ const getRentSimilarity = (first, second) => {
 };
 
 const getImageMatches = (firstImages = [], secondImages = []) => {
-    const first = new Set(firstImages.filter(Boolean));
-    return secondImages.filter((image) => image && first.has(image));
+    const first = new Set(firstImages.filter(Boolean).map(String));
+    return secondImages.filter((image) => image && first.has(String(image)));
 };
 
-const getDuplicateSignals = (first, second) => {
+export const getDuplicateSignals = (
+    first,
+    second,
+    sharedFingerprintCount = 0
+) => {
     const signals = [];
     let score = 0;
 
@@ -85,10 +90,45 @@ const getDuplicateSignals = (first, second) => {
     }
 
     const matchingImages = getImageMatches(first.images, second.images);
+    const matchingImageCount =
+        matchingImages.length + sharedFingerprintCount;
 
-    if (matchingImages.length > 0) {
-        score += Math.min(20, matchingImages.length * 10);
-        signals.push("One or more image URLs match exactly");
+    if (matchingImageCount > 0) {
+        score += Math.min(30, matchingImageCount * 15);
+        signals.push("One or more uploaded image files are shared");
+    }
+
+    const firstCoordinates =
+        first.address?.location?.coordinates ?? [];
+    const secondCoordinates =
+        second.address?.location?.coordinates ?? [];
+    if (
+        firstCoordinates.length === 2 &&
+        secondCoordinates.length === 2 &&
+        firstCoordinates.every(Number.isFinite) &&
+        secondCoordinates.every(Number.isFinite)
+    ) {
+        const toRadians = (degrees) => (degrees * Math.PI) / 180;
+        const latitudeDelta = toRadians(
+            secondCoordinates[1] - firstCoordinates[1]
+        );
+        const longitudeDelta = toRadians(
+            secondCoordinates[0] - firstCoordinates[0]
+        );
+        const haversine =
+            Math.sin(latitudeDelta / 2) ** 2 +
+            Math.cos(toRadians(firstCoordinates[1])) *
+                Math.cos(toRadians(secondCoordinates[1])) *
+                Math.sin(longitudeDelta / 2) ** 2;
+        const distanceMeters =
+            6371000 *
+            2 *
+            Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+
+        if (distanceMeters <= 50) {
+            score += 15;
+            signals.push("Listing coordinates are within 50 meters");
+        }
     }
 
     if (
@@ -111,7 +151,7 @@ const getDuplicateSignals = (first, second) => {
     return {
         score: Math.min(score, 100),
         signals,
-        matchingImageCount: matchingImages.length,
+        matchingImageCount,
     };
 };
 
@@ -126,23 +166,99 @@ export const findPotentialDuplicates = async (propertyId) => {
 
     if (!property) {
         const error = new Error("Property not found.");
-        error.statusCode = 404;
+        error.status = 404;
         throw error;
     }
 
+    const currentImageFiles = property.images?.length
+        ? await UploadedFile.find({
+              _id: { $in: property.images },
+              purpose: "property_image",
+              status: "uploaded",
+          })
+              .select("imageFingerprint")
+              .lean()
+        : [];
+    const imageFingerprints = [
+        ...new Set(
+            currentImageFiles
+                .map((file) => file.imageFingerprint)
+                .filter(Boolean)
+        ),
+    ];
+    const filesWithMatchingFingerprint = imageFingerprints.length
+        ? await UploadedFile.find({
+              purpose: "property_image",
+              status: "uploaded",
+              imageFingerprint: { $in: imageFingerprints },
+              property: { $ne: property._id },
+          })
+              .select("property")
+              .lean()
+        : [];
+    const imageCandidateIds = [
+        ...new Set(
+            filesWithMatchingFingerprint
+                .map((file) => file.property)
+                .filter(Boolean)
+                .map(String)
+        ),
+    ];
     const candidates = await Property.find({
         _id: { $ne: property._id },
         status: "published",
+        $or: [
+            { "address.city": property.address?.city },
+            ...(property.images?.length
+                ? [{ images: { $in: property.images } }]
+                : []),
+            ...(imageCandidateIds.length
+                ? [{ _id: { $in: imageCandidateIds } }]
+                : []),
+        ],
     })
+        .sort({ createdAt: -1 })
         .select(
             "title address pricing images propertyType bedrooms status createdAt"
         )
-        .limit(500)
+        .limit(1000)
         .lean();
+
+    const candidateImageFiles =
+        imageFingerprints.length && candidates.length
+            ? await UploadedFile.find({
+                  _id: {
+                      $in: candidates.flatMap(
+                          (candidate) => candidate.images ?? []
+                      ),
+                  },
+                  purpose: "property_image",
+                  status: "uploaded",
+                  imageFingerprint: { $in: imageFingerprints },
+              })
+                  .select("property imageFingerprint")
+                  .lean()
+            : [];
+    const matchingFingerprintsByProperty = new Map();
+    for (const file of candidateImageFiles) {
+        const key = String(file.property);
+        const matches =
+            matchingFingerprintsByProperty.get(key) || new Set();
+        matches.add(file.imageFingerprint);
+        matchingFingerprintsByProperty.set(key, matches);
+    }
 
     const results = candidates
         .map((candidate) => {
-            const comparison = getDuplicateSignals(property, candidate);
+            const sharedFingerprintCount =
+                matchingFingerprintsByProperty.get(
+                    String(candidate._id)
+                )?.size ?? 0;
+            const comparison = getDuplicateSignals(
+                property,
+                candidate,
+                sharedFingerprintCount
+            );
 
             return {
                 property: {
@@ -166,6 +282,7 @@ export const findPotentialDuplicates = async (propertyId) => {
             title: property.title,
         },
         candidateCount: candidates.length,
+        candidateLimit: 1000,
         potentialDuplicates: results,
         note:
             "Similarity scores are heuristic review signals, not proof of duplication or fraud.",

@@ -1,6 +1,13 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
-import { calculateRentalCost } from "../services/rentalCost.service.js";
+import { getPropertyDetails } from "./propertyDetail.controller.js";
+import {
+    buildPropertySearchFilter,
+    getPropertySort,
+} from "../services/propertySearch.service.js";
+import { notifyRentersOfMatchingProperty } from "../services/matchingAlert.service.js";
+import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
+import User from "../models/User.js";
 
 const editableFields = [
     "title",
@@ -24,44 +31,6 @@ function pickFields(source, allowedFields) {
     return Object.fromEntries(
         Object.entries(source).filter(([key]) => allowedFields.includes(key))
     );
-}
-
-const PROPERTY_TYPES = [
-    "apartment",
-    "house",
-    "room",
-    "shared_accommodation",
-];
-
-const FURNISHING_TYPES = [
-    "furnished",
-    "semi_furnished",
-    "unfurnished",
-];
-
-const SORT_OPTIONS = {
-    rent_asc: { "pricing.monthlyRent": 1 },
-    rent_desc: { "pricing.monthlyRent": -1 },
-    newest: { createdAt: -1 },
-    oldest: { createdAt: 1 },
-};
-
-function escapeRegex(value) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function parseOptionalNumber(value) {
-    if (value === undefined) return undefined;
-
-    if (
-        value === "" ||
-        !Number.isFinite(Number(value)) ||
-        Number(value) < 0
-    ) {
-        return null;
-    }
-
-    return Number(value);
 }
 
 // POST /api/v1/properties
@@ -96,170 +65,16 @@ export async function createProperty(req, res, next) {
 // GET /api/v1/properties
 export async function getProperties(req, res, next) {
     try {
-        const {
-            city,
-            area,
-            minRent,
-            maxRent,
-            bedrooms,
-            propertyType,
-            furnishing,
-            q,
-            sort = "newest",
-            page = "1",
-            limit = "10",
-        } = req.query;
-
-        const parsedMinRent = parseOptionalNumber(minRent);
-        const parsedMaxRent = parseOptionalNumber(maxRent);
-        const parsedBedrooms = parseOptionalNumber(bedrooms);
-
-        if (
-            parsedMinRent === null ||
-            parsedMaxRent === null ||
-            parsedBedrooms === null
-        ) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Rent and bedroom filters must be valid non-negative numbers.",
-            });
-        }
-
-        if (
-            parsedBedrooms !== undefined &&
-            (!Number.isInteger(parsedBedrooms) || parsedBedrooms > 100)
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Bedrooms must be an integer between 0 and 100.",
-            });
-        }
-
-        if (
-            parsedMinRent !== undefined &&
-            parsedMaxRent !== undefined &&
-            parsedMinRent > parsedMaxRent
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "minRent cannot exceed maxRent.",
-            });
-        }
-
-        if (propertyType && !PROPERTY_TYPES.includes(propertyType)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid propertyType.",
-                allowedValues: PROPERTY_TYPES,
-            });
-        }
-
-        if (furnishing && !FURNISHING_TYPES.includes(furnishing)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid furnishing.",
-                allowedValues: FURNISHING_TYPES,
-            });
-        }
-
-        const pageNumber = Number(page);
-        const pageSize = Number(limit);
-
-        if (
-            !Number.isInteger(pageNumber) ||
-            pageNumber < 1 ||
-            !Number.isInteger(pageSize) ||
-            pageSize < 1 ||
-            pageSize > 50
-        ) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "page must be >= 1; limit must be an integer from 1 to 50.",
-            });
-        }
-
-        if (sort && !SORT_OPTIONS[sort]) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid sort option.",
-                allowedValues: Object.keys(SORT_OPTIONS),
-            });
-        }
-
-        if (
-            q !== undefined &&
-            (typeof q !== "string" || q.trim().length > 100)
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Search text must be at most 100 characters.",
-            });
-        }
-
-        const filter = { status: "published" };
-
-        if (city?.trim()) {
-            filter["address.city"] = {
-                $regex: `^${escapeRegex(city.trim())}$`,
-                $options: "i",
-            };
-        }
-
-        if (area?.trim()) {
-            filter["address.area"] = {
-                $regex: `^${escapeRegex(area.trim())}$`,
-                $options: "i",
-            };
-        }
-
-        if (propertyType) {
-            filter.propertyType = propertyType;
-        }
-
-        if (furnishing) {
-            filter.furnishing = furnishing;
-        }
-
-        if (parsedBedrooms !== undefined) {
-            filter.bedrooms = { $gte: parsedBedrooms };
-        }
-
-        if (
-            parsedMinRent !== undefined ||
-            parsedMaxRent !== undefined
-        ) {
-            filter["pricing.monthlyRent"] = {};
-
-            if (parsedMinRent !== undefined) {
-                filter["pricing.monthlyRent"].$gte = parsedMinRent;
-            }
-
-            if (parsedMaxRent !== undefined) {
-                filter["pricing.monthlyRent"].$lte = parsedMaxRent;
-            }
-        }
-
-        if (q?.trim()) {
-            const searchPattern = new RegExp(escapeRegex(q.trim()), "i");
-
-            filter.$or = [
-                { title: searchPattern },
-                { description: searchPattern },
-                { "address.area": searchPattern },
-                { "address.city": searchPattern },
-            ];
-        }
-
-        const skip = (pageNumber - 1) * pageSize;
+        const { page, limit, sort } = req.validated.query;
+        const filter = buildPropertySearchFilter(req.validated.query);
+        const skip = (page - 1) * limit;
 
         const [properties, total] = await Promise.all([
             Property.find(filter)
                 .populate("landlord", "displayName photoURL")
-                .sort(SORT_OPTIONS[sort])
+                .sort(getPropertySort(sort))
                 .skip(skip)
-                .limit(pageSize)
+                .limit(limit)
                 .lean(),
 
             Property.countDocuments(filter),
@@ -269,12 +84,12 @@ export async function getProperties(req, res, next) {
             success: true,
             count: properties.length,
             pagination: {
-                page: pageNumber,
-                limit: pageSize,
+                page,
+                limit,
                 total,
-                totalPages: Math.ceil(total / pageSize),
-                hasNextPage: pageNumber * pageSize < total,
-                hasPreviousPage: pageNumber > 1,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page * limit < total,
+                hasPreviousPage: page > 1,
             },
             properties,
         });
@@ -283,11 +98,16 @@ export async function getProperties(req, res, next) {
     }
 }
 
+export async function getRecentProperties(req, res, next) {
+    req.validated.query.sort = "newest";
+    return getProperties(req, res, next);
+}
+
 // GET /api/v1/properties/mine
 export async function getMyProperties(req, res, next) {
     try {
         const properties = await Property.find({
-            landlord: req.neveUser._id,
+            ...manageablePropertyFilter(req.neveUser._id),
         }).sort({ createdAt: -1 });
 
         return res.status(200).json({
@@ -300,130 +120,138 @@ export async function getMyProperties(req, res, next) {
     }
 }
 
-// GET /api/v1/properties/:id/detail
-export async function getPropertyDetail(req, res, next) {
+export async function updatePropertyManagers(req, res, next) {
     try {
         const { id } = req.params;
-
-        if (!mongoose.isValidObjectId(id)) {
+        const { managerId, action } = req.body ?? {};
+        if (
+            !mongoose.isValidObjectId(id) ||
+            !mongoose.isValidObjectId(managerId) ||
+            !["assign", "revoke"].includes(action)
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "A valid property ID is required",
+                message: "A valid managerId and assign/revoke action are required.",
             });
         }
 
         const property = await Property.findOne({
             _id: id,
-            status: "published",
-        }).select("-landlord -houseRules");
-
+            landlord: req.neveUser._id,
+        }).select("+managerAssignments");
         if (!property) {
             return res.status(404).json({
                 success: false,
-                message: "Property not found or not publicly available",
+                message: "Property not found or you are not its owner.",
             });
         }
 
-        const pricing = property.pricing.toObject();
-        const costBreakdown = calculateRentalCost(pricing);
-        const coordinates = property.address.location?.coordinates;
-        const validCoordinates =
-            Array.isArray(coordinates) &&
-            coordinates.length === 2 &&
-            coordinates.every(Number.isFinite);
-        const utilitiesEstimateAvailable =
-            pricing.estimatedMonthlyUtilities !== null &&
-            pricing.estimatedMonthlyUtilities !== undefined;
+        if (action === "assign") {
+            const manager = await User.findOne({
+                _id: managerId,
+                role: "property_manager",
+                isActive: true,
+            }).select("_id");
+            if (!manager) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Active property manager not found.",
+                });
+            }
+            const existing = property.managerAssignments.find(
+                (assignment) =>
+                    String(assignment.manager) === String(managerId) &&
+                    assignment.revokedAt === null
+            );
+            if (existing) {
+                return res.status(409).json({
+                    success: false,
+                    message: "This manager is already assigned to the property.",
+                });
+            }
+            const activeCount = property.managerAssignments.filter(
+                (assignment) => assignment.revokedAt === null
+            ).length;
+            if (activeCount >= 10) {
+                return res.status(409).json({
+                    success: false,
+                    message: "A property can have at most 10 active managers.",
+                });
+            }
+            property.managerAssignments.push({
+                manager: manager._id,
+                assignedBy: req.neveUser._id,
+                assignedAt: new Date(),
+                revokedAt: null,
+            });
+        } else {
+            const assignment = property.managerAssignments.find(
+                (entry) =>
+                    String(entry.manager) === String(managerId) &&
+                    entry.revokedAt === null
+            );
+            if (!assignment) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Active property manager assignment not found.",
+                });
+            }
+            assignment.revokedAt = new Date();
+        }
 
-        const missingInformation = [];
-        if (!utilitiesEstimateAvailable) {
-            missingInformation.push("estimated_utilities");
-        }
-        if (!property.availabilityDate) {
-            missingInformation.push("availability_date");
-        }
-        if (!property.description?.trim()) {
-            missingInformation.push("description");
-        }
-        if (!validCoordinates) {
-            missingInformation.push("coordinates");
-        }
-        if (!Array.isArray(property.amenities) || property.amenities.length === 0) {
-            missingInformation.push("amenities");
-        }
-
-        const completenessFields = [
-            Boolean(property.description?.trim()),
-            utilitiesEstimateAvailable,
-            Boolean(property.availabilityDate),
-            validCoordinates,
-            Array.isArray(property.amenities) && property.amenities.length > 0,
-        ];
-        const completeness = Math.round(
-            (completenessFields.filter(Boolean).length /
-                completenessFields.length) *
-                100
-        );
-
-        const [longitude, latitude] = validCoordinates
-            ? coordinates
-            : [undefined, undefined];
-
-        return res.status(200).json({
-            property: {
-                id: property._id,
-                title: property.title,
-                description: property.description,
-                propertyType: property.propertyType,
-                address: property.address.area
-                    ? {
-                        area: property.address.area,
-                        city: property.address.city,
-                        country: property.address.country,
-                    }
-                    : property.address,
-                areaSqft: property.areaSqft,
-                latitude,
-                longitude,
-                bedrooms: property.bedrooms,
-                bathrooms: property.bathrooms,
-                floor: property.floor,
-                furnishing: property.furnishing,
-                amenities: property.amenities,
-                images: property.images,
-                createdAt: property.createdAt,
-                updatedAt: property.updatedAt,
-            },
-            listings: [
-                {
-                    id: property._id,
-                    rentAmount: pricing.monthlyRent,
-                    currency: costBreakdown.currency,
-                    depositAmount: pricing.securityDeposit ?? null,
-                    advanceRent: pricing.advanceRent ?? null,
-                    serviceCharge: pricing.monthlyServiceCharge ?? null,
-                    estimatedUtilities: utilitiesEstimateAvailable
-                        ? pricing.estimatedMonthlyUtilities
-                        : null,
-                    utilitiesEstimateAvailable,
-                    monthlyTotal: costBreakdown.recurringMonthly.knownSubtotal,
-                    costBreakdown,
-                    availabilityDate: property.availabilityDate,
-                    leaseDurationMonths: property.leaseDurationMonths,
-                    reliability: {
-                        completeness,
-                        missingInformation,
-                        note: "Completeness measures the availability of listing information. It does not verify the truth or accuracy of the claims.",
-                    },
-                    createdAt: property.createdAt,
-                    updatedAt: property.updatedAt,
-                },
-            ],
-            listingCount: 1,
+        await property.save();
+        return res.json({
+            success: true,
+            message:
+                action === "assign"
+                    ? "Property manager assigned."
+                    : "Property manager assignment revoked.",
+            managerAssignments: property.managerAssignments,
         });
     } catch (error) {
         next(error);
     }
+}
+
+export async function getPropertyManagers(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID.",
+            });
+        }
+        const property = await Property.findOne({
+            _id: id,
+            landlord: req.neveUser._id,
+        })
+            .select("+managerAssignments")
+            .populate(
+                "managerAssignments.manager managerAssignments.assignedBy",
+                "displayName photoURL role"
+            )
+            .lean();
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Property not found or you are not its owner.",
+            });
+        }
+        return res.json({
+            success: true,
+            propertyId: property._id,
+            managerAssignments: property.managerAssignments,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/properties/:id/detail
+export async function getPropertyDetail(req, res, next) {
+    req.params.propertyId = req.params.id;
+    return getPropertyDetails(req, res, next);
 }
 
 // GET /api/v1/properties/:id
@@ -480,18 +308,11 @@ export async function updateProperty(req, res, next) {
             });
         }
 
-        const property = await Property.findOneAndUpdate(
-            {
-                _id: id,
-                landlord: req.neveUser._id,
-                status: { $in: ["draft", "published", "paused"] },
-            },
-            { $set: data },
-            {
-                new: true,
-                runValidators: true,
-            }
-        );
+        const property = await Property.findOne({
+            _id: id,
+            ...manageablePropertyFilter(req.neveUser._id),
+            status: { $in: ["draft", "published", "paused"] },
+        });
 
         if (!property) {
             return res.status(404).json({
@@ -499,6 +320,8 @@ export async function updateProperty(req, res, next) {
                 message: "Property not found or you do not own it",
             });
         }
+        Object.assign(property, data);
+        await property.save();
 
         return res.status(200).json({
             success: true,
@@ -540,7 +363,7 @@ export async function updatePropertyStatus(req, res, next) {
 
         const property = await Property.findOne({
             _id: id,
-            landlord: req.neveUser._id,
+            ...manageablePropertyFilter(req.neveUser._id),
         });
 
         if (!property) {
@@ -550,14 +373,29 @@ export async function updatePropertyStatus(req, res, next) {
             });
         }
 
+        const wasPublished = property.status === "published";
         // A paused listing can be republished; a draft can be published.
         property.status = status;
         await property.save();
+
+        let matchingAlerts = null;
+        if (status === "published" && !wasPublished) {
+            try {
+                matchingAlerts = {
+                    status: "sent",
+                    ...(await notifyRentersOfMatchingProperty(property)),
+                };
+            } catch (error) {
+                console.error("Publish matching-listing alerts error:", error);
+                matchingAlerts = { status: "failed" };
+            }
+        }
 
         return res.status(200).json({
             success: true,
             message: `Property ${status} successfully`,
             property,
+            ...(matchingAlerts ? { matchingAlerts } : {}),
         });
     } catch (error) {
         next(error);

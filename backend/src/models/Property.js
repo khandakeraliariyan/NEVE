@@ -1,5 +1,23 @@
 import mongoose from "mongoose";
 
+const propertyManagerAssignmentSchema = new mongoose.Schema(
+    {
+        manager: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+        assignedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+        assignedAt: { type: Date, default: Date.now },
+        revokedAt: { type: Date, default: null },
+    },
+    { _id: false }
+);
+
 const propertySchema = new mongoose.Schema(
     {
         landlord: {
@@ -7,6 +25,12 @@ const propertySchema = new mongoose.Schema(
             ref: "User",
             required: true,
             index: true,
+        },
+
+        managerAssignments: {
+            type: [propertyManagerAssignmentSchema],
+            default: [],
+            select: false,
         },
 
         title: {
@@ -130,6 +154,38 @@ const propertySchema = new mongoose.Schema(
             },
         },
 
+        videos: {
+            type: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "UploadedFile",
+                },
+            ],
+            default: [],
+            validate: {
+                validator(value) {
+                    return value.length <= 5;
+                },
+                message: "A maximum of 5 property videos is allowed",
+            },
+        },
+
+        floorPlans: {
+            type: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "UploadedFile",
+                },
+            ],
+            default: [],
+            validate: {
+                validator(value) {
+                    return value.length <= 5;
+                },
+                message: "A maximum of 5 floor plans is allowed",
+            },
+        },
+
         pricing: {
             monthlyRent: {
                 type: Number,
@@ -204,6 +260,7 @@ propertySchema.index({
 });
 
 propertySchema.index({ "address.location": "2dsphere" });
+propertySchema.index({ "managerAssignments.manager": 1, status: 1 });
 
 const Property = mongoose.model("Property", propertySchema);
 

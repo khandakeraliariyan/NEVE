@@ -5,6 +5,10 @@ import mongoose from "mongoose";
 import UploadedFile from "../models/UploadedFile.js";
 import Property from "../models/Property.js";
 import { env } from "../config/env.js";
+import {
+    appendAuditEvent,
+    findAgreementForEvidenceFile,
+} from "../services/tenancyAgreement.service.js";
 
 import {
     validateUpload,
@@ -13,14 +17,32 @@ import {
     createDownloadUrl,
     deleteStoredObject,
 } from "../services/fileUpload.service.js";
+import { canManageProperty } from "../services/propertyAccess.service.js";
+import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
+import { findSharedCaseForEvidenceFile } from "../services/tenancyCase.service.js";
 
-const getUserId = (req) => req.user?._id || req.user?.id;
+const getUserId = (req) => req.neveUser?._id;
 
 const getSafeFileName = (name) =>
     path.basename(name).replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
 
+const propertyMediaFields = {
+    property_image: "images",
+    property_video: "videos",
+    floor_plan: "floorPlans",
+};
+
 const getFilePrefix = (purpose) =>
-    purpose === "property_image" ? "property-images" : "private-evidence";
+    propertyMediaFields[purpose]
+        ? `property-media/${propertyMediaFields[purpose]}`
+        : "private-evidence";
+
+const getErrorStatus = (error) =>
+    Number.isInteger(error.status) &&
+    error.status >= 400 &&
+    error.status < 600
+        ? error.status
+        : 500;
 
 export const requestUploadUrl = async (req, res) => {
     try {
@@ -45,16 +67,21 @@ export const requestUploadUrl = async (req, res) => {
 
         let property = null;
 
-        if (purpose === "property_image") {
+        if (propertyMediaFields[purpose]) {
             if (!propertyId || !mongoose.isValidObjectId(propertyId)) {
                 return res.status(400).json({
-                    message: "A valid propertyId is required for property images.",
+                    message: "A valid propertyId is required for listing media.",
                 });
             }
 
-            if (!["landlord", "admin"].includes(req.user.role)) {
+            if (
+                !["landlord", "property_manager", "admin"].includes(
+                    req.neveUser.role
+                )
+            ) {
                 return res.status(403).json({
-                    message: "Only landlords or admins can upload property images.",
+                    message:
+                        "Only landlords, property managers, or admins can upload listing media.",
                 });
             }
 
@@ -64,14 +91,12 @@ export const requestUploadUrl = async (req, res) => {
                 return res.status(404).json({ message: "Property not found." });
             }
 
-            const landlordId = property.landlord?._id || property.landlord;
-
             if (
-                req.user.role !== "admin" &&
-                String(landlordId) !== String(userId)
+                req.neveUser.role !== "admin" &&
+                !(await canManageProperty(property, userId))
             ) {
                 return res.status(403).json({
-                    message: "You cannot upload images for this property.",
+                    message: "You cannot upload media for this property.",
                 });
             }
         }
@@ -124,7 +149,13 @@ export const requestUploadUrl = async (req, res) => {
         }
 
         console.error("Request upload URL error:", error);
-        return res.status(500).json({ message: "Could not create upload URL." });
+        const statusCode = getErrorStatus(error);
+        return res.status(statusCode).json({
+            message:
+                statusCode === 503
+                    ? "File storage is not configured."
+                    : "Could not create upload URL.",
+        });
     }
 };
 
@@ -161,6 +192,13 @@ export const completeUpload = async (req, res) => {
             });
         }
 
+        if (file.purpose === "property_image") {
+            const etag = String(metadata.ETag || "").replaceAll('"', "");
+            file.imageFingerprint = /^[a-f0-9]{32}$/i.test(etag)
+                ? etag.toLowerCase()
+                : null;
+        }
+
         file.status = "uploaded";
         await file.save();
 
@@ -178,8 +216,12 @@ export const completeUpload = async (req, res) => {
         });
     } catch (error) {
         console.error("Complete upload error:", error);
-        return res.status(500).json({
-            message: "Could not confirm upload. Check the upload URL and try again.",
+        const statusCode = getErrorStatus(error);
+        return res.status(statusCode).json({
+            message:
+                statusCode === 503
+                    ? "File storage is not configured."
+                    : "Could not confirm upload. Check the upload URL and try again.",
         });
     }
 };
@@ -203,27 +245,39 @@ export const getFileAccessUrl = async (req, res) => {
 
         const userId = String(getUserId(req));
         const isUploader = String(file.uploadedBy) === userId;
-        const isAdmin = req.user.role === "admin";
+        const isAdmin = req.neveUser.role === "admin";
 
         let isPropertyOwner = false;
 
-        if (file.purpose === "property_image" && file.property) {
+        if (propertyMediaFields[file.purpose] && file.property) {
             const property = await Property.findById(file.property).select(
                 "landlord"
             );
 
             if (property) {
-                const landlordId = property.landlord?._id || property.landlord;
-                isPropertyOwner = String(landlordId) === userId;
+                isPropertyOwner = await canManageProperty(property, userId);
             }
         }
 
-        // Private tenancy evidence is accessible only to its uploader or an admin
-        // until a verified tenancy-sharing/permission system is implemented.
-        const allowed =
-            isAdmin ||
-            isUploader ||
-            (file.purpose === "property_image" && isPropertyOwner);
+        const agreement = file.purpose === "tenancy_evidence"
+            ? await findAgreementForEvidenceFile(
+                file._id,
+                getUserId(req),
+                req.neveUser.role
+            )
+            : null;
+        const sharedCase = file.purpose === "tenancy_evidence"
+            ? await findSharedCaseForEvidenceFile(
+                file._id,
+                getUserId(req),
+                req.neveUser.role
+            )
+            : null;
+        const allowed = file.purpose === "tenancy_evidence"
+            ? isUploader || Boolean(agreement) || Boolean(sharedCase)
+            : isAdmin ||
+                isUploader ||
+                (propertyMediaFields[file.purpose] && isPropertyOwner);
 
         if (!allowed) {
             return res.status(403).json({
@@ -231,8 +285,31 @@ export const getFileAccessUrl = async (req, res) => {
             });
         }
 
+        if (agreement) {
+            appendAuditEvent(
+                agreement,
+                getUserId(req),
+                "evidence_file_access_requested",
+                "file",
+                file._id
+            );
+            await agreement.save();
+        }
+
         const url = await createDownloadUrl(file.storageKey);
 
+        res.set("Cache-Control", "private, no-store");
+        await recordSensitiveAccess({
+            actor: getUserId(req),
+            action: "file_access_url_issued",
+            resourceType: "file",
+            resourceId: file._id,
+            agreement: agreement?._id ?? sharedCase?.agreement ?? null,
+            details: sharedCase
+                ? { caseId: String(sharedCase._id), purpose: file.purpose }
+                : { purpose: file.purpose },
+            ipAddress: req.ip,
+        });
         return res.json({
             fileId: file._id,
             url,
@@ -240,8 +317,12 @@ export const getFileAccessUrl = async (req, res) => {
         });
     } catch (error) {
         console.error("Get file access URL error:", error);
-        return res.status(500).json({
-            message: "Could not generate file access URL.",
+        const statusCode = getErrorStatus(error);
+        return res.status(statusCode).json({
+            message:
+                statusCode === 503
+                    ? "File storage is not configured."
+                    : "Could not generate file access URL.",
         });
     }
 };

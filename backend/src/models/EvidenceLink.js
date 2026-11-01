@@ -1,5 +1,23 @@
 import mongoose from "mongoose";
 
+const relationshipEventSchema = new mongoose.Schema(
+    {
+        actor: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+        relationship: {
+            type: String,
+            enum: ["supports", "contradicts", "context_only", "unassessed"],
+            required: true,
+        },
+        explanation: { type: String, maxlength: 1000, default: "" },
+        createdAt: { type: Date, default: Date.now },
+    },
+    { _id: false }
+);
+
 const evidenceLinkSchema = new mongoose.Schema(
     {
         property: {
@@ -39,6 +57,7 @@ const evidenceLinkSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+        history: { type: [relationshipEventSchema], default: [] },
     },
     { timestamps: true }
 );

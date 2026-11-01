@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import ViewingRequest from "../models/ViewingRequest.js";
 import Property from "../models/Property.js";
 import { createNotification } from "../services/notification.service.js";
+import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 
 // GET /api/v1/viewings/landlord
 export const getLandlordViewingRequests = async (req, res, next) => {
@@ -28,10 +29,19 @@ export const getLandlordViewingRequests = async (req, res, next) => {
             });
         }
 
-        // Find only properties owned by the authenticated landlord.
-        const propertyIds = await Property.find({
-            landlord: req.neveUser._id,
-        }).distinct("_id");
+        if (
+            status !== undefined &&
+            !ViewingRequest.schema.path("status").enumValues.includes(status)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid viewing request status.",
+            });
+        }
+
+        const propertyIds = await Property.find(
+            manageablePropertyFilter(req.neveUser._id)
+        ).distinct("_id");
 
         const filter = {
             property: { $in: propertyIds },
@@ -83,10 +93,10 @@ export const respondToViewingRequest = async (req, res, next) => {
             });
         }
 
-        if (!["approved", "rejected"].includes(status)) {
+        if (!["confirmed", "declined"].includes(status)) {
             return res.status(400).json({
                 success: false,
-                message: "Status must be approved or rejected.",
+                message: "Status must be confirmed or declined.",
             });
         }
 
@@ -112,7 +122,7 @@ export const respondToViewingRequest = async (req, res, next) => {
         // Verify ownership through the property itself.
         const property = await Property.findOne({
             _id: viewingRequest.property,
-            landlord: req.neveUser._id,
+            ...manageablePropertyFilter(req.neveUser._id),
         }).select("_id");
 
         if (!property) {
@@ -122,34 +132,25 @@ export const respondToViewingRequest = async (req, res, next) => {
             });
         }
 
-        if (viewingRequest.status !== "pending") {
+        if (viewingRequest.status !== "requested") {
             return res.status(409).json({
                 success: false,
-                message: "Only pending viewing requests can be updated.",
+                message: "Only requested viewings can be updated.",
             });
-        }
-
-        const update = {
-            status,
-        };
-
-        // Only set this field if your schema supports it.
-        if (
-            Object.prototype.hasOwnProperty.call(
-                ViewingRequest.schema.paths,
-                "landlordResponse"
-            )
-        ) {
-            update.landlordResponse = landlordResponse.trim();
         }
 
         const updatedRequest = await ViewingRequest.findOneAndUpdate(
             {
                 _id: viewingId,
                 property: property._id,
-                status: "pending",
+                status: "requested",
             },
-            { $set: update },
+            {
+                $set: {
+                    status,
+                    landlordNote: landlordResponse.trim(),
+                },
+            },
             {
                 new: true,
                 runValidators: true,
@@ -166,21 +167,21 @@ export const respondToViewingRequest = async (req, res, next) => {
         }
 
         try {
-            const approved = updatedRequest.status === "approved";
+            const confirmed = updatedRequest.status === "confirmed";
             const propertyId = updatedRequest.property?._id
                 || updatedRequest.property;
 
             await createNotification({
                 recipient: updatedRequest.renter._id || updatedRequest.renter,
-                type: approved
-                    ? "viewing_request_approved"
-                    : "viewing_request_rejected",
-                title: approved
-                    ? "Viewing request approved"
-                    : "Viewing request rejected",
-                message: approved
-                    ? "Your property viewing request has been approved."
-                    : "Your property viewing request has been rejected.",
+                type: confirmed
+                    ? "viewing_request_confirmed"
+                    : "viewing_request_declined",
+                title: confirmed
+                    ? "Viewing request confirmed"
+                    : "Viewing request declined",
+                message: confirmed
+                    ? "Your property viewing request has been confirmed."
+                    : "Your property viewing request has been declined.",
                 relatedProperty: propertyId,
                 relatedViewingRequest: updatedRequest._id,
             });
