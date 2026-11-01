@@ -3,6 +3,7 @@ import Property from "../models/Property.js";
 import PropertyReport from "../models/PropertyReport.js";
 import ListingWarning from "../models/ListingWarning.js";
 import PropertyClaim from "../models/PropertyClaim.js";
+import CommunicationReport from "../models/CommunicationReport.js";
 
 const getPagination = (query) => {
     const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
@@ -23,6 +24,7 @@ export const getAdminOverview = async (req, res, next) => {
             pendingReports,
             openWarnings,
             unreviewedClaims,
+            pendingCommunicationReports,
         ] = await Promise.all([
             Property.countDocuments(),
             Property.countDocuments({ status: "published" }),
@@ -31,6 +33,9 @@ export const getAdminOverview = async (req, res, next) => {
             }),
             ListingWarning.countDocuments({ status: "open" }),
             PropertyClaim.countDocuments({ status: "unreviewed" }),
+            CommunicationReport.countDocuments({
+                status: { $in: ["pending", "in_review"] },
+            }),
         ]);
 
         return res.status(200).json({
@@ -44,6 +49,7 @@ export const getAdminOverview = async (req, res, next) => {
                     pendingReports,
                     openWarnings,
                     unreviewedClaims,
+                    pendingCommunicationReports,
                 },
             },
         });

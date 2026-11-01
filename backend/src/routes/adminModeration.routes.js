@@ -7,6 +7,7 @@ import {
     updateWarningPublicSummary,
     updateClaimPublicSummary,
 } from "../controllers/adminModeration.controller.js";
+import { updateCommunicationReportStatus } from "../controllers/communicationReport.controller.js";
 
 import {
     reviewPropertyClaim,
@@ -21,6 +22,10 @@ router.use(authenticateUser);
 router.use(allowRoles("admin"));
 
 router.patch("/reports/:reportId/status", updateReportStatus);
+router.patch(
+    "/communication-reports/:reportId/status",
+    updateCommunicationReportStatus
+);
 
 router.patch("/warnings/:warningId/status", updateWarningStatus);
 router.patch(

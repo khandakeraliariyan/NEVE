@@ -80,7 +80,11 @@ export const createPropertyClaim = async (req, res) => {
 export const attachClaimEvidence = async (req, res) => {
     try {
         const { propertyId, claimId } = req.params;
-        const { fileId } = req.body;
+        const {
+            fileId,
+            relationship = "unassessed",
+            explanation = "",
+        } = req.body;
 
         if (
             !mongoose.isValidObjectId(propertyId) ||
@@ -89,6 +93,18 @@ export const attachClaimEvidence = async (req, res) => {
         ) {
             return res.status(400).json({
                 message: "Invalid property, claim, or file ID.",
+            });
+        }
+
+        if (
+            !["supports", "contradicts", "context_only", "unassessed"].includes(
+                relationship
+            ) ||
+            typeof explanation !== "string" ||
+            explanation.length > 1000
+        ) {
+            return res.status(400).json({
+                message: "Invalid evidence relationship or explanation.",
             });
         }
 
@@ -108,6 +124,8 @@ export const attachClaimEvidence = async (req, res) => {
             fileId,
             userId: getUserId(req),
             isAdmin: req.neveUser.role === "admin",
+            relationship,
+            explanation: explanation.trim(),
         });
 
         if (result.error === "CLAIM_NOT_FOUND") {
@@ -134,6 +152,73 @@ export const attachClaimEvidence = async (req, res) => {
         console.error("Attach claim evidence error:", error);
         return res.status(500).json({
             message: "Could not attach evidence.",
+        });
+    }
+};
+
+export const updateClaimEvidenceLink = async (req, res) => {
+    try {
+        const { propertyId, linkId } = req.params;
+        const { relationship, explanation = "" } = req.body;
+
+        if (
+            !mongoose.isValidObjectId(propertyId) ||
+            !mongoose.isValidObjectId(linkId)
+        ) {
+            return res.status(400).json({
+                message: "Invalid property or evidence link ID.",
+            });
+        }
+
+        if (
+            !["supports", "contradicts", "context_only", "unassessed"].includes(
+                relationship
+            ) ||
+            typeof explanation !== "string" ||
+            explanation.length > 1000
+        ) {
+            return res.status(400).json({
+                message: "Invalid evidence relationship or explanation.",
+            });
+        }
+
+        const propertyResult = await findManageableProperty(propertyId, req);
+        if (propertyResult.error === "NOT_FOUND") {
+            return res.status(404).json({ message: "Property not found." });
+        }
+        if (propertyResult.error === "FORBIDDEN") {
+            return res.status(403).json({ message: "Access denied." });
+        }
+
+        const link = await EvidenceLink.findOne({
+            _id: linkId,
+            property: propertyResult.property._id,
+        });
+        if (!link) {
+            return res.status(404).json({ message: "Evidence link not found." });
+        }
+
+        link.relationship = relationship;
+        link.explanation = explanation.trim();
+        link.history.push({
+            actor: getUserId(req),
+            relationship,
+            explanation: explanation.trim(),
+            createdAt: new Date(),
+        });
+        if (link.history.length > 50) {
+            link.history.splice(0, link.history.length - 50);
+        }
+        await link.save();
+
+        return res.json({
+            message: "Evidence relationship updated.",
+            evidenceLink: link,
+        });
+    } catch (error) {
+        console.error("Update claim evidence link error:", error);
+        return res.status(500).json({
+            message: "Could not update the evidence relationship.",
         });
     }
 };
@@ -182,6 +267,7 @@ export const getPropertyEvidenceGraph = async (req, res) => {
                 explanation: link.explanation,
                 linkedBy: link.linkedBy,
                 createdAt: link.createdAt,
+                history: link.history,
                 file: link.uploadedFile
                     ? {
                         id: link.uploadedFile._id,

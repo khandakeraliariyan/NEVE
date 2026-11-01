@@ -52,6 +52,11 @@ const renterPreferenceSchema = new mongoose.Schema(
             type: [String],
             default: [],
         },
+
+        alertsEnabled: {
+            type: Boolean,
+            default: true,
+        },
     },
     { timestamps: true }
 );

@@ -5,6 +5,7 @@ import {
     attachClaimEvidence,
     getPropertyEvidenceGraph,
     reviewPropertyClaim,
+    updateClaimEvidenceLink,
 } from "../controllers/evidenceGraph.controller.js";
 
 import { authenticateUser } from "../middleware/auth.middleware.js";
@@ -25,6 +26,12 @@ router.post(
     "/properties/:propertyId/claims/:claimId/evidence",
     allowRoles("landlord", "admin"),
     attachClaimEvidence
+);
+
+router.patch(
+    "/properties/:propertyId/evidence/:linkId",
+    allowRoles("landlord", "admin"),
+    updateClaimEvidenceLink
 );
 
 router.get(

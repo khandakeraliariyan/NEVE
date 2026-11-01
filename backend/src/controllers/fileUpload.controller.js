@@ -5,6 +5,10 @@ import mongoose from "mongoose";
 import UploadedFile from "../models/UploadedFile.js";
 import Property from "../models/Property.js";
 import { env } from "../config/env.js";
+import {
+    appendAuditEvent,
+    findAgreementForEvidenceFile,
+} from "../services/tenancyAgreement.service.js";
 
 import {
     validateUpload,
@@ -255,12 +259,14 @@ export const getFileAccessUrl = async (req, res) => {
             }
         }
 
-        // Private tenancy evidence is accessible only to its uploader or an admin
-        // until a verified tenancy-sharing/permission system is implemented.
-        const allowed =
-            isAdmin ||
-            isUploader ||
-            (propertyMediaFields[file.purpose] && isPropertyOwner);
+        const agreement = file.purpose === "tenancy_evidence"
+            ? await findAgreementForEvidenceFile(file._id, getUserId(req))
+            : null;
+        const allowed = file.purpose === "tenancy_evidence"
+            ? isUploader || Boolean(agreement)
+            : isAdmin ||
+                isUploader ||
+                (propertyMediaFields[file.purpose] && isPropertyOwner);
 
         if (!allowed) {
             return res.status(403).json({
@@ -268,8 +274,20 @@ export const getFileAccessUrl = async (req, res) => {
             });
         }
 
+        if (agreement) {
+            appendAuditEvent(
+                agreement,
+                getUserId(req),
+                "evidence_file_access_requested",
+                "file",
+                file._id
+            );
+            await agreement.save();
+        }
+
         const url = await createDownloadUrl(file.storageKey);
 
+        res.set("Cache-Control", "private, no-store");
         return res.json({
             fileId: file._id,
             url,

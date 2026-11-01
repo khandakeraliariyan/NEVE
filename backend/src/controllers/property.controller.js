@@ -5,6 +5,7 @@ import {
     buildPropertySearchFilter,
     getPropertySort,
 } from "../services/propertySearch.service.js";
+import { notifyRentersOfMatchingProperty } from "../services/matchingAlert.service.js";
 
 const editableFields = [
     "title",
@@ -247,14 +248,29 @@ export async function updatePropertyStatus(req, res, next) {
             });
         }
 
+        const wasPublished = property.status === "published";
         // A paused listing can be republished; a draft can be published.
         property.status = status;
         await property.save();
+
+        let matchingAlerts = null;
+        if (status === "published" && !wasPublished) {
+            try {
+                matchingAlerts = {
+                    status: "sent",
+                    ...(await notifyRentersOfMatchingProperty(property)),
+                };
+            } catch (error) {
+                console.error("Publish matching-listing alerts error:", error);
+                matchingAlerts = { status: "failed" };
+            }
+        }
 
         return res.status(200).json({
             success: true,
             message: `Property ${status} successfully`,
             property,
+            ...(matchingAlerts ? { matchingAlerts } : {}),
         });
     } catch (error) {
         next(error);

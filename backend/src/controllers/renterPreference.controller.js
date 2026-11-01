@@ -11,6 +11,7 @@ const allowedFields = [
     "propertyTypes",
     "furnishing",
     "amenities",
+    "alertsEnabled",
 ];
 
 const PROPERTY_TYPES = [
@@ -41,6 +42,7 @@ export const getRenterPreferences = async (req, res) => {
                 propertyTypes: [],
                 furnishing: null,
                 amenities: [],
+                alertsEnabled: true,
             },
         });
     } catch (error) {
@@ -73,6 +75,15 @@ export const updateRenterPreferences = async (req, res) => {
         }
 
         const updates = {};
+
+        if (body.alertsEnabled !== undefined) {
+            if (typeof body.alertsEnabled !== "boolean") {
+                return res.status(400).json({
+                    message: "alertsEnabled must be a boolean.",
+                });
+            }
+            updates.alertsEnabled = body.alertsEnabled;
+        }
 
         for (const key of ["cities", "areas", "propertyTypes", "amenities"]) {
             if (body[key] !== undefined) {

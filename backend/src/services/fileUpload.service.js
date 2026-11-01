@@ -28,7 +28,13 @@ const uploadLimits = {
         maxBytes: env.MAX_FLOOR_PLAN_SIZE_MB * 1024 * 1024,
     },
     tenancy_evidence: {
-        mimeTypes: ["application/pdf"],
+        mimeTypes: [
+            "application/pdf",
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "text/plain",
+        ],
         maxBytes: env.MAX_TENANCY_EVIDENCE_SIZE_MB * 1024 * 1024,
     },
 };

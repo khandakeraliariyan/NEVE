@@ -17,7 +17,12 @@ const adminAuditLogSchema = new mongoose.Schema(
         targetType: {
             type: String,
             required: true,
-            enum: ["property_report", "listing_warning", "property_claim"],
+            enum: [
+                "property_report",
+                "listing_warning",
+                "property_claim",
+                "communication_report",
+            ],
         },
         targetId: {
             type: mongoose.Schema.Types.ObjectId,

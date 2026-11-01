@@ -28,6 +28,8 @@ export async function attachEvidenceToClaim({
     fileId,
     userId,
     isAdmin,
+    relationship = "unassessed",
+    explanation = "",
 }) {
     const claim = await PropertyClaim.findOne({
         _id: claimId,
@@ -66,6 +68,15 @@ export async function attachEvidenceToClaim({
                     claim: claim._id,
                     uploadedFile: file._id,
                     linkedBy: userId,
+                    relationship,
+                    explanation,
+                    history: [
+                        {
+                            actor: userId,
+                            relationship,
+                            explanation,
+                        },
+                    ],
                 },
             },
             {

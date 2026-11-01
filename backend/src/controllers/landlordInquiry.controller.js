@@ -41,7 +41,7 @@ export const getLandlordInquiries = async (req, res, next) => {
 
         const [inquiries, total] = await Promise.all([
             Inquiry.find(filter)
-                .populate("renter", "displayName email phoneNumber")
+                .populate("renter", "displayName photoURL")
                 .populate("property", "title address pricing status")
                 .sort({ createdAt: -1 })
                 .skip(skip)
@@ -144,7 +144,7 @@ export const respondToInquiry = async (req, res, next) => {
                 runValidators: true,
             }
         )
-            .populate("renter", "displayName email")
+            .populate("renter", "displayName photoURL")
             .populate("property", "title address");
 
         if (!updatedInquiry) {

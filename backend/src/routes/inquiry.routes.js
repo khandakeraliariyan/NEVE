@@ -11,6 +11,11 @@ import {
     getLandlordInquiries as getNewLandlordInquiries,
     respondToInquiry,
 } from "../controllers/landlordInquiry.controller.js";
+import {
+    getInquiryMessages,
+    sendInquiryMessage,
+} from "../controllers/inquiryMessage.controller.js";
+import { reportInquiryMessage } from "../controllers/communicationReport.controller.js";
 
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
@@ -30,6 +35,27 @@ router.get(
     authenticateUser,
     allowRoles("renter"),
     getMyInquiries
+);
+
+router.get(
+    "/:inquiryId/messages",
+    authenticateUser,
+    allowRoles("renter", "landlord"),
+    getInquiryMessages
+);
+
+router.post(
+    "/:inquiryId/messages",
+    authenticateUser,
+    allowRoles("renter", "landlord"),
+    sendInquiryMessage
+);
+
+router.post(
+    "/:inquiryId/messages/:messageId/report",
+    authenticateUser,
+    allowRoles("renter", "landlord"),
+    reportInquiryMessage
 );
 
 // Landlord routes

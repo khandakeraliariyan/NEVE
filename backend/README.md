@@ -162,9 +162,10 @@ node --input-type=module -e "import('./src/app.js')"
   search, and map endpoints validate their filters and pagination.
 - Unknown endpoints return JSON 404 responses. A central error handler logs
   errors and returns JSON error responses.
-- Private tenancy evidence uses signed object URLs and is restricted by the
-  file-access handler to the uploader or an admin. Property-image reads are
-  exposed for published properties.
+- Tenancy documents use signed object URLs. Access is limited to the uploader,
+  the two participants on the associated inquiry/agreement, or a mediator or
+  legal reviewer explicitly shared on that agreement. Admin role alone does
+  not grant access to tenancy evidence.
 
 Firebase identity is stored on `req.user`, while the database user record is
 stored on `req.neveUser`. Marketplace routes that need a renter profile enforce
@@ -187,7 +188,7 @@ the feature inventory previously proposed.
 | `/api/v1/properties` | `GET /mine`, `POST /`, `PATCH /:id`, `PATCH /:id/status` | Authenticated landlord or property-manager listing management |
 | `/api/v1/properties` | `POST /:id/view-event` | Authenticated renter view-event recording |
 | `/api/v1/properties` | `GET /:propertyId/details`, `GET /:propertyId/transparency` | Property detail/transparency router mounted before the main property router |
-| `/api/v1/inquiries` | `POST /`, `GET /mine` | Renter inquiry creation and list |
+| `/api/v1/inquiries` | `POST /`, `GET /mine`, `GET /:inquiryId/messages`, `POST /:inquiryId/messages`, `POST /:inquiryId/messages/:messageId/report` | Renter inquiries, participant-only message threads, and message reporting |
 | `/api/v1/inquiries` | `GET /landlord`, `PATCH /:inquiryId/respond`, `GET /received`, `PATCH /:id` | Landlord/property-manager inquiry management (role restrictions vary by route) |
 | `/api/v1/viewings` | `POST /`, `GET /mine`, `PATCH /:id/cancel`, `GET /my-requests`, `PATCH /:viewingId/cancel` | Renter viewing requests |
 | `/api/v1/viewings` | `GET /landlord`, `PATCH /:viewingId/respond`, `GET /received`, `PATCH /:id` | Landlord/property-manager viewing management |
@@ -201,12 +202,17 @@ the feature inventory previously proposed.
 | `/api/v1/nearby-places` | `GET /:propertyId` | Nearby-place lookup for a published property |
 | `/api/v1/rental-costs` | `GET /:propertyId`, `PUT /:propertyId` | Rental-cost summary and update |
 | `/api/v1/saved-properties` | `GET /`, `POST /:propertyId`, `DELETE /:propertyId` | Authenticated saved properties |
-| `/api/v1/renter-preferences` | `GET /`, `PUT /` | Authenticated preference read/update |
+| `/api/v1/renter-preferences` | `GET /`, `PUT /` | Authenticated preference read/update, including matching-alert opt-in |
 | `/api/v1/listing-consistency` | `GET /:propertyId`, `PATCH /warnings/:warningId` | Listing consistency check and warning status |
 | `/api/v1/evidence-graph` | `POST /properties/:propertyId/claims`, `POST /properties/:propertyId/claims/:claimId/evidence`, `GET /properties/:propertyId`, `PATCH /claims/:claimId/review` | Authenticated evidence and claim operations; review is admin-only |
+| `/api/v1/evidence-graph` | `PATCH /properties/:propertyId/evidence/:linkId` | Property owner/admin updates an evidence relationship; changes are retained in link history |
+| `/api/v1/tenancy` | `POST /agreements`, `GET /agreements`, `GET /agreements/:agreementId`, `PATCH /agreements/:agreementId/status` | Inquiry-linked agreement records; accessible only to participants or explicitly shared reviewers |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses`, `POST /agreements/:agreementId/obligations`, `PATCH /agreements/:agreementId/obligations/:obligationId`, `POST /agreements/:agreementId/payments` | Manual clause annotations, obligations, and BDT payment/receipt records |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph` | Case-scoped evidence graph; participants and explicitly shared reviewers can inspect or update relationship assessments |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a mediator or legal reviewer |
 | `/api/v1/property-trust` | `GET /:propertyId` | Public trust summaries for published properties |
-| `/api/v1/admin/dashboard` | `GET /overview`, `GET /reports`, `GET /warnings`, `GET /claims` | Admin dashboard |
-| `/api/v1/admin/moderation` | `PATCH /reports/:reportId/status`, `PATCH /warnings/:warningId/status`, `PATCH /warnings/:warningId/public-visibility`, `PATCH /claims/:claimId/review`, `PATCH /claims/:claimId/public-visibility` | Admin moderation |
+| `/api/v1/admin/dashboard` | `GET /overview`, `GET /reports`, `GET /warnings`, `GET /claims`, `GET /communication-reports` | Admin dashboard and communication-report review queue |
+| `/api/v1/admin/moderation` | `PATCH /reports/:reportId/status`, `PATCH /communication-reports/:reportId/status`, `PATCH /warnings/:warningId/status`, `PATCH /warnings/:warningId/public-visibility`, `PATCH /claims/:claimId/review`, `PATCH /claims/:claimId/public-visibility` | Admin moderation |
 | `/api/v1/admin/audit-logs` | `GET /` | Admin audit-log query |
 | `/api/v1/admin/trust-approval` | `PATCH /claims/:claimId/public-summary`, `PATCH /warnings/:warningId/public-summary` | Admin approval/revocation of public trust summaries |
 | `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId` | Property reviews |
@@ -225,8 +231,10 @@ Mongoose models currently defined in `src/models/`:
 | `User` | NEVE profile linked to a Firebase UID, role, account state, favorites, and recently viewed properties |
 | `Property` | Rental listing, location, amenities, images, videos, floor plans, pricing, availability, and publication status |
 | `Inquiry` | Renter inquiry, landlord response, and inquiry status |
+| `InquiryMessage` | Private inquiry-thread messages with sender/recipient and read receipt |
+| `CommunicationReport` | Participant-submitted suspicious-message reports and admin review state |
 | `ViewingRequest` | Requested property viewing, participants, date, and status (`requested`, `confirmed`, `declined`, `cancelled`, or `completed`) |
-| `Notification` | Recipient notifications and read state |
+| `Notification` | Recipient notifications, read state, and deduplicated matching-listing alerts |
 | `PropertyReport` | Renter-submitted listing reports and administrative review |
 | `PropertyViewEvent` | Property-view event records |
 | `UploadedFile` | R2 object metadata, uploader, purpose, and upload state |
@@ -237,14 +245,16 @@ Mongoose models currently defined in `src/models/`:
 | `ListingWarning` | Listing-consistency warnings and public summaries |
 | `PropertyClaim` | Claims about listing details and their review/publication state |
 | `EvidenceLink` | Links uploaded files to claims and records their relationship |
+| `TenancyAgreement` | Inquiry-linked agreement metadata, manual clause annotations, obligations, payment entries, limited case sharing, and a bounded audit trail |
+| `TenancyEvidenceLink` | Evidence-graph edges from agreement nodes to private files, including relationship history |
 | `AdminAuditLog` | Administrative actions and target records |
 | `Review` | Property ratings, comments, and moderation state |
 | `ReviewReport` | Reports about reviews |
 
 Properties use the statuses `draft`, `published`, and `paused`. Review, report,
-warning, claim, inquiry, viewing, and upload statuses are defined separately
-in their respective schemas; some currently conflict with controller behavior
-as noted below.
+warning, claim, inquiry, viewing, agreement, and upload statuses are defined
+separately in their schemas; some legacy inquiry and viewing workflows still
+have inconsistent transitions as noted below.
 
 ## Feature notes
 
@@ -275,7 +285,10 @@ Uploads use a two-step signed-URL workflow: request a URL, upload directly to
 R2, then call the completion endpoint. The backend checks purpose, MIME type,
 declared size, and stored object metadata. Property images accept JPEG, PNG,
 and WebP; property videos accept MP4 and WebM; floor plans accept PDF, JPEG,
-PNG, and WebP; tenancy evidence accepts PDF. Property media is attached to a
+PNG, and WebP; tenancy evidence accepts PDF, JPEG, PNG, WebP, and plain text.
+Agreement and case-related tenancy evidence is private and can only be accessed
+by its uploader, the agreement participants, or a reviewer explicitly shared
+on that agreement. Property media is attached to a
 listing after upload and is returned by the property detail and
 `/api/v1/property-images/:propertyId` endpoints as short-lived signed URLs.
 Each listing supports up to 20 images, 5 videos, and 5 floor plans.
@@ -353,6 +366,46 @@ Property comparisons include this same calculated summary for each listing.
 Renter inquiries and viewing requests are handled by the inquiries and viewings
 route groups.
 
+### Renter-landlord messages, agreements, and Evidence Graph
+
+`GET` and `POST /api/v1/inquiries/:inquiryId/messages` expose a private,
+paginated thread only to that inquiry's renter and landlord. The original
+inquiry text is returned separately as `initialMessage`; subsequent messages
+have sender/recipient IDs and a read timestamp. Closed or declined inquiries
+cannot receive new messages. Message notifications are created for recipients;
+the send response reports `notificationStatus` if the message persisted but
+notification creation failed. Inquiry responses expose public profile names
+and photos, not renter email addresses or phone numbers.
+
+Upload an agreement through `/api/v1/uploads` with purpose `tenancy_evidence`
+(PDF, JPEG, PNG, WebP, or plain text), complete the upload, then create an
+agreement using its file ID and an inquiry ID connecting its renter and
+landlord. Clause annotations, obligations, and BDT payment/receipt records are
+entered manually. Clause notes and payments are user-provided; the API does
+not perform OCR, extraction, legal interpretation, signature verification,
+payment verification, or liability determinations.
+
+Agreement documents are shared with the inquiry participants. Participants
+may grant or revoke read-only access for an active mediator or legal reviewer
+on that agreement only. Private download URLs are short-lived; access requests
+and agreement changes append actor/action records to a bounded 100-event
+audit trail. Agreement metadata and evidence use private, no-store cache
+headers. The case Evidence Graph returns agreement, clause, obligation,
+payment, message, event, and evidence-link nodes; relationship assessments
+retain a bounded history and are not treated as verified facts.
+
+The graph response also includes deterministic analysis flags for missing
+agreement metadata and evidence attachments, participant-marked disputes or
+contradictory relationships, and unassessed or low-confidence links. Evidence
+links accept an optional confidence value from 0 to 1. These checks use
+structured records and participant assessments only; uploaded files are not
+analyzed, and flags do not verify facts or determine liability.
+
+Jurisdiction defaults to Bangladesh as metadata. Bangladesh-specific legal
+source retrieval, automated extraction, generated plain-language explanations,
+and editable legal wording are not implemented. `plainLanguageNote` is an
+optional user-authored annotation, not model-generated legal guidance.
+
 ### Neighborhood intelligence
 
 `GET /api/v1/properties/:id/nearby`,
@@ -419,6 +472,27 @@ Its response includes reasons, shortfalls, and unknown listing data. Scores
 are deterministic preference comparisons, not guarantees of property
 suitability.
 
+Renter preferences include `alertsEnabled` (default `true`). When a listing
+transitions to published, the backend sends an in-app notification to renters
+whose deterministic preference score is at least 70% and whose known rent is
+not outside their budget. Notifications are deduplicated per renter/property.
+The publish response includes `matchingAlerts.status` and delivery counts, or
+reports `failed` if notification delivery could not be completed. Email, push,
+scheduled digests, and multiple independently saved searches are not included.
+
+### Suspicious communication reports
+
+Either participant in an inquiry can report a message they received through
+`POST /api/v1/inquiries/:inquiryId/messages/:messageId/report` using a supported
+reason (`scam_or_fraud`, `off_platform_payment`, `harassment`, `spam`,
+`threatening_or_abusive`, or `other`) and optional details. Users cannot report
+their own messages or submit multiple reports for the same message. Reports
+are available to administrators through
+`GET /api/v1/admin/dashboard/communication-reports` and can be reviewed using
+`PATCH /api/v1/admin/moderation/communication-reports/:reportId/status`.
+Administrative status changes are audit-logged. Reports request human review;
+they do not automatically determine misconduct or restrict an account.
+
 ### Responses and pagination
 
 Shared response and pagination helpers are available in `src/utils/`.
@@ -450,6 +524,10 @@ These are known issues in the source at the time this README was written:
    controller for its exact response shape.
 6. **Documentation/config template:** there is no backend `.env.example` or
    Swagger configuration file in the current source tree.
+7. **External agreement intelligence:** OCR, automated clause extraction,
+   AI-generated explanations or wording, and legal-source retrieval require
+   an external provider and are not implemented. Agreement clause notes remain
+   user-entered.
 
 Treat these gaps as implementation work, not as supported behavior. Recheck
 this section after the corresponding code has been corrected.
