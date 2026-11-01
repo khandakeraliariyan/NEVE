@@ -34,6 +34,7 @@ import {
     addCaseEvidence,
     createTenancyCase,
     getTenancyCase,
+    listSharedTenancyCases,
     listTenancyCases,
     removeCaseEvidence,
     revokeTenancyCaseShare,
@@ -66,6 +67,11 @@ router.post(
     "/agreements/:agreementId/cases",
     allowRoles("renter", "landlord"),
     createTenancyCase
+);
+router.get(
+    "/cases",
+    allowRoles("mediator", "legal_reviewer"),
+    listSharedTenancyCases
 );
 router.get("/cases/:caseId", getTenancyCase);
 router.post("/cases/:caseId/evidence", addCaseEvidence);

@@ -1,8 +1,13 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import { env } from "./config/env.js";
+import {
+    apiLimiter,
+    authLimiter,
+    userLimiter,
+    uploadLimiter,
+} from "./middleware/rateLimit.middleware.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -43,33 +48,8 @@ app.disable("x-powered-by");
 
 app.use(helmet());
 
-const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        message: "Too many requests. Please try again later.",
-    },
-});
-
-const createSensitiveLimiter = () =>
-    rateLimit({
-        windowMs: 15 * 60 * 1000,
-        limit: 20,
-        standardHeaders: true,
-        legacyHeaders: false,
-        message: {
-            message: "Too many requests. Please try again later.",
-        },
-    });
-
-const authLimiter = createSensitiveLimiter();
-const userLimiter = createSensitiveLimiter();
-const uploadLimiter = createSensitiveLimiter();
-
-app.use("/api/v1", apiLimiter);
-
+// CORS runs first so preflights don't count against the rate limit and browsers
+// can read 429 responses.
 app.use(
     cors({
         origin: env.CLIENT_URL,
@@ -78,6 +58,8 @@ app.use(
         allowedHeaders: ["Content-Type", "Authorization"],
     })
 );
+
+app.use("/api/v1", apiLimiter);
 
 app.use(express.json({ limit: "1mb" }));
 

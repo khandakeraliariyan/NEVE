@@ -61,6 +61,21 @@ export async function isEvidenceForAgreement(fileId, agreementId) {
     return Boolean(link || condition || maintenance);
 }
 
+export function buildSharedCaseFilter({ userId, status }) {
+    if (
+        status !== undefined &&
+        !["open", "resolved", "closed"].includes(status)
+    ) {
+        return { error: "Provide a supported case status." };
+    }
+    return {
+        filter: {
+            sharedWith: { $elemMatch: { user: userId, revokedAt: null } },
+            ...(status !== undefined ? { status } : {}),
+        },
+    };
+}
+
 export async function findCaseForUser(caseId, userId, userRole) {
     const tenancyCase = await TenancyCase.findById(caseId);
     if (!tenancyCase) return null;

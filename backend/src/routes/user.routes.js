@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
     createProfile,
     getMyProfile,
+    lookupUsers,
 } from "../controllers/user.controller.js";
 
 import { authenticateUser } from "../middleware/auth.middleware.js";
@@ -25,6 +26,13 @@ const router = Router();
 
 router.post("/profile", authenticateUser, createProfile);
 router.get("/me", authenticateUser, getMyProfile);
+
+router.get(
+    "/lookup",
+    authenticateUser,
+    allowRoles("renter", "landlord"),
+    lookupUsers
+);
 
 router.post(
     "/me/favorites/:propertyId",

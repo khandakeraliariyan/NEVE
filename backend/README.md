@@ -183,9 +183,12 @@ node --input-type=module -e "import('./src/app.js')"
 - All API routes are mounted under `/api/v1`.
 - Helmet adds standard security headers; the Express `x-powered-by` header is
   disabled.
-- A general rate limiter allows up to 100 requests per 15-minute window.
-  Authentication, user, and upload groups have additional 20-request
-  per-15-minute limiters.
+- CORS runs before rate limiting, so preflight requests aren't counted and
+  browsers can read `429` responses.
+- A general rate limiter allows up to 100 requests per 15-minute window, not
+  counting uploads. Authentication and user groups have additional 20-request
+  per-15-minute limiters. Uploads have their own 120-request limiter, enough
+  for a full listing's 30 media files at two requests each.
 - CORS allows the configured `CLIENT_URL`, credentials, and the methods and
   headers configured in `src/app.js`.
 - JSON request bodies are limited to 1 MB.
@@ -219,6 +222,7 @@ the feature inventory previously proposed.
 | `/api/v1/health` | `GET /` | Public health check |
 | `/api/v1/auth` | `GET /me` | Authenticated current-user lookup |
 | `/api/v1/users` | `POST /profile`, `GET /me` | Authenticated profile creation and lookup |
+| `/api/v1/users` | `GET /lookup?type=manager\|reviewer&q=&limit=` | Renter/landlord search for active property managers or reviewers to assign or share with. Matches part of a name or a full email, and returns only ID, name, photo, and role |
 | `/api/v1/users` | `POST /me/favorites/:propertyId`, `GET /me/favorites`, `DELETE /me/favorites/:propertyId` | Renter favorites |
 | `/api/v1/users` | `POST /me/recently-viewed/:propertyId`, `GET /me/recently-viewed`, `DELETE /me/recently-viewed/:propertyId`, `DELETE /me/recently-viewed` | Renter recently viewed properties |
 | `/api/v1/properties` | `GET /`, `GET /recent`, `GET /search`, `GET /nearby`, `GET /:id`, `GET /:id/detail`, `GET /:id/costs`, `GET /:id/nearby`, `GET /:id/neighborhood-insights`, `POST /compare` | Public listing discovery, detail, nearby information, cost, and comparison |
@@ -249,6 +253,7 @@ the feature inventory previously proposed.
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph`, `GET /agreements/:agreementId/evidence-report` | Traceable evidence graph and downloadable JSON report; access follows agreement permissions |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a mediator or legal reviewer |
 | `/api/v1/tenancy` | `GET /agreements/:agreementId/cases`, `POST /agreements/:agreementId/cases`, `GET /cases/:caseId`, `POST /cases/:caseId/evidence`, `DELETE /cases/:caseId/evidence/:fileId`, `PATCH /cases/:caseId/status` | Private dispute cases with agreement-linked evidence; participants manage cases, assigned reviewers have read-only scope |
+| `/api/v1/tenancy` | `GET /cases?status=&page=&limit=` | Mediator/legal reviewer list of cases shared directly with them; removed evidence and other shares are omitted |
 | `/api/v1/tenancy` | `POST /cases/:caseId/shares`, `DELETE /cases/:caseId/shares/:userId` | Participants share/revoke a case and its selected evidence with a mediator or legal reviewer |
 | `/api/v1/tenancy` | `PATCH /agreements/:agreementId/property-manager` | Participants assign or unassign an active property manager for that agreement |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/condition-reports/:stage`, `POST /agreements/:agreementId/condition-reports/:reportId/entries`, `GET /agreements/:agreementId/condition-reports`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/reviews`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/corrections`, `GET /agreements/:agreementId/condition-comparison` | Room condition and utility-meter move-in/out records, participant review, preserved corrections, and comparison |
@@ -261,7 +266,7 @@ the feature inventory previously proposed.
 | `/api/v1/admin/privacy` | `GET /deletion-requests`, `PATCH /deletion-requests/:requestId`, `GET /retention-due`, `PATCH /files/:fileId/retention`, `GET /access-logs` | Admin review of private-document deletion, retention/legal holds, and sensitive access history |
 | `/api/v1/admin/ai-evaluations` | `POST /runs`, `GET /runs`, `GET /runs/:runId` | Admin-only benchmark metric submission and review |
 | `/api/v1/admin/trust-approval` | `PATCH /claims/:claimId/public-summary`, `PATCH /warnings/:warningId/public-summary` | Admin approval/revocation of public trust summaries |
-| `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId` | Property reviews |
+| `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId` | Property reviews; posting requires a `confirmed` or `completed` viewing of that property |
 | `/api/v1/review-moderation` | `POST /:reviewId/reports`, `GET /reports`, `PATCH /reports/:reportId`, `PATCH /:reviewId/moderation` | Review reports and moderation |
 | `/api/v1/landlord/dashboard` | `GET /properties`, `GET /performance` | Landlord/property-manager listing dashboard and analytics for owned or assigned listings |
 | `/api/v1/landlord/dashboard` | `GET /tenancies` | Property-manager assigned tenancies, lease dates, open obligations, and maintenance summary |
@@ -474,8 +479,10 @@ optional user-authored annotation, not model-generated legal guidance.
 Participants can create a dispute case with `POST
 /api/v1/tenancy/agreements/:agreementId/cases`, attach files already linked to
 that agreement, and share the case with an active mediator or legal reviewer.
-Case-only reviewers can view that case and request short-lived access URLs for
-its selected evidence; they cannot browse the agreement, other cases, or
+Sharing notifies the reviewer in-app, and the response reports
+`notificationStatus`. Case-only reviewers can find shared cases with
+`GET /api/v1/tenancy/cases`, view them, and request short-lived access URLs for
+their selected evidence; they cannot browse the agreement, other cases, or
 unselected files. Participants can revoke the share or remove evidence while
 retaining its removal history. The older agreement-wide share route remains
 available when participants intentionally grant broader read-only access.
