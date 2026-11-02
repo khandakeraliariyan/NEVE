@@ -56,7 +56,10 @@ const REVIEWER_NAV = [
 const ADMIN_NAV = [
     {
         title: "System governance",
-        items: [{ to: "/admin", label: "Platform health", end: true }],
+        items: [
+            { to: "/admin", label: "Platform health", end: true },
+            { to: "/admin/audit-logs", label: "Audit trail" },
+        ],
     },
 ];
 
