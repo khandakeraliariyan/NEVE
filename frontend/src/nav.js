@@ -5,7 +5,12 @@ export const PUBLIC_NAV = [
 ];
 
 // Sidebar groups per role in the signed-in workspace.
-const RENTER_NAV = [];
+const RENTER_NAV = [
+    {
+        title: "Overview",
+        items: [{ to: "/renter", label: "Dashboard" }],
+    },
+];
 const LANDLORD_NAV = [];
 const TENANCY_NAV = [];
 const REVIEWER_NAV = [];

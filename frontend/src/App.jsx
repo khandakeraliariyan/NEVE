@@ -12,6 +12,7 @@ import PropertyDetails from "./pages/public/property/PropertyDetails";
 import NeighborhoodIntel from "./pages/public/property/NeighborhoodIntel";
 import TrueCost from "./pages/public/property/TrueCost";
 import PropertyComparison from "./pages/public/PropertyComparison";
+import RenterDashboard from "./pages/renter/RenterDashboard";
 
 export default function App() {
     return (
@@ -31,7 +32,11 @@ export default function App() {
             </Route>
 
             <Route element={<RequireAuth />}>
-                <Route element={<WorkspaceLayout />} />
+                <Route element={<WorkspaceLayout />}>
+                    <Route element={<RequireAuth roles={["renter"]} />}>
+                        <Route path="renter" element={<RenterDashboard />} />
+                    </Route>
+                </Route>
             </Route>
         </Routes>
     );
