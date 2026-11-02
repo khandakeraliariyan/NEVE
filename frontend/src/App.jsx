@@ -28,6 +28,7 @@ import AgreementDetails from "./pages/tenancy/AgreementDetails";
 import ClausesAnnotations from "./pages/tenancy/ClausesAnnotations";
 import EvidenceGraph from "./pages/tenancy/EvidenceGraph";
 import ConditionComparison from "./pages/tenancy/ConditionComparison";
+import DisputeCases from "./pages/tenancy/DisputeCases";
 
 const TENANCY_ROLES = ["renter", "landlord", "property_manager", "mediator", "legal_reviewer"];
 
@@ -71,6 +72,7 @@ export default function App() {
                         <Route path="agreements/:agreementId/clauses" element={<ClausesAnnotations />} />
                         <Route path="agreements/:agreementId/evidence" element={<EvidenceGraph />} />
                         <Route path="agreements/:agreementId/condition/compare" element={<ConditionComparison />} />
+                        <Route path="agreements/:agreementId/cases" element={<DisputeCases />} />
                     </Route>
                     <Route element={<RequireAuth roles={["landlord"]} />}>
                         <Route path="managers" element={<DelegatedManagers />} />
