@@ -22,6 +22,7 @@ import PropertyForm from "./pages/landlord/PropertyForm";
 import MediaFloorplans from "./pages/landlord/MediaFloorplans";
 import CostDisclosures from "./pages/landlord/CostDisclosures";
 import DelegatedManagers from "./pages/landlord/DelegatedManagers";
+import ViewingManagement from "./pages/landlord/ViewingManagement";
 
 export default function App() {
     return (
@@ -55,6 +56,7 @@ export default function App() {
                         <Route path="listings/:id/edit" element={<PropertyForm />} />
                         <Route path="listings/:id/media" element={<MediaFloorplans />} />
                         <Route path="listings/:id/costs" element={<CostDisclosures />} />
+                        <Route path="listings/viewings" element={<ViewingManagement />} />
                     </Route>
                     <Route element={<RequireAuth roles={["landlord"]} />}>
                         <Route path="managers" element={<DelegatedManagers />} />

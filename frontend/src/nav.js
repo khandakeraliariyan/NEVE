@@ -32,6 +32,10 @@ const LANDLORD_NAV = [
         ],
     },
     {
+        title: "Tenants & engagement",
+        items: [{ to: "/listings/viewings", label: "Viewing management" }],
+    },
+    {
         title: "Governance",
         roles: ["landlord"],
         items: [{ to: "/managers", label: "Delegated managers" }],
