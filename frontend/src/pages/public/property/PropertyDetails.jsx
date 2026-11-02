@@ -356,6 +356,9 @@ export default function PropertyDetails() {
                                 <p className="eyebrow mb-1">Local connectivity</p>
                                 <h2 className="text-2xl">What's nearby</h2>
                             </div>
+                            <Link to={`/properties/${property.id}/neighborhood`} className="text-sm font-semibold text-forest hover:underline">
+                                Full neighborhood report →
+                            </Link>
                         </div>
                         {nearbyPlaces.available ? (
                             <>

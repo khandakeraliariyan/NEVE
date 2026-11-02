@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import Landing from "./pages/public/Landing";
 import PropertyDiscovery from "./pages/public/PropertyDiscovery";
 import PropertyDetails from "./pages/public/property/PropertyDetails";
+import NeighborhoodIntel from "./pages/public/property/NeighborhoodIntel";
 
 export default function App() {
     return (
@@ -21,6 +22,7 @@ export default function App() {
                 <Route index element={<Landing />} />
                 <Route path="properties" element={<PropertyDiscovery />} />
                 <Route path="properties/:id" element={<PropertyDetails />} />
+                <Route path="properties/:id/neighborhood" element={<NeighborhoodIntel />} />
                 <Route path="*" element={<NotFound />} />
             </Route>
 
