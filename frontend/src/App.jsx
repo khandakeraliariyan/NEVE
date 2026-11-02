@@ -20,6 +20,7 @@ import LandlordDashboard from "./pages/landlord/LandlordDashboard";
 import MyProperties from "./pages/landlord/MyProperties";
 import PropertyForm from "./pages/landlord/PropertyForm";
 import MediaFloorplans from "./pages/landlord/MediaFloorplans";
+import CostDisclosures from "./pages/landlord/CostDisclosures";
 
 export default function App() {
     return (
@@ -52,6 +53,7 @@ export default function App() {
                         <Route path="listings/new" element={<PropertyForm />} />
                         <Route path="listings/:id/edit" element={<PropertyForm />} />
                         <Route path="listings/:id/media" element={<MediaFloorplans />} />
+                        <Route path="listings/:id/costs" element={<CostDisclosures />} />
                     </Route>
                 </Route>
             </Route>
