@@ -17,6 +17,10 @@ const RENTER_NAV = [
             { to: "/recommendations", label: "Smart recommendations" },
         ],
     },
+    {
+        title: "Communications",
+        items: [{ to: "/viewings", label: "Viewing requests" }],
+    },
 ];
 const LANDLORD_NAV = [];
 const TENANCY_NAV = [];
