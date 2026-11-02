@@ -13,6 +13,7 @@ import NeighborhoodIntel from "./pages/public/property/NeighborhoodIntel";
 import TrueCost from "./pages/public/property/TrueCost";
 import PropertyComparison from "./pages/public/PropertyComparison";
 import RenterDashboard from "./pages/renter/RenterDashboard";
+import MyFavorites from "./pages/renter/MyFavorites";
 
 export default function App() {
     return (
@@ -35,6 +36,7 @@ export default function App() {
                 <Route element={<WorkspaceLayout />}>
                     <Route element={<RequireAuth roles={["renter"]} />}>
                         <Route path="renter" element={<RenterDashboard />} />
+                        <Route path="saved" element={<MyFavorites />} />
                     </Route>
                 </Route>
             </Route>

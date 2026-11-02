@@ -10,6 +10,10 @@ const RENTER_NAV = [
         title: "Overview",
         items: [{ to: "/renter", label: "Dashboard" }],
     },
+    {
+        title: "Discovery & saved",
+        items: [{ to: "/saved", label: "My favorites" }],
+    },
 ];
 const LANDLORD_NAV = [];
 const TENANCY_NAV = [];
