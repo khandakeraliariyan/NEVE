@@ -25,7 +25,10 @@ const RENTER_NAV = [
 const LANDLORD_NAV = [
     {
         title: "Portfolio & assets",
-        items: [{ to: "/dashboard", label: "Dashboard" }],
+        items: [
+            { to: "/dashboard", label: "Dashboard" },
+            { to: "/listings", label: "My properties", end: true },
+        ],
     },
 ];
 const TENANCY_NAV = [];
