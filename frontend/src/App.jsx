@@ -33,6 +33,7 @@ import CaseQueue from "./pages/tenancy/CaseQueue";
 import CaseEvidenceReview from "./pages/tenancy/CaseEvidenceReview";
 import PlatformHealth from "./pages/admin/PlatformHealth";
 import AuditTrail from "./pages/admin/AuditTrail";
+import AIEvaluations from "./pages/admin/AIEvaluations";
 
 const TENANCY_ROLES = ["renter", "landlord", "property_manager", "mediator", "legal_reviewer"];
 
@@ -85,6 +86,8 @@ export default function App() {
                     <Route element={<RequireAuth roles={["admin"]} />}>
                         <Route path="admin" element={<PlatformHealth />} />
                         <Route path="admin/audit-logs" element={<AuditTrail />} />
+                        <Route path="admin/ai-evaluations" element={<AIEvaluations />} />
+                        <Route path="admin/ai-evaluations/:runId" element={<AIEvaluations />} />
                     </Route>
                     <Route element={<RequireAuth roles={["landlord"]} />}>
                         <Route path="managers" element={<DelegatedManagers />} />
