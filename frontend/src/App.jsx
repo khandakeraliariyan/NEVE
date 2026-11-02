@@ -6,6 +6,7 @@ import SignIn from "./pages/auth/SignIn";
 import SignUp from "./pages/auth/SignUp";
 import CompleteProfile from "./pages/auth/CompleteProfile";
 import NotFound from "./pages/NotFound";
+import Landing from "./pages/public/Landing";
 
 export default function App() {
     return (
@@ -15,6 +16,7 @@ export default function App() {
             <Route path="/complete-profile" element={<CompleteProfile />} />
 
             <Route element={<PublicLayout />}>
+                <Route index element={<Landing />} />
                 <Route path="*" element={<NotFound />} />
             </Route>
 
