@@ -1,5 +1,5 @@
 // Top navigation for public pages.
-export const PUBLIC_NAV = [];
+export const PUBLIC_NAV = [{ to: "/properties", label: "Find Homes" }];
 
 // Sidebar groups per role in the signed-in workspace.
 const RENTER_NAV = [];
