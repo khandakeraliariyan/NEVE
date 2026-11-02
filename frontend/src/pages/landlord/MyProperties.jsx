@@ -122,7 +122,7 @@ export default function MyProperties() {
                                     Cost disclosure
                                 </Link>
                                 {role === "landlord" && (
-                                    <Link to={`/listings/${property._id}/managers`} className="rounded-md bg-sage px-2 py-1 text-forest">
+                                    <Link to={`/managers?property=${property._id}`} className="rounded-md bg-sage px-2 py-1 text-forest">
                                         Managers
                                     </Link>
                                 )}

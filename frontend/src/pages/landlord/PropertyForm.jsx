@@ -392,7 +392,7 @@ export default function PropertyForm() {
                                     <p className="font-semibold">Cost disclosure</p>
                                     <p className="text-xs text-muted">Itemized charges and unknown costs</p>
                                 </Link>
-                                <Link to={`/listings/${property._id}/managers`} className="rounded-xl border border-line p-4 hover:border-moss">
+                                <Link to={`/managers?property=${property._id}`} className="rounded-xl border border-line p-4 hover:border-moss">
                                     <p className="font-semibold">Property managers</p>
                                     <p className="text-xs text-muted">Landlords can assign up to 10</p>
                                 </Link>
