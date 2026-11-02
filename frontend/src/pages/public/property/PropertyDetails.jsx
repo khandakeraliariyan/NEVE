@@ -410,6 +410,9 @@ export default function PropertyDetails() {
                         </div>
                         <MissingList items={costs.moveIn.missingComponents} unknownCosts={costs.unknownCosts} />
                         <p className="mt-3 text-xs text-muted">{COST_DISCLAIMER}</p>
+                        <Link to={`/properties/${property.id}/true-cost`} className="mt-3 block text-sm font-semibold text-forest hover:underline">
+                            See full cost breakdown →
+                        </Link>
                     </Card>
 
                     {isRenter ? (

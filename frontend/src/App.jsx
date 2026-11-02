@@ -10,6 +10,7 @@ import Landing from "./pages/public/Landing";
 import PropertyDiscovery from "./pages/public/PropertyDiscovery";
 import PropertyDetails from "./pages/public/property/PropertyDetails";
 import NeighborhoodIntel from "./pages/public/property/NeighborhoodIntel";
+import TrueCost from "./pages/public/property/TrueCost";
 
 export default function App() {
     return (
@@ -23,6 +24,7 @@ export default function App() {
                 <Route path="properties" element={<PropertyDiscovery />} />
                 <Route path="properties/:id" element={<PropertyDetails />} />
                 <Route path="properties/:id/neighborhood" element={<NeighborhoodIntel />} />
+                <Route path="properties/:id/true-cost" element={<TrueCost />} />
                 <Route path="*" element={<NotFound />} />
             </Route>
 
