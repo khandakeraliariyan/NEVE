@@ -31,6 +31,7 @@ import ConditionComparison from "./pages/tenancy/ConditionComparison";
 import DisputeCases from "./pages/tenancy/DisputeCases";
 import CaseQueue from "./pages/tenancy/CaseQueue";
 import CaseEvidenceReview from "./pages/tenancy/CaseEvidenceReview";
+import PlatformHealth from "./pages/admin/PlatformHealth";
 
 const TENANCY_ROLES = ["renter", "landlord", "property_manager", "mediator", "legal_reviewer"];
 
@@ -79,6 +80,9 @@ export default function App() {
                     </Route>
                     <Route element={<RequireAuth roles={["mediator", "legal_reviewer"]} />}>
                         <Route path="cases" element={<CaseQueue />} />
+                    </Route>
+                    <Route element={<RequireAuth roles={["admin"]} />}>
+                        <Route path="admin" element={<PlatformHealth />} />
                     </Route>
                     <Route element={<RequireAuth roles={["landlord"]} />}>
                         <Route path="managers" element={<DelegatedManagers />} />

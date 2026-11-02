@@ -53,7 +53,12 @@ const REVIEWER_NAV = [
         items: [{ to: "/cases", label: "Case queue", end: true }],
     },
 ];
-const ADMIN_NAV = [];
+const ADMIN_NAV = [
+    {
+        title: "System governance",
+        items: [{ to: "/admin", label: "Platform health", end: true }],
+    },
+];
 
 export function workspaceNav(role) {
     switch (role) {
