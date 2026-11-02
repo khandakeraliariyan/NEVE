@@ -47,7 +47,12 @@ const TENANCY_NAV = [
         items: [{ to: "/agreements", label: "Tenancy dashboard", end: true }],
     },
 ];
-const REVIEWER_NAV = [];
+const REVIEWER_NAV = [
+    {
+        title: "Active review",
+        items: [{ to: "/cases", label: "Case queue", end: true }],
+    },
+];
 const ADMIN_NAV = [];
 
 export function workspaceNav(role) {
