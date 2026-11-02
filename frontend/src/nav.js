@@ -22,7 +22,12 @@ const RENTER_NAV = [
         items: [{ to: "/viewings", label: "Viewing requests" }],
     },
 ];
-const LANDLORD_NAV = [];
+const LANDLORD_NAV = [
+    {
+        title: "Portfolio & assets",
+        items: [{ to: "/dashboard", label: "Dashboard" }],
+    },
+];
 const TENANCY_NAV = [];
 const REVIEWER_NAV = [];
 const ADMIN_NAV = [];
