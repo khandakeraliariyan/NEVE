@@ -41,7 +41,12 @@ const LANDLORD_NAV = [
         items: [{ to: "/managers", label: "Delegated managers" }],
     },
 ];
-const TENANCY_NAV = [];
+const TENANCY_NAV = [
+    {
+        title: "Tenancy",
+        items: [{ to: "/agreements", label: "Tenancy dashboard", end: true }],
+    },
+];
 const REVIEWER_NAV = [];
 const ADMIN_NAV = [];
 
@@ -54,7 +59,7 @@ export function workspaceNav(role) {
             return [...LANDLORD_NAV, ...TENANCY_NAV].filter((group) => !group.roles || group.roles.includes(role));
         case "mediator":
         case "legal_reviewer":
-            return REVIEWER_NAV;
+            return [...TENANCY_NAV, ...REVIEWER_NAV];
         case "admin":
             return ADMIN_NAV;
         default:

@@ -23,6 +23,9 @@ import MediaFloorplans from "./pages/landlord/MediaFloorplans";
 import CostDisclosures from "./pages/landlord/CostDisclosures";
 import DelegatedManagers from "./pages/landlord/DelegatedManagers";
 import ViewingManagement from "./pages/landlord/ViewingManagement";
+import TenancyDashboard from "./pages/tenancy/TenancyDashboard";
+
+const TENANCY_ROLES = ["renter", "landlord", "property_manager", "mediator", "legal_reviewer"];
 
 export default function App() {
     return (
@@ -57,6 +60,9 @@ export default function App() {
                         <Route path="listings/:id/media" element={<MediaFloorplans />} />
                         <Route path="listings/:id/costs" element={<CostDisclosures />} />
                         <Route path="listings/viewings" element={<ViewingManagement />} />
+                    </Route>
+                    <Route element={<RequireAuth roles={TENANCY_ROLES} />}>
+                        <Route path="agreements" element={<TenancyDashboard />} />
                     </Route>
                     <Route element={<RequireAuth roles={["landlord"]} />}>
                         <Route path="managers" element={<DelegatedManagers />} />
