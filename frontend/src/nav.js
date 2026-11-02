@@ -28,6 +28,7 @@ const LANDLORD_NAV = [
         items: [
             { to: "/dashboard", label: "Dashboard" },
             { to: "/listings", label: "My properties", end: true },
+            { to: "/listings/new", label: "Create property" },
         ],
     },
 ];

@@ -18,6 +18,7 @@ import Recommendations from "./pages/renter/Recommendations";
 import ViewingRequests from "./pages/renter/ViewingRequests";
 import LandlordDashboard from "./pages/landlord/LandlordDashboard";
 import MyProperties from "./pages/landlord/MyProperties";
+import PropertyForm from "./pages/landlord/PropertyForm";
 
 export default function App() {
     return (
@@ -47,6 +48,8 @@ export default function App() {
                     <Route element={<RequireAuth roles={["landlord", "property_manager"]} />}>
                         <Route path="dashboard" element={<LandlordDashboard />} />
                         <Route path="listings" element={<MyProperties />} />
+                        <Route path="listings/new" element={<PropertyForm />} />
+                        <Route path="listings/:id/edit" element={<PropertyForm />} />
                     </Route>
                 </Route>
             </Route>
