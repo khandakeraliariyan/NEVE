@@ -14,6 +14,7 @@ import TrueCost from "./pages/public/property/TrueCost";
 import PropertyComparison from "./pages/public/PropertyComparison";
 import RenterDashboard from "./pages/renter/RenterDashboard";
 import MyFavorites from "./pages/renter/MyFavorites";
+import Recommendations from "./pages/renter/Recommendations";
 
 export default function App() {
     return (
@@ -37,6 +38,7 @@ export default function App() {
                     <Route element={<RequireAuth roles={["renter"]} />}>
                         <Route path="renter" element={<RenterDashboard />} />
                         <Route path="saved" element={<MyFavorites />} />
+                        <Route path="recommendations" element={<Recommendations />} />
                     </Route>
                 </Route>
             </Route>

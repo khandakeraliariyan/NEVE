@@ -12,7 +12,10 @@ const RENTER_NAV = [
     },
     {
         title: "Discovery & saved",
-        items: [{ to: "/saved", label: "My favorites" }],
+        items: [
+            { to: "/saved", label: "My favorites" },
+            { to: "/recommendations", label: "Smart recommendations" },
+        ],
     },
 ];
 const LANDLORD_NAV = [];
