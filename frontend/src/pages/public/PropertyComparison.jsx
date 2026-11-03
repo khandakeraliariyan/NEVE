@@ -149,7 +149,6 @@ export default function PropertyComparison() {
                                         bestLabel="Lowest rent"
                                     />
                                     <Row title="Service charge" hint="Per month, from the listing" cells={items.map((p) => money(p.pricing.monthlyServiceCharge))} />
-                                    <Row title="Estimated utilities" hint="Landlord estimate" cells={items.map((p) => money(p.pricing.estimatedMonthlyUtilities))} />
                                     <Row
                                         highlight
                                         title="Estimated monthly total"

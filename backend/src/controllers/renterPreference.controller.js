@@ -17,12 +17,9 @@ const allowedFields = [
 const PROPERTY_TYPES = [
     "apartment",
     "house",
-    "room",
-    "shared_accommodation",
 ];
 const FURNISHING_TYPES = [
     "furnished",
-    "semi_furnished",
     "unfurnished",
 ];
 

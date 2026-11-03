@@ -6,8 +6,8 @@ import PinPicker from "../../components/PinPicker";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, StatusBadge, fieldErrors } from "../../components/ui";
 
 const STEPS = ["Basic details", "Location", "Rent & terms", "Media, costs & review"];
-const PROPERTY_TYPES = ["apartment", "house", "room", "shared_accommodation"];
-const FURNISHING = ["furnished", "semi_furnished", "unfurnished"];
+const PROPERTY_TYPES = ["apartment", "house"];
+const FURNISHING = ["furnished", "unfurnished"];
 
 const EMPTY = {
     title: "",
@@ -24,9 +24,7 @@ const EMPTY = {
     monthlyRent: "",
     securityDeposit: "",
     advanceRent: "",
-    oneTimeFees: "",
     monthlyServiceCharge: "",
-    estimatedMonthlyUtilities: "",
     availabilityDate: "",
     leaseDurationMonths: "",
     amenities: "",
@@ -51,9 +49,7 @@ function fromProperty(p) {
         monthlyRent: num(p.pricing?.monthlyRent),
         securityDeposit: num(p.pricing?.securityDeposit),
         advanceRent: num(p.pricing?.advanceRent),
-        oneTimeFees: num(p.pricing?.oneTimeFees),
         monthlyServiceCharge: num(p.pricing?.monthlyServiceCharge),
-        estimatedMonthlyUtilities: num(p.pricing?.estimatedMonthlyUtilities),
         availabilityDate: p.availabilityDate ? p.availabilityDate.slice(0, 10) : "",
         leaseDurationMonths: num(p.leaseDurationMonths),
         amenities: (p.amenities ?? []).join(", "),
@@ -83,9 +79,7 @@ function toBody(f) {
             monthlyRent: Number(f.monthlyRent),
             securityDeposit: num(f.securityDeposit),
             advanceRent: num(f.advanceRent),
-            oneTimeFees: num(f.oneTimeFees),
             monthlyServiceCharge: num(f.monthlyServiceCharge),
-            estimatedMonthlyUtilities: num(f.estimatedMonthlyUtilities),
         },
         availabilityDate: f.availabilityDate || null,
         leaseDurationMonths: optional(f.leaseDurationMonths),
@@ -222,7 +216,7 @@ export default function PropertyForm() {
         (k) => String(form[k]).trim() !== ""
     ).length + (form.pin ? 1 : 0);
     const completeness = Math.round((filled / 11) * 100);
-    const upfront = [form.monthlyRent, form.advanceRent, form.oneTimeFees, form.securityDeposit];
+    const upfront = [form.monthlyRent, form.advanceRent, form.securityDeposit];
     const upfrontKnown = upfront.every((v) => v !== "");
     const upfrontTotal = upfrontKnown ? upfront.reduce((s, v) => s + Number(v), 0) : null;
 
@@ -351,14 +345,8 @@ export default function PropertyForm() {
                                 <Field label="Advance rent (৳)">
                                     <input type="number" min="0" className="field" value={form.advanceRent} onChange={set("advanceRent")} />
                                 </Field>
-                                <Field label="One-time fees (৳)">
-                                    <input type="number" min="0" className="field" value={form.oneTimeFees} onChange={set("oneTimeFees")} />
-                                </Field>
                                 <Field label="Monthly service charge (৳)">
                                     <input type="number" min="0" className="field" value={form.monthlyServiceCharge} onChange={set("monthlyServiceCharge")} />
-                                </Field>
-                                <Field label="Estimated monthly utilities (৳)">
-                                    <input type="number" min="0" className="field" value={form.estimatedMonthlyUtilities} onChange={set("estimatedMonthlyUtilities")} />
                                 </Field>
                                 <Field label="Available from">
                                     <input type="date" className="field" value={form.availabilityDate} onChange={set("availabilityDate")} />
@@ -459,7 +447,6 @@ export default function PropertyForm() {
                         <div className="space-y-1">
                             <div className="flex justify-between"><span>First month's rent</span><span>{money(form.monthlyRent === "" ? null : Number(form.monthlyRent))}</span></div>
                             <div className="flex justify-between"><span>Advance rent</span><span>{money(form.advanceRent === "" ? null : Number(form.advanceRent))}</span></div>
-                            <div className="flex justify-between"><span>One-time fees</span><span>{money(form.oneTimeFees === "" ? null : Number(form.oneTimeFees))}</span></div>
                             <div className="flex justify-between"><span>Security deposit</span><span>{money(form.securityDeposit === "" ? null : Number(form.securityDeposit))}</span></div>
                         </div>
                         <div className="mt-3 flex justify-between border-t border-line pt-2 font-semibold">

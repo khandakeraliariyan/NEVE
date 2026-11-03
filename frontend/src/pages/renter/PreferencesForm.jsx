@@ -2,8 +2,8 @@ import { useState } from "react";
 import { label } from "../../lib/format";
 import { Button, ErrorBox, Field } from "../../components/ui";
 
-const PROPERTY_TYPES = ["apartment", "house", "room", "shared_accommodation"];
-const FURNISHING = ["furnished", "semi_furnished", "unfurnished"];
+const PROPERTY_TYPES = ["apartment", "house"];
+const FURNISHING = ["furnished", "unfurnished"];
 const BEDROOMS = [0, 1, 2, 3, 4, 5];
 
 const toList = (text) =>

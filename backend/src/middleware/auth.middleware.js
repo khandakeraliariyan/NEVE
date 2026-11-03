@@ -26,6 +26,9 @@ export async function authenticateUser(req, res, next) {
             uid: decodedToken.uid,
             email: decodedToken.email ?? null,
             emailVerified: decodedToken.email_verified ?? false,
+            name: decodedToken.name ?? null,
+            // "password" or "google.com"
+            signInProvider: decodedToken.firebase?.sign_in_provider ?? null,
         };
 
         next();

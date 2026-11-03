@@ -18,10 +18,10 @@ const propertySearchFields = {
     city: z.string().trim().max(100).optional(),
     area: z.string().trim().max(100).optional(),
     propertyType: z
-        .enum(["apartment", "house", "room", "shared_accommodation"])
+        .enum(["apartment", "house"])
         .optional(),
     furnishing: z
-        .enum(["furnished", "semi_furnished", "unfurnished"])
+        .enum(["furnished", "unfurnished"])
         .optional(),
     minRent: z.coerce.number().min(0).optional(),
     maxRent: z.coerce.number().min(0).optional(),

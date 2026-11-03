@@ -1,10 +1,8 @@
 const propertyTypes = [
     "apartment",
     "house",
-    "room",
-    "shared_accommodation",
 ];
-const furnishingTypes = ["furnished", "semi_furnished", "unfurnished"];
+const furnishingTypes = ["furnished", "unfurnished"];
 const allowedFields = new Set([
     "name",
     "query",

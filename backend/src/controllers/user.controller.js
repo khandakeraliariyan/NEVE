@@ -1,6 +1,8 @@
 import User from "../models/User.js";
 import { buildUserLookupFilter } from "../services/userLookup.service.js";
 
+const SELF_SELECTABLE_ROLES = ["renter", "landlord"];
+
 // GET /api/v1/users/lookup?type=manager|reviewer&q=
 // Finds active staff to assign or share with. Never returns contact details.
 export async function lookupUsers(req, res, next) {
@@ -39,7 +41,7 @@ export async function createProfile(req, res, next) {
     try {
         const firebaseUid = req.user.uid;
 
-        // Never accept firebaseUid or role from the request body.
+        // Never accept firebaseUid from the request body; role is limited below.
         const existingUser = await User.findOne({ firebaseUid });
 
         if (existingUser) {
@@ -62,11 +64,22 @@ export async function createProfile(req, res, next) {
             });
         }
 
+        // Users may only pick renter or landlord (property owner) for themselves.
+        // Staff roles (admin, mediator, ...) are never self-assigned.
+        const requestedRole = req.body.role ?? "renter";
+
+        if (!SELF_SELECTABLE_ROLES.includes(requestedRole)) {
+            return res.status(400).json({
+                success: false,
+                message: "Role must be either renter or landlord",
+            });
+        }
+
         const user = await User.create({
             firebaseUid,
             email: req.user.email,
             displayName,
-            role: "renter",
+            role: requestedRole,
         });
 
         return res.status(201).json({

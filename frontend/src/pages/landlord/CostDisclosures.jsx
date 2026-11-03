@@ -108,13 +108,11 @@ export default function CostDisclosures() {
 
             <Card className="mb-6">
                 <p className="mb-3 font-semibold">Pricing already on the listing</p>
-                <div className="grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
+                <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                     {[
                         ["Monthly rent", pricing.monthlyRent],
                         ["Service charge", pricing.monthlyServiceCharge],
-                        ["Est. utilities", pricing.estimatedMonthlyUtilities],
                         ["Advance rent", pricing.advanceRent],
-                        ["One-time fees", pricing.oneTimeFees],
                         ["Security deposit", pricing.securityDeposit],
                     ].map(([title, value]) => (
                         <div key={title} className="rounded-xl bg-mist px-3 py-2">

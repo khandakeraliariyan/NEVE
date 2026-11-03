@@ -50,8 +50,6 @@ export function validatePreferences(preferences) {
         ![
             "apartment",
             "house",
-            "room",
-            "shared_accommodation",
         ].includes(preferences.propertyType)
     ) {
         errors.push("Invalid propertyType");
@@ -61,7 +59,6 @@ export function validatePreferences(preferences) {
         preferences.furnishing !== undefined &&
         ![
             "furnished",
-            "semi_furnished",
             "unfurnished",
         ].includes(preferences.furnishing)
     ) {

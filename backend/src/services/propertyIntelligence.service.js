@@ -8,10 +8,7 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
         Math.round((amount + Number.EPSILON) * 100) / 100;
     const monthlyRent = pricing.monthlyRent ?? null;
     const monthlyServiceCharge = pricing.monthlyServiceCharge ?? null;
-    const estimatedMonthlyUtilities =
-        pricing.estimatedMonthlyUtilities ?? null;
     const advanceRent = pricing.advanceRent ?? null;
-    const oneTimeFees = pricing.oneTimeFees ?? null;
     const refundableDeposit = pricing.securityDeposit ?? null;
     const listedRecurringCosts =
         (monthlyRent ?? 0) + (monthlyServiceCharge ?? 0);
@@ -20,7 +17,6 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
     const knownRecurringCosts =
         listedRecurringCosts + additionalRecurringCosts;
     const estimatedAdditionalCosts =
-        (estimatedMonthlyUtilities ?? 0) +
         additionalCosts.monthly.estimatedAdditionalCosts;
     const monthlyKnownSubtotal =
         knownRecurringCosts + estimatedAdditionalCosts;
@@ -41,18 +37,15 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
     const requiredRecurringCosts =
         listedRecurringCosts + sumRequiredItemized(["monthly"], true);
     const optionalRecurringCosts = sumRequiredItemized(["monthly"], false);
-    const requiredEstimatedCosts =
-        (estimatedMonthlyUtilities ?? 0) +
-        sumRequiredItemized(["monthly_estimate"], true);
+    const requiredEstimatedCosts = sumRequiredItemized(
+        ["monthly_estimate"],
+        true
+    );
     const optionalEstimatedCosts = sumRequiredItemized(
         ["monthly_estimate"],
         false
     );
-    const listedUpfrontComponents = [
-        advanceRent,
-        oneTimeFees,
-        refundableDeposit,
-    ];
+    const listedUpfrontComponents = [advanceRent, refundableDeposit];
     const listedUpfrontTotal = listedUpfrontComponents.every(
         (amount) => amount !== null
     )
@@ -74,13 +67,9 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
     const missingMonthlyComponents = [
         ...(monthlyRent === null ? ["monthlyRent"] : []),
         ...(monthlyServiceCharge === null ? ["monthlyServiceCharge"] : []),
-        ...(estimatedMonthlyUtilities === null
-            ? ["estimatedMonthlyUtilities"]
-            : []),
     ];
     const missingUpfrontComponents = [
         ...(advanceRent === null ? ["advanceRent"] : []),
-        ...(oneTimeFees === null ? ["oneTimeFees"] : []),
         ...(refundableDeposit === null ? ["securityDeposit"] : []),
     ];
     const additionalCostDisclosureMissing = !costRecord;
@@ -125,17 +114,6 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
                       required: true,
                   },
               ]),
-        ...(estimatedMonthlyUtilities === null
-            ? []
-            : [
-                  {
-                      name: "Estimated utilities",
-                      amount: estimatedMonthlyUtilities,
-                      type: "monthly_estimate",
-                      source: "landlord_estimate",
-                      required: true,
-                  },
-              ]),
         ...items.map((item) => ({
             name: item.name,
             amount: item.amount,
@@ -159,18 +137,6 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
                       name: "Advance rent",
                       amount: advanceRent,
                       type: "advance_rent",
-                      source: "listing",
-                      refundable: false,
-                      required: true,
-                  },
-              ]),
-        ...(oneTimeFees === null
-            ? []
-            : [
-                  {
-                      name: "One-time fees",
-                      amount: oneTimeFees,
-                      type: "one_time",
                       source: "listing",
                       refundable: false,
                       required: true,
@@ -210,9 +176,7 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
         pricing: {
             monthlyRent,
             monthlyServiceCharge,
-            estimatedMonthlyUtilities,
             advanceRent,
-            oneTimeFees,
             securityDeposit: refundableDeposit,
         },
         monthly: {
@@ -245,7 +209,6 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
         },
         moveIn: {
             advanceRent,
-            oneTimeFees,
             refundableDeposit,
             listedUpfrontTotal,
             knownUpfrontSubtotal: roundCurrency(knownUpfrontSubtotal),
@@ -294,8 +257,8 @@ export function buildRentalCostSummary(pricing = {}, costRecord = null) {
         unknownCosts,
         hasUnknownCosts: unknownCosts.length > 0,
         assumptions: [
-            "Monthly totals include listed rent, listed service charges, and separately itemized recurring add-on costs; estimated utilities and estimated add-ons are identified as estimates.",
-            "The move-in estimate includes one month of recurring costs, advance rent, listed one-time fees, listed refundable security deposit, and separately itemized one-time fees or refundable deposits.",
+            "Monthly totals include listed rent, listed service charges, and separately itemized recurring add-on costs; estimated add-ons are identified as estimates.",
+            "The move-in estimate includes one month of recurring costs, advance rent, listed refundable security deposit, and separately itemized one-time fees or refundable deposits.",
             "Itemized costs are treated as additional to the listing's pricing fields. Do not enter the same charge in both places.",
             "A missing amount or an unknown-cost note makes the complete estimate unavailable; known subtotals are shown separately and do not imply that undisclosed costs are zero.",
         ],

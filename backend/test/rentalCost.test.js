@@ -9,9 +9,7 @@ test("true rental-cost summary combines listing and itemized costs", () => {
         {
             monthlyRent: 20000,
             monthlyServiceCharge: 1500,
-            estimatedMonthlyUtilities: 2500,
             advanceRent: 20000,
-            oneTimeFees: 1000,
             securityDeposit: 40000,
         },
         {
@@ -48,21 +46,21 @@ test("true rental-cost summary combines listing and itemized costs", () => {
 
     assert.equal(summary.currency, "BDT");
     assert.equal(summary.monthly.knownRecurringCosts, 22000);
-    assert.equal(summary.monthly.estimatedAdditionalCosts, 3300);
+    assert.equal(summary.monthly.estimatedAdditionalCosts, 800);
     assert.equal(summary.monthly.knownSubtotal, 22000);
-    assert.equal(summary.monthly.quantifiedSubtotal, 25300);
-    assert.equal(summary.monthly.estimatedTotal, 25300);
+    assert.equal(summary.monthly.quantifiedSubtotal, 22800);
+    assert.equal(summary.monthly.estimatedTotal, 22800);
     assert.equal(summary.monthly.complete, true);
     assert.equal(summary.monthly.requiredRecurringCosts, 22000);
     assert.equal(summary.monthly.optionalRecurringCosts, 0);
-    assert.equal(summary.monthly.requiredEstimatedCosts, 2500);
+    assert.equal(summary.monthly.requiredEstimatedCosts, 0);
     assert.equal(summary.monthly.optionalEstimatedCosts, 800);
-    assert.equal(summary.moveIn.listedUpfrontTotal, 61000);
-    assert.equal(summary.moveIn.knownUpfrontSubtotal, 63300);
-    assert.equal(summary.moveIn.quantifiedSubtotal, 88600);
-    assert.equal(summary.moveIn.estimatedTotal, 88600);
+    assert.equal(summary.moveIn.listedUpfrontTotal, 60000);
+    assert.equal(summary.moveIn.knownUpfrontSubtotal, 62300);
+    assert.equal(summary.moveIn.quantifiedSubtotal, 85100);
+    assert.equal(summary.moveIn.estimatedTotal, 85100);
     assert.equal(summary.moveIn.complete, true);
-    assert.equal(summary.moveIn.requiredUpfrontCosts, 61300);
+    assert.equal(summary.moveIn.requiredUpfrontCosts, 60300);
     assert.equal(summary.moveIn.optionalUpfrontCosts, 2000);
     assert.equal(
         summary.monthly.breakdown.find((item) => item.name === "Internet")
@@ -81,9 +79,7 @@ test("rental totals remain incomplete when listing costs are undisclosed", () =>
         {
             monthlyRent: 20000,
             monthlyServiceCharge: null,
-            estimatedMonthlyUtilities: null,
             advanceRent: null,
-            oneTimeFees: null,
             securityDeposit: null,
         },
         null
@@ -109,9 +105,7 @@ test("unknown cost notes suppress complete estimates without hiding subtotals", 
         {
             monthlyRent: 18000,
             monthlyServiceCharge: 0,
-            estimatedMonthlyUtilities: 2000,
             advanceRent: 18000,
-            oneTimeFees: 0,
             securityDeposit: 0,
         },
         {
@@ -120,9 +114,9 @@ test("unknown cost notes suppress complete estimates without hiding subtotals", 
         }
     );
 
-    assert.equal(summary.monthly.quantifiedSubtotal, 20000);
+    assert.equal(summary.monthly.quantifiedSubtotal, 18000);
     assert.equal(summary.monthly.estimatedTotal, null);
-    assert.equal(summary.moveIn.quantifiedSubtotal, 38000);
+    assert.equal(summary.moveIn.quantifiedSubtotal, 36000);
     assert.equal(summary.moveIn.estimatedTotal, null);
     assert.equal(summary.hasUnknownCosts, true);
 });

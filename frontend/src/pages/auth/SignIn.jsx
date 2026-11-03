@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
-import AuthShell, { firebaseMessage } from "./AuthShell";
+import AuthShell, { firebaseMessage, GoogleButton, OrDivider } from "./AuthShell";
 import { auth, firebaseConfigured } from "../../lib/firebase";
 import { homePathForRole, useAuth } from "../../context/AuthContext";
 import { Button, ErrorBox, Field } from "../../components/ui";
@@ -50,6 +50,8 @@ export default function SignIn() {
 
     return (
         <AuthShell title="Sign in" subtitle="Welcome back to Neve.">
+            <GoogleButton label="Sign in with Google" onError={setError} />
+            <OrDivider />
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Field label="Email">
                     <input type="email" required autoComplete="email" className="field" value={email} onChange={(e) => setEmail(e.target.value)} />

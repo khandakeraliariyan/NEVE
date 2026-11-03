@@ -2,8 +2,7 @@
 function getKnownUpfrontCosts(pricing = {}) {
     const components = {
         securityDeposit: pricing.securityDeposit,
-        advanceRent: pricing.advanceRent,
-        oneTimeFees: pricing.oneTimeFees
+        advanceRent: pricing.advanceRent
     };
 
     const missingComponents = Object.entries(components)
@@ -48,8 +47,6 @@ export function buildPropertyComparison(properties) {
                 monthlyRent: item.pricing?.monthlyRent ?? null,
                 monthlyServiceCharge:
                     item.pricing?.monthlyServiceCharge ?? null,
-                estimatedMonthlyUtilities:
-                    item.pricing?.estimatedMonthlyUtilities ?? null,
                 upfrontCosts: getKnownUpfrontCosts(item.pricing)
             }
         };

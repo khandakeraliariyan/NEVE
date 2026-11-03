@@ -9,8 +9,6 @@ const PROPERTY_TYPES = [
     ["", "Any type"],
     ["apartment", "Apartment"],
     ["house", "House"],
-    ["room", "Room"],
-    ["shared_accommodation", "Shared accommodation"],
 ];
 
 const PILLARS = [

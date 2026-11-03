@@ -14,8 +14,8 @@ const FILTER_KEYS = [
     "q", "city", "area", "propertyType", "furnishing", "minRent", "maxRent", "bedrooms", "maxBedrooms",
     "availableBy", "minLeaseDurationMonths", "maxLeaseDurationMonths", "amenities",
 ];
-const PROPERTY_TYPES = ["apartment", "house", "room", "shared_accommodation"];
-const FURNISHING = ["furnished", "semi_furnished", "unfurnished"];
+const PROPERTY_TYPES = ["apartment", "house"];
+const FURNISHING = ["furnished", "unfurnished"];
 const SORTS = [
     ["newest", "Newest first"],
     ["oldest", "Oldest first"],

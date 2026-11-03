@@ -49,7 +49,7 @@ const propertySchema = new mongoose.Schema(
 
         propertyType: {
             type: String,
-            enum: ["apartment", "house", "room", "shared_accommodation"],
+            enum: ["apartment", "house"],
             required: true,
         },
 
@@ -110,7 +110,7 @@ const propertySchema = new mongoose.Schema(
 
         furnishing: {
             type: String,
-            enum: ["furnished", "semi_furnished", "unfurnished"],
+            enum: ["furnished", "unfurnished"],
             required: true,
         },
 
@@ -205,19 +205,7 @@ const propertySchema = new mongoose.Schema(
                 min: 0,
             },
 
-            oneTimeFees: {
-                type: Number,
-                default: null,
-                min: 0,
-            },
-
             monthlyServiceCharge: {
-                type: Number,
-                default: null,
-                min: 0,
-            },
-
-            estimatedMonthlyUtilities: {
                 type: Number,
                 default: null,
                 min: 0,
