@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-serif: Arial, Helvetica, sans-serif;
+  --font-mono: Arial, Helvetica, sans-serif;
+
+  --color-canvas: #eef6f0;
+  --color-panel: #ffffff;
+  --color-mist: #f4f9f5;
+  --color-sage: #dcebe0;
+  --color-sage-strong: #c6dfcd;
+  --color-line: #d5e4da;
+  --color-forest: #173f2f;
+  --color-forest-hover: #0f2e21;
+  --color-moss: #2f6b4f;
+  --color-ink: #13231b;
+  --color-muted: #5b6e63;
+  --color-amber: #f6dfb8;
+  --color-amber-ink: #7a4b0d;
+  --color-rose: #f7dcdc;
+  --color-rose-ink: #8a2323;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--color-line);
+  background: var(--color-mist);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.field:focus {
+  border-color: var(--color-moss);
+  background: #fff;
+}

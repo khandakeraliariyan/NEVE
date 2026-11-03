@@ -9,7 +9,6 @@ export function isAgreementParticipant(agreement, userId) {
     return (
         String(agreement.renter) === id ||
         String(agreement.landlord) === id ||
-        String(agreement.assignedPropertyManager ?? "") === id ||
         agreement.sharedWith.some(
             (entry) =>
                 String(entry.user) === id &&
@@ -18,13 +17,13 @@ export function isAgreementParticipant(agreement, userId) {
     );
 }
 
-export function canManageAgreement(agreement, userId, userRole) {
+// The third (role) argument is accepted for call-site compatibility; only the
+// agreement's renter and landlord may manage it.
+export function canManageAgreement(agreement, userId) {
     const id = String(userId);
     return (
         String(agreement.renter) === id ||
-        String(agreement.landlord) === id ||
-        (userRole === "property_manager" &&
-            String(agreement.assignedPropertyManager ?? "") === id)
+        String(agreement.landlord) === id
     );
 }
 
@@ -38,9 +37,6 @@ export async function findAccessibleAgreement(
         $or: [
             { renter: userId },
             { landlord: userId },
-            ...(userRole === "property_manager"
-                ? [{ assignedPropertyManager: userId }]
-                : []),
             ...(["mediator", "legal_reviewer"].includes(userRole)
                 ? [{
                     sharedWith: {
@@ -98,9 +94,6 @@ export async function findAgreementForEvidenceFile(
                 $or: [
                     { renter: userId },
                     { landlord: userId },
-                    ...(userRole === "property_manager"
-                        ? [{ assignedPropertyManager: userId }]
-                        : []),
                     ...(["mediator", "legal_reviewer"].includes(userRole)
                         ? [{
                             sharedWith: {

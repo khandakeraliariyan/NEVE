@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 
 import Property from "../models/Property.js";
-import RentalCost from "../models/RentalCost.js";
 import NearbyPlaceCache from "../models/NearbyPlaceCache.js";
 import ListingWarning from "../models/ListingWarning.js";
 import PropertyClaim from "../models/PropertyClaim.js";
@@ -102,10 +101,9 @@ export const getPropertyDetails = async (req, res, next) => {
             publicMedia(property.floorPlans, "floor_plan"),
         ]);
 
-        const [costRecord, nearbyCache] = await Promise.all([
-            RentalCost.findOne({ property: property._id }).lean(),
-            NearbyPlaceCache.findOne({ property: property._id }).lean(),
-        ]);
+        const nearbyCache = await NearbyPlaceCache.findOne({
+            property: property._id,
+        }).lean();
 
         const places = (nearbyCache?.places || []).map(
             normalizeNeighborhoodPlace
@@ -139,10 +137,7 @@ export const getPropertyDetails = async (req, res, next) => {
             counts: countByCategory(places),
         };
 
-        const rentalCosts = buildRentalCostSummary(
-            property.pricing,
-            costRecord
-        );
+        const rentalCosts = buildRentalCostSummary(property.pricing);
 
         return res.status(200).json({
             success: true,
@@ -275,3 +270,41 @@ export const getPublicPropertyTransparency = async (req, res) => {
         });
     }
 };
+
+// GET /api/v1/properties/:id/costs
+// Public cost summary for a published listing, built from its pricing fields.
+export async function getPropertyCosts(req, res, next) {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID",
+            });
+        }
+
+        const property = await Property.findOne({
+            _id: id,
+            status: "published",
+        }).select("title pricing");
+
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Published property not found",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            property: {
+                id: property._id,
+                title: property.title,
+            },
+            cost: buildRentalCostSummary(property.pricing),
+        });
+    } catch (error) {
+        next(error);
+    }
+}

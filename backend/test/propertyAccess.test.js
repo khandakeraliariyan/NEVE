@@ -7,12 +7,10 @@ import { manageablePropertyFilter } from "../src/services/propertyAccess.service
 
 const objectId = () => new mongoose.Types.ObjectId();
 
-test("property manager assignments are recorded without becoming public property fields", () => {
-    const manager = objectId();
-    const assignedBy = objectId();
+test("only the landlord can manage a property", () => {
+    const landlord = objectId();
     const property = new Property({
-        landlord: objectId(),
-        managerAssignments: [{ manager, assignedBy }],
+        landlord,
         title: "Sunny apartment",
         description: "A property description.",
         propertyType: "apartment",
@@ -24,10 +22,6 @@ test("property manager assignments are recorded without becoming public property
     });
 
     assert.equal(property.validateSync(), undefined);
-    assert.equal(Property.schema.path("managerAssignments").options.select, false);
-    const filter = manageablePropertyFilter(manager);
-    assert.deepEqual(filter.$or[1].managerAssignments.$elemMatch, {
-        manager,
-        revokedAt: null,
-    });
+    assert.equal(Property.schema.path("managerAssignments"), undefined);
+    assert.deepEqual(manageablePropertyFilter(landlord), { landlord });
 });

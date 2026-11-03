@@ -75,13 +75,13 @@ export const requestUploadUrl = async (req, res) => {
             }
 
             if (
-                !["landlord", "property_manager", "admin"].includes(
+                !["landlord", "admin"].includes(
                     req.neveUser.role
                 )
             ) {
                 return res.status(403).json({
                     message:
-                        "Only landlords, property managers, or admins can upload listing media.",
+                        "Only landlords or admins can upload listing media.",
                 });
             }
 

@@ -67,9 +67,6 @@ export async function listTenancyCases(req, res, next) {
             $or: [
                 { renter: req.neveUser._id },
                 { landlord: req.neveUser._id },
-                ...(req.neveUser.role === "property_manager"
-                    ? [{ assignedPropertyManager: req.neveUser._id }]
-                    : []),
                 ...(["mediator", "legal_reviewer"].includes(req.neveUser.role)
                     ? [{
                         sharedWith: {

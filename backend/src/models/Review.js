@@ -57,6 +57,30 @@ const reviewSchema = new mongoose.Schema(
             type: String,
             default: null,
             maxlength: 500
+        },
+
+        // One public reply from the property's landlord.
+        landlordReply: {
+            type: new mongoose.Schema(
+                {
+                    text: {
+                        type: String,
+                        required: true,
+                        trim: true,
+                        minlength: 2,
+                        maxlength: 1000
+                    },
+                    author: {
+                        type: mongoose.Schema.Types.ObjectId,
+                        ref: "User",
+                        required: true
+                    },
+                    repliedAt: { type: Date, default: Date.now },
+                    editedAt: { type: Date, default: null }
+                },
+                { _id: false }
+            ),
+            default: null
         }
     },
     { timestamps: true }

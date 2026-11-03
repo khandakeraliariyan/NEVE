@@ -26,12 +26,12 @@ const savedSearchSchema = new mongoose.Schema(
         area: { type: String, trim: true, maxlength: 100, default: "" },
         propertyType: {
             type: String,
-            enum: ["apartment", "house", "room", "shared_accommodation"],
+            enum: ["apartment", "house"],
             default: null,
         },
         furnishing: {
             type: String,
-            enum: ["furnished", "semi_furnished", "unfurnished"],
+            enum: ["furnished", "unfurnished"],
             default: null,
         },
         minRent: { type: Number, min: 0, default: null },

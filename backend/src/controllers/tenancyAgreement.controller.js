@@ -250,9 +250,6 @@ export async function listTenancyAgreements(req, res, next) {
             $or: [
                 { renter: id },
                 { landlord: id },
-                ...(req.neveUser.role === "property_manager"
-                    ? [{ assignedPropertyManager: id }]
-                    : []),
                 ...(["mediator", "legal_reviewer"].includes(req.neveUser.role)
                     ? [{
                         sharedWith: {
@@ -266,10 +263,6 @@ export async function listTenancyAgreements(req, res, next) {
             TenancyAgreement.find(filter)
                 .populate("property", "title address")
                 .populate("renter landlord", "displayName photoURL role")
-                .populate(
-                    "assignedPropertyManager",
-                    "displayName photoURL role"
-                )
                 .populate("documentFile", "originalName mimeType sizeBytes")
                 .sort({ updatedAt: -1 })
                 .skip((pagination.page - 1) * pagination.limit)
@@ -317,10 +310,6 @@ export async function getTenancyAgreement(req, res, next) {
         await agreement.populate([
             { path: "property", select: "title address" },
             { path: "renter landlord", select: "displayName photoURL role" },
-            {
-                path: "assignedPropertyManager",
-                select: "displayName photoURL role",
-            },
             {
                 path: "documentFile",
                 select: "originalName mimeType sizeBytes status",
@@ -534,7 +523,7 @@ export async function updateAgreementObligation(req, res, next) {
         if (!canManageAgreement(agreement, userId(req), req.neveUser.role)) {
             return res.status(403).json({
                 success: false,
-                message: "Only agreement participants or the assigned property manager can update obligations.",
+                message: "Only agreement participants can update obligations.",
             });
         }
 

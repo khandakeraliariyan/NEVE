@@ -8,29 +8,21 @@ import {
 import {
     getLandlordPerformance
 } from "../controllers/landlordPerformance.controller.js";
-import { getAssignedTenancyDashboard } from "../controllers/landlordDashboard.controller.js";
 
 const router = express.Router();
 
 router.get(
     "/properties",
     authenticateUser,
-    allowRoles("landlord", "property_manager"),
+    allowRoles("landlord"),
     getLandlordDashboard
 );
 
 router.get(
     "/performance",
     authenticateUser,
-    allowRoles("landlord", "property_manager"),
+    allowRoles("landlord"),
     getLandlordPerformance
-);
-
-router.get(
-    "/tenancies",
-    authenticateUser,
-    allowRoles("property_manager"),
-    getAssignedTenancyDashboard
 );
 
 export default router;

@@ -171,21 +171,6 @@ const tenancyAgreementSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
-        assignedPropertyManager: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            default: null,
-            index: true,
-        },
-        propertyManagerAssignedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            default: null,
-        },
-        propertyManagerAssignedAt: {
-            type: Date,
-            default: null,
-        },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -229,9 +214,5 @@ const tenancyAgreementSchema = new mongoose.Schema(
 
 tenancyAgreementSchema.index({ renter: 1, createdAt: -1 });
 tenancyAgreementSchema.index({ landlord: 1, createdAt: -1 });
-tenancyAgreementSchema.index({
-    assignedPropertyManager: 1,
-    createdAt: -1,
-});
 
 export default mongoose.model("TenancyAgreement", tenancyAgreementSchema);

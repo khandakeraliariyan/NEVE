@@ -32,14 +32,13 @@ test("tenancy case rejects unsupported statuses", () => {
     assert.ok(tenancyCase.validateSync().errors.status);
 });
 
-test("case access distinguishes participants, assigned reviewers, and revoked shares", () => {
+test("case access distinguishes participants, shared reviewers, and revoked shares", () => {
     const renter = objectId();
-    const manager = objectId();
+    const outsider = objectId();
     const mediator = objectId();
     const agreement = {
         renter,
         landlord: objectId(),
-        assignedPropertyManager: manager,
     };
     const tenancyCase = {
         sharedWith: [
@@ -61,16 +60,7 @@ test("case access distinguishes participants, assigned reviewers, and revoked sh
         resolveTenancyCaseAccessScope({
             tenancyCase,
             agreement,
-            userId: manager,
-            userRole: "property_manager",
-        }),
-        "manage"
-    );
-    assert.equal(
-        resolveTenancyCaseAccessScope({
-            tenancyCase,
-            agreement,
-            userId: manager,
+            userId: outsider,
             userRole: "renter",
         }),
         null

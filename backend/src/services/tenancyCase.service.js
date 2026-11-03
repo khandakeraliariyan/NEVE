@@ -16,11 +16,7 @@ export function resolveTenancyCaseAccessScope({
         [agreement.renter, agreement.landlord].some(
             (participant) => String(participant) === String(userId)
         );
-    const isAssignedManager =
-        userRole === "property_manager" &&
-        String(agreement?.assignedPropertyManager ?? "") === String(userId);
-    const controlsAgreement = isAgreementParty || isAssignedManager;
-    if (controlsAgreement) return "manage";
+    if (isAgreementParty) return "manage";
 
     if (
         ["mediator", "legal_reviewer"].includes(userRole) &&
@@ -85,9 +81,6 @@ export async function findCaseForUser(caseId, userId, userRole) {
         $or: [
             { renter: userId },
             { landlord: userId },
-            ...(userRole === "property_manager"
-                ? [{ assignedPropertyManager: userId }]
-                : []),
             ...(["mediator", "legal_reviewer"].includes(userRole)
                 ? [
                     {
@@ -98,7 +91,7 @@ export async function findCaseForUser(caseId, userId, userRole) {
                 ]
                 : []),
         ],
-    }).select("_id renter landlord assignedPropertyManager");
+    }).select("_id renter landlord");
 
     const accessScope = resolveTenancyCaseAccessScope({
         tenancyCase,

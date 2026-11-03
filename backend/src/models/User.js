@@ -40,7 +40,6 @@ const userSchema = new mongoose.Schema(
             enum: [
                 "renter",
                 "landlord",
-                "property_manager",
                 "mediator",
                 "legal_reviewer",
                 "admin",

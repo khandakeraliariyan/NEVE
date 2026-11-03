@@ -1,23 +1,5 @@
 import mongoose from "mongoose";
 
-const propertyManagerAssignmentSchema = new mongoose.Schema(
-    {
-        manager: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-        },
-        assignedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-        },
-        assignedAt: { type: Date, default: Date.now },
-        revokedAt: { type: Date, default: null },
-    },
-    { _id: false }
-);
-
 const propertySchema = new mongoose.Schema(
     {
         landlord: {
@@ -25,12 +7,6 @@ const propertySchema = new mongoose.Schema(
             ref: "User",
             required: true,
             index: true,
-        },
-
-        managerAssignments: {
-            type: [propertyManagerAssignmentSchema],
-            default: [],
-            select: false,
         },
 
         title: {
@@ -49,7 +25,7 @@ const propertySchema = new mongoose.Schema(
 
         propertyType: {
             type: String,
-            enum: ["apartment", "house", "room", "shared_accommodation"],
+            enum: ["apartment", "house"],
             required: true,
         },
 
@@ -110,7 +86,7 @@ const propertySchema = new mongoose.Schema(
 
         furnishing: {
             type: String,
-            enum: ["furnished", "semi_furnished", "unfurnished"],
+            enum: ["furnished", "unfurnished"],
             required: true,
         },
 
@@ -205,19 +181,7 @@ const propertySchema = new mongoose.Schema(
                 min: 0,
             },
 
-            oneTimeFees: {
-                type: Number,
-                default: null,
-                min: 0,
-            },
-
             monthlyServiceCharge: {
-                type: Number,
-                default: null,
-                min: 0,
-            },
-
-            estimatedMonthlyUtilities: {
                 type: Number,
                 default: null,
                 min: 0,
@@ -242,9 +206,14 @@ const propertySchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ["draft", "published", "paused"],
+            enum: ["draft", "published", "paused", "deleted"],
             default: "draft",
             index: true,
+        },
+
+        deletedAt: {
+            type: Date,
+            default: null,
         },
     },
     {
@@ -260,7 +229,36 @@ propertySchema.index({
 });
 
 propertySchema.index({ "address.location": "2dsphere" });
-propertySchema.index({ "managerAssignments.manager": 1, status: 1 });
+
+// Deleted listings are kept for renters' history (inquiries, reviews, tenancy
+// records) but hidden from every query unless the query names a status itself
+// or passes { includeDeleted: true } as a query option.
+function excludeDeleted() {
+    if (this.getOptions().includeDeleted) return;
+    if (this.getFilter().status !== undefined) return;
+    this.where({ status: { $ne: "deleted" } });
+}
+
+propertySchema.pre(
+    [
+        "find",
+        "findOne",
+        "countDocuments",
+        "distinct",
+        "findOneAndUpdate",
+        "updateOne",
+        "updateMany",
+    ],
+    excludeDeleted
+);
+
+propertySchema.pre("aggregate", function () {
+    if (this.options?.includeDeleted) return;
+    const pipeline = this.pipeline();
+    // $geoNear (and $search) must stay the first stage.
+    const at = pipeline[0]?.$geoNear || pipeline[0]?.$search ? 1 : 0;
+    pipeline.splice(at, 0, { $match: { status: { $ne: "deleted" } } });
+});
 
 const Property = mongoose.model("Property", propertySchema);
 
