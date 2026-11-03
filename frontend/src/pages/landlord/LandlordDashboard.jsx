@@ -74,6 +74,7 @@ export default function LandlordDashboard() {
                     title="Inquiries"
                     value={performance.loading ? "…" : totals?.inquiries ?? 0}
                     caption={`${pendingInquiries.data?.pagination?.total ?? 0} awaiting your response`}
+                    to="/inquiries"
                 />
                 <StatCard title="Viewing requests" value={viewings.loading ? "…" : viewings.data?.pagination?.total ?? 0} caption="Waiting to be confirmed or declined" to="/listings/viewings" />
             </div>

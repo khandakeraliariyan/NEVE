@@ -381,7 +381,7 @@ export default function PropertyDetails() {
                     </Card>
 
                     <LazySection>
-                        <Reviews propertyId={property.id} />
+                        <Reviews propertyId={property.id} landlordId={landlord?.id} />
                     </LazySection>
                 </div>
 

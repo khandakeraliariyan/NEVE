@@ -172,3 +172,60 @@ Health check: http://localhost:5000/api/v1/health
 MongoDB connected successfully
 Neve API running at http://localhost:5000
 Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+MongoDB connected successfully
+Neve API running at http://localhost:5000
+Health check: http://localhost:5000/api/v1/health

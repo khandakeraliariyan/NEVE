@@ -32,6 +32,11 @@ import CaseEvidenceReview from "./pages/tenancy/CaseEvidenceReview";
 import PlatformHealth from "./pages/admin/PlatformHealth";
 import AuditTrail from "./pages/admin/AuditTrail";
 import AIEvaluations from "./pages/admin/AIEvaluations";
+import AccountSettings from "./pages/account/AccountSettings";
+import Inquiries from "./pages/shared/Inquiries";
+import ConditionReports from "./pages/tenancy/ConditionReports";
+import Maintenance from "./pages/tenancy/Maintenance";
+import ListingClaims from "./pages/landlord/ListingClaims";
 
 const TENANCY_ROLES = ["renter", "landlord", "mediator", "legal_reviewer"];
 
@@ -54,6 +59,10 @@ export default function App() {
 
             <Route element={<RequireAuth />}>
                 <Route element={<WorkspaceLayout />}>
+                    <Route path="settings" element={<AccountSettings />} />
+                    <Route element={<RequireAuth roles={["renter", "landlord"]} />}>
+                        <Route path="inquiries" element={<Inquiries />} />
+                    </Route>
                     <Route element={<RequireAuth roles={["renter"]} />}>
                         <Route path="renter" element={<RenterDashboard />} />
                         <Route path="saved" element={<MyFavorites />} />
@@ -66,6 +75,7 @@ export default function App() {
                         <Route path="listings/new" element={<PropertyForm />} />
                         <Route path="listings/:id/edit" element={<PropertyForm />} />
                         <Route path="listings/:id/media" element={<MediaFloorplans />} />
+                        <Route path="listings/:id/claims" element={<ListingClaims />} />
                         <Route path="listings/viewings" element={<ViewingManagement />} />
                     </Route>
                     <Route element={<RequireAuth roles={TENANCY_ROLES} />}>
@@ -73,7 +83,9 @@ export default function App() {
                         <Route path="agreements/:agreementId" element={<AgreementDetails />} />
                         <Route path="agreements/:agreementId/clauses" element={<ClausesAnnotations />} />
                         <Route path="agreements/:agreementId/evidence" element={<EvidenceGraph />} />
+                        <Route path="agreements/:agreementId/condition" element={<ConditionReports />} />
                         <Route path="agreements/:agreementId/condition/compare" element={<ConditionComparison />} />
+                        <Route path="agreements/:agreementId/maintenance" element={<Maintenance />} />
                         <Route path="agreements/:agreementId/cases" element={<DisputeCases />} />
                         <Route path="cases/:caseId" element={<CaseEvidenceReview />} />
                     </Route>

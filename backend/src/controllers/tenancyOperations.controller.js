@@ -726,7 +726,18 @@ export async function listMaintenanceRequests(req, res, next) {
                     : []),
             ],
         }).select("_id");
-        const agreementIds = agreements.map((agreement) => agreement._id);
+        let agreementIds = agreements.map((agreement) => agreement._id);
+        if (req.query.agreementId !== undefined) {
+            if (!isValidId(req.query.agreementId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid agreement ID.",
+                });
+            }
+            agreementIds = agreementIds.filter(
+                (id) => String(id) === String(req.query.agreementId)
+            );
+        }
         const filter = { agreement: { $in: agreementIds } };
         Object.assign(filter, search.filter);
         if (req.query.status !== undefined) {
@@ -741,6 +752,8 @@ export async function listMaintenanceRequests(req, res, next) {
         const [requests, total] = await Promise.all([
             MaintenanceRequest.find(filter)
                 .populate("submittedBy", "displayName photoURL role")
+                .populate("history.actor", "displayName photoURL role")
+                .populate("evidenceFiles history.evidenceFiles", "originalName mimeType sizeBytes status")
                 .populate("property", "title address")
                 .sort({ updatedAt: -1 })
                 .skip((page - 1) * limit)

@@ -50,7 +50,38 @@ function ReviewForm({ initial, onSubmit, onCancel, busy }) {
     );
 }
 
-export default function Reviews({ propertyId }) {
+function ReplyForm({ initial = "", busy, onSubmit, onCancel }) {
+    const [text, setText] = useState(initial);
+    return (
+        <form
+            onSubmit={(e) => {
+                e.preventDefault();
+                onSubmit(text.trim());
+            }}
+            className="mt-3 space-y-2 rounded-xl bg-mist p-3 text-sm"
+        >
+            <textarea
+                className="field min-h-20"
+                minLength={2}
+                maxLength={1000}
+                required
+                placeholder="Reply publicly as the landlord (up to 1000 characters)"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+            />
+            <div className="flex gap-2">
+                <Button type="submit" disabled={busy || text.trim().length < 2}>
+                    {initial ? "Save reply" : "Post reply"}
+                </Button>
+                <Button type="button" variant="ghost" onClick={onCancel}>
+                    Cancel
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+export default function Reviews({ propertyId, landlordId }) {
     const { role, profile, status } = useAuth();
     const [page, setPage] = useState(1);
     const [writing, setWriting] = useState(false);
@@ -60,7 +91,9 @@ export default function Reviews({ propertyId }) {
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState(null);
     const [notice, setNotice] = useState(null);
+    const [replyingId, setReplyingId] = useState(null);
     const isRenter = status === "ready" && role === "renter";
+    const isOwner = status === "ready" && role === "landlord" && Boolean(landlordId) && profile?._id === landlordId;
 
     const reviews = useApi(() => api.get(`/reviews/properties/${propertyId}`, { page }, { auth: false }), [propertyId, page]);
     const list = reviews.data?.reviews ?? [];
@@ -167,7 +200,48 @@ export default function Reviews({ propertyId }) {
                                             Report
                                         </button>
                                     )}
+                                    {isOwner && !review.landlordReply && replyingId !== review._id && (
+                                        <button type="button" className="text-forest underline" onClick={() => setReplyingId(review._id)}>
+                                            Reply
+                                        </button>
+                                    )}
                                 </div>
+                                {review.landlordReply && replyingId !== review._id && (
+                                    <div className="mt-3 rounded-xl border-l-4 border-forest bg-mist px-4 py-3 text-sm">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <p className="font-semibold text-forest">Response from the landlord</p>
+                                            <span className="text-xs text-muted">
+                                                {date(review.landlordReply.repliedAt)}
+                                                {review.landlordReply.editedAt && " · edited"}
+                                            </span>
+                                        </div>
+                                        <p className="mt-1 leading-relaxed text-muted">{review.landlordReply.text}</p>
+                                        {isOwner && (
+                                            <div className="mt-2 flex gap-4 text-xs">
+                                                <button type="button" className="text-forest underline" onClick={() => setReplyingId(review._id)}>
+                                                    Edit reply
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="text-rose-ink underline"
+                                                    onClick={() => window.confirm("Delete your reply?") && run(() => api.del(`/reviews/${review._id}/reply`), "Reply deleted.")}
+                                                >
+                                                    Delete reply
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {isOwner && replyingId === review._id && (
+                                    <ReplyForm
+                                        initial={review.landlordReply?.text ?? ""}
+                                        busy={busy}
+                                        onCancel={() => setReplyingId(null)}
+                                        onSubmit={async (text) => {
+                                            if (await run(() => api.put(`/reviews/${review._id}/reply`, { text }), "Reply saved.")) setReplyingId(null);
+                                        }}
+                                    />
+                                )}
                                 {reportingId === review._id && (
                                     <form
                                         className="mt-3 grid gap-2 rounded-xl bg-mist p-3 text-sm sm:grid-cols-[180px_1fr_auto]"

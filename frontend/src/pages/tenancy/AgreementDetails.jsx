@@ -469,7 +469,8 @@ export default function AgreementDetails() {
                 <div className="flex flex-wrap gap-2">
                     <Button as={Link} to={`/agreements/${agreement._id}/clauses`} variant="outline">Clauses</Button>
                     <Button as={Link} to={`/agreements/${agreement._id}/evidence`} variant="outline">Evidence graph</Button>
-                    <Button as={Link} to={`/agreements/${agreement._id}/condition/compare`} variant="outline">Condition comparison</Button>
+                    <Button as={Link} to={`/agreements/${agreement._id}/condition`} variant="outline">Condition reports</Button>
+                    <Button as={Link} to={`/agreements/${agreement._id}/maintenance`} variant="outline">Maintenance</Button>
                     {isParticipant && <Button as={Link} to={`/agreements/${agreement._id}/cases`}>Dispute cases</Button>}
                 </div>
             </div>

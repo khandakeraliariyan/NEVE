@@ -139,7 +139,9 @@ export default function TenancyDashboard() {
                                 {(maintenance.data?.data ?? []).map((m) => (
                                     <li key={m._id} className="rounded-xl bg-mist p-3 text-sm">
                                         <div className="flex items-center justify-between gap-2">
-                                            <span className="font-semibold">{m.title}</span>
+                                            <Link to={`/agreements/${m.agreement}/maintenance`} className="font-semibold text-forest hover:underline">
+                                                {m.title}
+                                            </Link>
                                             <StatusBadge status={m.status} />
                                         </div>
                                         <p className="text-xs text-muted">

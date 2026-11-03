@@ -49,7 +49,7 @@ export default function RenterDashboard() {
 
             <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatTile title="Saved properties" to="/saved" value={saved.loading ? "…" : `${saved.data?.pagination?.total ?? 0}`} caption="Listings on your shortlist" />
-                <StatTile title="Open inquiries" to="/renter" value={inquiries.loading ? "…" : pendingInquiries} caption={`${inquiryList.length} sent in total`} />
+                <StatTile title="Open inquiries" to="/inquiries" value={inquiries.loading ? "…" : pendingInquiries} caption={`${inquiryList.length} sent in total`} />
                 <StatTile
                     title="Upcoming viewings"
                     to="/viewings"
@@ -177,7 +177,9 @@ export default function RenterDashboard() {
                             {inquiryList.slice(0, 5).map((inquiry) => (
                                 <li key={inquiry._id} className="py-2 text-sm">
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="font-semibold">{inquiry.property?.title ?? "Listing"}</span>
+                                        <Link to={`/inquiries?id=${inquiry._id}`} className="font-semibold text-forest hover:underline">
+                                            {inquiry.property?.title ?? "Listing"}
+                                        </Link>
                                         <StatusBadge status={inquiry.status} />
                                     </div>
                                     <p className="text-xs text-muted">

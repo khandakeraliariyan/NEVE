@@ -7,7 +7,9 @@ import {
     getPropertyReviews,
     createReview,
     updateReview,
-    deleteReview
+    deleteReview,
+    upsertReviewReply,
+    deleteReviewReply
 } from "../controllers/review.controller.js";
 
 const router = express.Router();
@@ -38,6 +40,21 @@ router.delete(
     authenticateUser,
     allowRoles("renter"),
     deleteReview
+);
+
+// Landlord-only: one public reply per review on their own property.
+router.put(
+    "/:reviewId/reply",
+    authenticateUser,
+    allowRoles("landlord"),
+    upsertReviewReply
+);
+
+router.delete(
+    "/:reviewId/reply",
+    authenticateUser,
+    allowRoles("landlord"),
+    deleteReviewReply
 );
 
 export default router;

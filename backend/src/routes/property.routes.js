@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
     createProperty,
+    deleteProperty,
     getProperties,
     getRecentProperties,
     getMyProperties,
@@ -88,6 +89,13 @@ router.patch(
     authenticateUser,
     allowRoles("landlord"),
     updateProperty
+);
+
+router.delete(
+    "/:id",
+    authenticateUser,
+    allowRoles("landlord"),
+    deleteProperty
 );
 
 router.patch(

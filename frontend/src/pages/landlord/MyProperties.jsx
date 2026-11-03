@@ -47,6 +47,26 @@ export default function MyProperties() {
         }
     }
 
+    async function remove(property) {
+        const ok = window.confirm(
+            `Delete “${property.title}”? It disappears from Neve and from renters' saved lists, and open viewing requests are cancelled. This can't be undone.`
+        );
+        if (!ok) return;
+        setBusyId(property._id);
+        setError(null);
+        setFeedback(null);
+        try {
+            const payload = await api.del(`/properties/${property._id}`);
+            const cancelled = payload.cancelledViewings ?? 0;
+            setFeedback(`“${property.title}” was deleted.${cancelled ? ` ${cancelled} open viewing request${cancelled === 1 ? " was" : "s were"} cancelled.` : ""}`);
+            await listings.reload();
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusyId(null);
+        }
+    }
+
     return (
         <div>
             <PageHeader
@@ -112,6 +132,9 @@ export default function MyProperties() {
                                 <Link to={`/listings/${property._id}/media`} className="rounded-md bg-sage px-2 py-1 text-forest">
                                     Media & floor plans
                                 </Link>
+                                <Link to={`/listings/${property._id}/claims`} className="rounded-md bg-sage px-2 py-1 text-forest">
+                                    Claims & evidence
+                                </Link>
                             </div>
                             <div className="mt-auto flex gap-2 pt-2">
                                 <ButtonLink to={`/listings/${property._id}/edit`} variant="secondary" className="flex-1">
@@ -126,13 +149,16 @@ export default function MyProperties() {
                                         Publish
                                     </Button>
                                 )}
+                                <Button variant="danger" disabled={busyId === property._id} onClick={() => remove(property)} aria-label={`Delete ${property.title}`}>
+                                    Delete
+                                </Button>
                             </div>
                         </div>
                     </Card>
                 ))}
             </div>
             <Pagination page={page} totalPages={listings.data?.pagination?.totalPages} onChange={setPage} />
-            <p className="mt-6 text-xs text-muted">Published listings can be paused and republished. A listing can't return to draft once published.</p>
+            <p className="mt-6 text-xs text-muted">Published listings can be paused and republished. A listing can't return to draft once published. Deleting is permanent; listings with active tenancy records can only be paused.</p>
         </div>
     );
 }

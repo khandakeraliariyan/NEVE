@@ -370,10 +370,14 @@ export default function PropertyForm() {
                     {step === 3 && property && (
                         <>
                             <h2 className="text-xl">Media & review</h2>
-                            <div className="grid gap-3">
+                            <div className="grid gap-3 md:grid-cols-2">
                                 <Link to={`/listings/${property._id}/media`} className="rounded-xl border border-line p-4 hover:border-moss">
                                     <p className="font-semibold">Media & floor plans</p>
                                     <p className="text-xs text-muted">Up to 20 photos, 5 videos, 5 floor plans</p>
+                                </Link>
+                                <Link to={`/listings/${property._id}/claims`} className="rounded-xl border border-line p-4 hover:border-moss">
+                                    <p className="font-semibold">Claims & evidence</p>
+                                    <p className="text-xs text-muted">Back up listing facts with documents for review</p>
                                 </Link>
                             </div>
                             <div>

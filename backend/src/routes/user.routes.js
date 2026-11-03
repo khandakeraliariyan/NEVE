@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
     createProfile,
     getMyProfile,
+    updateMyProfile,
     lookupUsers,
 } from "../controllers/user.controller.js";
 
@@ -26,6 +27,7 @@ const router = Router();
 
 router.post("/profile", authenticateUser, createProfile);
 router.get("/me", authenticateUser, getMyProfile);
+router.patch("/me", authenticateUser, updateMyProfile);
 
 router.get(
     "/lookup",

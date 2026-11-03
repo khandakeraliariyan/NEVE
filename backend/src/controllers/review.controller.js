@@ -274,3 +274,97 @@ export async function deleteReview(req, res, next) {
         next(error);
     }
 }
+
+async function findReviewOnOwnedProperty(req, res) {
+    const { reviewId } = req.params;
+
+    if (!mongoose.isValidObjectId(reviewId)) {
+        res.status(400).json({ success: false, message: "Invalid review ID." });
+        return null;
+    }
+
+    const review = await Review.findOne({
+        _id: reviewId,
+        moderationStatus: "visible"
+    });
+
+    if (!review) {
+        res.status(404).json({ success: false, message: "Review not found." });
+        return null;
+    }
+
+    const ownsProperty = await Property.exists({
+        _id: review.property,
+        landlord: req.neveUser._id
+    });
+
+    if (!ownsProperty) {
+        res.status(403).json({
+            success: false,
+            message: "Only the property's landlord can reply to this review."
+        });
+        return null;
+    }
+
+    return review;
+}
+
+// Landlord: add or edit the public reply to a review on their property.
+export async function upsertReviewReply(req, res, next) {
+    try {
+        const text =
+            typeof req.body?.text === "string" ? req.body.text.trim() : "";
+
+        if (text.length < 2 || text.length > 1000) {
+            return res.status(400).json({
+                success: false,
+                message: "Reply must be between 2 and 1000 characters."
+            });
+        }
+
+        const review = await findReviewOnOwnedProperty(req, res);
+        if (!review) return;
+
+        const editing = Boolean(review.landlordReply);
+        review.landlordReply = {
+            text,
+            author: req.neveUser._id,
+            repliedAt: review.landlordReply?.repliedAt ?? new Date(),
+            editedAt: editing ? new Date() : null
+        };
+        await review.save();
+
+        return res.status(editing ? 200 : 201).json({
+            success: true,
+            message: editing ? "Reply updated." : "Reply posted.",
+            review
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// Landlord: remove their reply.
+export async function deleteReviewReply(req, res, next) {
+    try {
+        const review = await findReviewOnOwnedProperty(req, res);
+        if (!review) return;
+
+        if (!review.landlordReply) {
+            return res.status(404).json({
+                success: false,
+                message: "This review has no reply."
+            });
+        }
+
+        review.landlordReply = null;
+        await review.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Reply deleted."
+        });
+    } catch (error) {
+        next(error);
+    }
+}

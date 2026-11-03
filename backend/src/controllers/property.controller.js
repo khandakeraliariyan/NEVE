@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
+import Inquiry from "../models/Inquiry.js";
+import SavedProperty from "../models/SavedProperty.js";
+import TenancyAgreement from "../models/TenancyAgreement.js";
+import User from "../models/User.js";
+import ViewingRequest from "../models/ViewingRequest.js";
+import { createNotification } from "../services/notification.service.js";
 import { getPropertyDetails } from "./propertyDetail.controller.js";
 import {
     buildPropertySearchFilter,
@@ -267,6 +273,105 @@ export async function updatePropertyStatus(req, res, next) {
             message: `Property ${status} successfully`,
             property,
             ...(matchingAlerts ? { matchingAlerts } : {}),
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+// DELETE /api/v1/properties/:id
+// Soft-deletes a listing the landlord owns. The record is kept (hidden from
+// every query) so renters' inquiries, reviews and reports keep their context.
+export async function deleteProperty(req, res, next) {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID",
+            });
+        }
+
+        const property = await Property.findOne({
+            _id: id,
+            ...manageablePropertyFilter(req.neveUser._id),
+        });
+
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Property not found or you do not own it",
+            });
+        }
+
+        const activeAgreements = await TenancyAgreement.countDocuments({
+            property: property._id,
+            status: { $ne: "archived" },
+        });
+
+        if (activeAgreements > 0) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "This listing has tenancy records that aren't archived. Archive them first, or pause the listing instead.",
+            });
+        }
+
+        const openViewings = await ViewingRequest.find({
+            property: property._id,
+            status: { $in: ["requested", "confirmed"] },
+        }).select("_id renter");
+
+        property.status = "deleted";
+        property.deletedAt = new Date();
+        await property.save();
+
+        await Promise.all([
+            ViewingRequest.updateMany(
+                { _id: { $in: openViewings.map((viewing) => viewing._id) } },
+                { $set: { status: "cancelled" } }
+            ),
+            Inquiry.updateMany(
+                {
+                    property: property._id,
+                    status: { $in: ["pending", "submitted", "acknowledged"] },
+                },
+                { $set: { status: "closed" } }
+            ),
+            SavedProperty.deleteMany({ property: property._id }),
+            User.updateMany(
+                {
+                    $or: [
+                        { favorites: property._id },
+                        { "recentlyViewed.property": property._id },
+                    ],
+                },
+                {
+                    $pull: {
+                        favorites: property._id,
+                        recentlyViewed: { property: property._id },
+                    },
+                }
+            ),
+        ]);
+
+        await Promise.allSettled(
+            openViewings.map((viewing) =>
+                createNotification({
+                    recipient: viewing.renter,
+                    type: "viewing_request_declined",
+                    title: "Viewing cancelled",
+                    message: `"${property.title}" is no longer listed, so your viewing request was cancelled.`,
+                    relatedProperty: property._id,
+                    relatedViewingRequest: viewing._id,
+                })
+            )
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Listing deleted",
+            cancelledViewings: openViewings.length,
         });
     } catch (error) {
         next(error);

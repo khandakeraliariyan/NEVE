@@ -19,7 +19,10 @@ const RENTER_NAV = [
     },
     {
         title: "Communications",
-        items: [{ to: "/viewings", label: "Viewing requests" }],
+        items: [
+            { to: "/inquiries", label: "Inquiries" },
+            { to: "/viewings", label: "Viewing requests" },
+        ],
     },
 ];
 const LANDLORD_NAV = [
@@ -33,7 +36,10 @@ const LANDLORD_NAV = [
     },
     {
         title: "Tenants & engagement",
-        items: [{ to: "/listings/viewings", label: "Viewing management" }],
+        items: [
+            { to: "/inquiries", label: "Inquiries" },
+            { to: "/listings/viewings", label: "Viewing management" },
+        ],
     },
 ];
 const TENANCY_NAV = [
@@ -59,7 +65,18 @@ const ADMIN_NAV = [
     },
 ];
 
+const ACCOUNT_NAV = [
+    {
+        title: "Account",
+        items: [{ to: "/settings", label: "Settings" }],
+    },
+];
+
 export function workspaceNav(role) {
+    return [...roleNav(role), ...ACCOUNT_NAV];
+}
+
+function roleNav(role) {
     switch (role) {
         case "renter":
             return [...RENTER_NAV, ...TENANCY_NAV];

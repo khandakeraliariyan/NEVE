@@ -95,7 +95,10 @@ export default function ConditionComparison() {
 
             {comparison && !comparison.available && (
                 <Empty title="Comparison not available yet">
-                    Both reports are needed. Missing: {comparison.missingStages.map((s) => label(s)).join(" and ")} report.
+                    Both reports are needed. Missing: {comparison.missingStages.map((s) => label(s)).join(" and ")} report.{" "}
+                    <Link to={`/agreements/${agreementId}/condition`} className="text-forest underline">
+                        Open condition reports
+                    </Link>
                 </Empty>
             )}
 

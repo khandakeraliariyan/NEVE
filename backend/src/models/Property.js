@@ -206,9 +206,14 @@ const propertySchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ["draft", "published", "paused"],
+            enum: ["draft", "published", "paused", "deleted"],
             default: "draft",
             index: true,
+        },
+
+        deletedAt: {
+            type: Date,
+            default: null,
         },
     },
     {
@@ -224,6 +229,36 @@ propertySchema.index({
 });
 
 propertySchema.index({ "address.location": "2dsphere" });
+
+// Deleted listings are kept for renters' history (inquiries, reviews, tenancy
+// records) but hidden from every query unless the query names a status itself
+// or passes { includeDeleted: true } as a query option.
+function excludeDeleted() {
+    if (this.getOptions().includeDeleted) return;
+    if (this.getFilter().status !== undefined) return;
+    this.where({ status: { $ne: "deleted" } });
+}
+
+propertySchema.pre(
+    [
+        "find",
+        "findOne",
+        "countDocuments",
+        "distinct",
+        "findOneAndUpdate",
+        "updateOne",
+        "updateMany",
+    ],
+    excludeDeleted
+);
+
+propertySchema.pre("aggregate", function () {
+    if (this.options?.includeDeleted) return;
+    const pipeline = this.pipeline();
+    // $geoNear (and $search) must stay the first stage.
+    const at = pipeline[0]?.$geoNear || pipeline[0]?.$search ? 1 : 0;
+    pipeline.splice(at, 0, { $match: { status: { $ne: "deleted" } } });
+});
 
 const Property = mongoose.model("Property", propertySchema);
 

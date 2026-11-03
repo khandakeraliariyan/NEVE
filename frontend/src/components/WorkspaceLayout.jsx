@@ -106,10 +106,10 @@ export default function WorkspaceLayout() {
                     </div>
                     <div className="flex items-center gap-4">
                         <NotificationBell />
-                        <div className="text-right text-sm leading-tight">
+                        <Link to="/settings" className="rounded-lg px-2 py-1 text-right text-sm leading-tight hover:bg-sage" title="Account settings">
                             <p className="font-semibold">{profile?.displayName}</p>
                             <p className="text-xs text-muted">{ROLE_LABELS[role]}</p>
-                        </div>
+                        </Link>
                         <button
                             type="button"
                             onClick={async () => {

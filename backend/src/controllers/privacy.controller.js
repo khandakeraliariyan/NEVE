@@ -311,6 +311,26 @@ export async function requestDocumentDeletion(req, res, next) {
     }
 }
 
+// GET /api/v1/privacy/documents
+// The signed-in user's own tenancy documents, which they may ask to delete.
+export async function listMyDeletableDocuments(req, res, next) {
+    try {
+        const files = await UploadedFile.find({
+            uploadedBy: req.neveUser._id,
+            purpose: "tenancy_evidence",
+            status: { $in: ["uploaded", "deletion_pending"] },
+        })
+            .select("originalName mimeType sizeBytes status createdAt")
+            .sort({ createdAt: -1 })
+            .limit(200)
+            .lean();
+        setPrivateResponse(res);
+        return res.json({ success: true, data: files });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function listMyDocumentDeletionRequests(req, res, next) {
     try {
         const page = Number(req.query.page ?? 1);

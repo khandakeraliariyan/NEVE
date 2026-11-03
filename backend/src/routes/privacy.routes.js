@@ -1,6 +1,7 @@
 import express from "express";
 import {
     exportMyData,
+    listMyDeletableDocuments,
     listMyDocumentDeletionRequests,
     requestDocumentDeletion,
 } from "../controllers/privacy.controller.js";
@@ -21,6 +22,7 @@ router.use(
 );
 
 router.get("/export", exportMyData);
+router.get("/documents", listMyDeletableDocuments);
 router.get("/documents/deletion-requests", listMyDocumentDeletionRequests);
 router.post("/documents/:fileId/deletion-requests", requestDocumentDeletion);
 
