@@ -13,7 +13,6 @@ const TABS = [
     { value: "obligations", label: "Obligations" },
     { value: "payments", label: "Payments" },
     { value: "sharing", label: "Sharing" },
-    { value: "manager", label: "Property manager" },
     { value: "activity", label: "Activity" },
 ];
 
@@ -63,10 +62,9 @@ function Overview({ agreement, canEdit, action }) {
         <div className="space-y-6">
             <Card>
                 <h2 className="mb-4 text-xl">Contracting parties</h2>
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-2">
                     <Party title="Renter" user={agreement.renter} />
                     <Party title="Landlord" user={agreement.landlord} />
-                    <Party title="Property manager" user={agreement.assignedPropertyManager} note="Assigned manager" />
                 </div>
             </Card>
             <Card>
@@ -420,27 +418,6 @@ function Sharing({ agreement, canEdit, action }) {
     );
 }
 
-function Manager({ agreement, canEdit, action }) {
-    const id = agreement._id;
-    return (
-        <Card className="space-y-4">
-            <h2 className="text-xl">Property manager for this agreement</h2>
-            <Party title="Currently assigned" user={agreement.assignedPropertyManager} note={agreement.propertyManagerAssignedAt ? `Since ${date(agreement.propertyManagerAssignedAt)}` : undefined} />
-            <p className="text-sm text-muted">An assigned manager can update obligations, condition reports and maintenance. Listing managers don't get agreement access automatically.</p>
-            {canEdit && (
-                <>
-                    {agreement.assignedPropertyManager && (
-                        <Button variant="danger" disabled={action.busy} onClick={() => action.run(() => api.patch(`/tenancy/agreements/${id}/property-manager`, { managerId: null }))}>
-                            Remove manager
-                        </Button>
-                    )}
-                    <PersonPicker type="manager" actionLabel="Assign" disabled={action.busy} onPick={(u) => action.run(() => api.patch(`/tenancy/agreements/${id}/property-manager`, { managerId: u._id }))} />
-                </>
-            )}
-        </Card>
-    );
-}
-
 function Activity({ agreement }) {
     const events = [...(agreement.auditTrail ?? [])].reverse().slice(0, 100);
     return (
@@ -464,7 +441,7 @@ function Activity({ agreement }) {
 export default function AgreementDetails() {
     const { agreementId } = useParams();
     const [tab, setTab] = useState("overview");
-    const { agreement, loading, error, reload, isParticipant, isManager, readOnly } = useAgreement(agreementId);
+    const { agreement, loading, error, reload, isParticipant, readOnly } = useAgreement(agreementId);
     const action = useAction(reload);
 
     if (loading && !agreement) return <Loading text="Loading agreement…" />;
@@ -527,10 +504,9 @@ export default function AgreementDetails() {
             <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
                 <div>
                     {tab === "overview" && <Overview agreement={agreement} canEdit={isParticipant} action={action} />}
-                    {tab === "obligations" && <Obligations agreement={agreement} canAdd={isParticipant} canUpdate={isParticipant || isManager} action={action} />}
+                    {tab === "obligations" && <Obligations agreement={agreement} canAdd={isParticipant} canUpdate={isParticipant} action={action} />}
                     {tab === "payments" && <Payments agreement={agreement} canEdit={isParticipant} action={action} />}
                     {tab === "sharing" && <Sharing agreement={agreement} canEdit={isParticipant} action={action} />}
-                    {tab === "manager" && <Manager agreement={agreement} canEdit={isParticipant} action={action} />}
                     {tab === "activity" && <Activity agreement={agreement} />}
                 </div>
                 <aside className="space-y-4">

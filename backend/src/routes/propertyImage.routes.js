@@ -18,14 +18,14 @@ router.get("/:propertyId", getPropertyImages);
 router.post(
   "/:propertyId/:fileId/attach",
   authenticateUser,
-  allowRoles("landlord", "property_manager", "admin"),
+  allowRoles("landlord", "admin"),
   attachPropertyImage
 );
 
 router.delete(
   "/:propertyId/:fileId",
   authenticateUser,
-  allowRoles("landlord", "property_manager", "admin"),
+  allowRoles("landlord", "admin"),
   removePropertyImage
 );
 

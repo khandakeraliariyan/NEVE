@@ -16,7 +16,6 @@ router.use(
     allowRoles(
         "renter",
         "landlord",
-        "property_manager",
         "mediator",
         "legal_reviewer",
         "admin"

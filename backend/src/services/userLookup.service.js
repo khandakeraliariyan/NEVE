@@ -1,5 +1,4 @@
 const LOOKUP_ROLES = {
-    manager: ["property_manager"],
     reviewer: ["mediator", "legal_reviewer"],
 };
 
@@ -9,7 +8,7 @@ export function buildUserLookupFilter({ type, q, requesterId }) {
             ? LOOKUP_ROLES[type]
             : null;
     if (!roles) {
-        return { error: "type must be manager or reviewer." };
+        return { error: "type must be reviewer." };
     }
     if (typeof q !== "string" || q.trim().length < 2 || q.trim().length > 100) {
         return { error: "q must be a text search of 2 to 100 characters." };

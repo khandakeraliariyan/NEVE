@@ -3,8 +3,8 @@ import { buildUserLookupFilter } from "../services/userLookup.service.js";
 
 const SELF_SELECTABLE_ROLES = ["renter", "landlord"];
 
-// GET /api/v1/users/lookup?type=manager|reviewer&q=
-// Finds active staff to assign or share with. Never returns contact details.
+// GET /api/v1/users/lookup?type=reviewer&q=
+// Finds active reviewers to share with. Never returns contact details.
 export async function lookupUsers(req, res, next) {
     try {
         const limit = Number(req.query.limit ?? 10);

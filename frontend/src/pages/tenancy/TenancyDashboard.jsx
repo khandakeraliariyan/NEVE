@@ -16,7 +16,7 @@ export default function TenancyDashboard() {
     const [creating, setCreating] = useState(false);
     const agreements = useApi(() => api.get("/tenancy/agreements", { page, limit: PAGE_SIZE }), [page]);
     const maintenance = useApi(() => api.get("/tenancy/maintenance-requests", { page: 1, limit: 4 }), [], {
-        enabled: ["renter", "landlord", "property_manager"].includes(role),
+        enabled: ["renter", "landlord"].includes(role),
     });
     const canCreate = ["renter", "landlord"].includes(role);
 
@@ -129,7 +129,7 @@ export default function TenancyDashboard() {
                         </ol>
                     </Card>
 
-                    {["renter", "landlord", "property_manager"].includes(role) && (
+                    {["renter", "landlord"].includes(role) && (
                         <Card>
                             <h2 className="mb-3 text-lg">Recent maintenance</h2>
                             {maintenance.loading && <Loading />}

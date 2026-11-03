@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { date, dateTime, label, money } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
-import { useAuth } from "../../context/AuthContext";
 import { PropertyImage } from "../../components/PropertyCard";
 import { ButtonLink, Card, Empty, ErrorBox, Loading, PageHeader, StatusBadge, Tabs } from "../../components/ui";
 
@@ -32,7 +31,6 @@ function StatCard({ title, value, caption, to }) {
 }
 
 export default function LandlordDashboard() {
-    const { role } = useAuth();
     const [status, setStatus] = useState("");
     const [range, setRange] = useState({ from: "", to: "" });
     const [appliedRange, setAppliedRange] = useState({ from: "", to: "" });
@@ -60,7 +58,7 @@ export default function LandlordDashboard() {
             <PageHeader
                 eyebrow="Portfolio overview"
                 title="Portfolio & tenancy operations"
-                description={role === "property_manager" ? "Listings you own or are assigned to manage." : "Your listings, renter demand and viewing requests."}
+                description="Your listings, renter demand and viewing requests."
                 actions={<ButtonLink to="/listings/new">+ Create listing</ButtonLink>}
             />
 

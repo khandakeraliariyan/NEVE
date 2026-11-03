@@ -23,7 +23,7 @@ const maintenanceEventSchema = new mongoose.Schema(
         },
         responsibility: {
             type: String,
-            enum: ["renter", "landlord", "shared", "property_manager"],
+            enum: ["renter", "landlord", "shared"],
             default: null,
         },
         evidenceFiles: {
@@ -95,7 +95,7 @@ const maintenanceRequestSchema = new mongoose.Schema(
         },
         responsibility: {
             type: String,
-            enum: ["renter", "landlord", "shared", "property_manager"],
+            enum: ["renter", "landlord", "shared"],
             default: null,
         },
         submittedBy: {

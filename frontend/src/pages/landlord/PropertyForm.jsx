@@ -5,7 +5,7 @@ import { label, money } from "../../lib/format";
 import PinPicker from "../../components/PinPicker";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, StatusBadge, fieldErrors } from "../../components/ui";
 
-const STEPS = ["Basic details", "Location", "Rent & terms", "Media, costs & review"];
+const STEPS = ["Basic details", "Location", "Rent & terms", "Media & review"];
 const PROPERTY_TYPES = ["apartment", "house"];
 const FURNISHING = ["furnished", "unfurnished"];
 
@@ -228,7 +228,7 @@ export default function PropertyForm() {
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <h1 className="text-3xl md:text-4xl">{isEdit ? "Edit property listing" : "Create property listing"}</h1>
-                    <p className="mt-1 text-sm text-muted">Save a draft first. Photos, floor plans and the cost disclosure need a saved draft.</p>
+                    <p className="mt-1 text-sm text-muted">Save a draft first. Photos and floor plans need a saved draft.</p>
                 </div>
                 {property && (
                     <div className="flex items-center gap-2 text-sm">
@@ -361,28 +361,19 @@ export default function PropertyForm() {
                             <Field label="House rules" hint="One per line">
                                 <textarea className="field min-h-24" value={form.houseRules} onChange={set("houseRules")} />
                             </Field>
-                            <Disclaimer title="Avoid double-counting">
-                                Leave a fee empty if it's unknown; don't enter 0 unless there's truly no charge. Don't enter the same fee here and again in the
-                                itemized cost disclosure.
+                            <Disclaimer title="Unknown amounts">
+                                Leave an amount empty if it's unknown; don't enter 0 unless there's truly no charge.
                             </Disclaimer>
                         </>
                     )}
 
                     {step === 3 && property && (
                         <>
-                            <h2 className="text-xl">Media, costs & review</h2>
-                            <div className="grid gap-3 md:grid-cols-3">
+                            <h2 className="text-xl">Media & review</h2>
+                            <div className="grid gap-3">
                                 <Link to={`/listings/${property._id}/media`} className="rounded-xl border border-line p-4 hover:border-moss">
                                     <p className="font-semibold">Media & floor plans</p>
                                     <p className="text-xs text-muted">Up to 20 photos, 5 videos, 5 floor plans</p>
-                                </Link>
-                                <Link to={`/listings/${property._id}/costs`} className="rounded-xl border border-line p-4 hover:border-moss">
-                                    <p className="font-semibold">Cost disclosure</p>
-                                    <p className="text-xs text-muted">Itemized charges and unknown costs</p>
-                                </Link>
-                                <Link to={`/managers?property=${property._id}`} className="rounded-xl border border-line p-4 hover:border-moss">
-                                    <p className="font-semibold">Property managers</p>
-                                    <p className="text-xs text-muted">Landlords can assign up to 10</p>
                                 </Link>
                             </div>
                             <div>
@@ -453,7 +444,7 @@ export default function PropertyForm() {
                             <span>Listed upfront total</span>
                             <span>{money(upfrontTotal)}</span>
                         </div>
-                        <p className="mt-2 text-xs text-muted">Renters see a fuller estimate once you add the itemized cost disclosure.</p>
+                        <p className="mt-2 text-xs text-muted">Renters see this as the listed move-in estimate.</p>
                     </Card>
                     <Card className="text-sm">
                         <p className="font-semibold">{form.title || "Untitled listing"}</p>

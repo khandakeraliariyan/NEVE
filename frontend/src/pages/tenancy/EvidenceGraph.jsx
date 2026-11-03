@@ -191,7 +191,7 @@ function EditLink({ agreementId, edge, onDone }) {
 
 export default function EvidenceGraph() {
     const { agreementId } = useParams();
-    const { agreement, isParticipant, isManager } = useAgreement(agreementId);
+    const { agreement, isParticipant } = useAgreement(agreementId);
     const graph = useApi(() => api.get(`/tenancy/agreements/${agreementId}/evidence-graph`), [agreementId]);
     const [hidden, setHidden] = useState(["event", "inquiry_message"]);
     const [selectedId, setSelectedId] = useState(null);
@@ -418,7 +418,7 @@ export default function EvidenceGraph() {
                                                 </div>
                                             )}
                                             {e.explanation && <p className="mt-1 text-xs text-muted">{e.explanation}</p>}
-                                            {e.linkedBy && (isParticipant || isManager) && <EditLink agreementId={agreementId} edge={e} onDone={graph.reload} />}
+                                            {e.linkedBy && isParticipant && <EditLink agreementId={agreementId} edge={e} onDone={graph.reload} />}
                                         </div>
                                     );
                                 })}

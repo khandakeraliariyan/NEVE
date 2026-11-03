@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { date, label, money } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
-import { useAuth } from "../../context/AuthContext";
 import { PropertyImage } from "../../components/PropertyCard";
 import { Button, ButtonLink, Card, Empty, ErrorBox, Loading, PageHeader, Pagination, StatusBadge } from "../../components/ui";
 
@@ -16,7 +15,6 @@ const STATUSES = [
 ];
 
 export default function MyProperties() {
-    const { role } = useAuth();
     const [status, setStatus] = useState("");
     const [page, setPage] = useState(1);
     const [query, setQuery] = useState("");
@@ -54,11 +52,7 @@ export default function MyProperties() {
             <PageHeader
                 eyebrow="Portfolio asset registry"
                 title="My properties"
-                description={
-                    role === "property_manager"
-                        ? "Listings you're assigned to manage. Publish, pause and keep details up to date."
-                        : "All your listings. Drafts stay private until you publish them."
-                }
+                description="All your listings. Drafts stay private until you publish them."
                 actions={<ButtonLink to="/listings/new">+ Create property</ButtonLink>}
             />
 
@@ -118,14 +112,6 @@ export default function MyProperties() {
                                 <Link to={`/listings/${property._id}/media`} className="rounded-md bg-sage px-2 py-1 text-forest">
                                     Media & floor plans
                                 </Link>
-                                <Link to={`/listings/${property._id}/costs`} className="rounded-md bg-sage px-2 py-1 text-forest">
-                                    Cost disclosure
-                                </Link>
-                                {role === "landlord" && (
-                                    <Link to={`/managers?property=${property._id}`} className="rounded-md bg-sage px-2 py-1 text-forest">
-                                        Managers
-                                    </Link>
-                                )}
                             </div>
                             <div className="mt-auto flex gap-2 pt-2">
                                 <ButtonLink to={`/listings/${property._id}/edit`} variant="secondary" className="flex-1">

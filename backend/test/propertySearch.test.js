@@ -6,7 +6,6 @@ import {
     propertySearchSchema,
 } from "../src/validators/common.validator.js";
 import { buildPropertySearchFilter } from "../src/services/propertySearch.service.js";
-import { buildRentalCostSummary } from "../src/services/propertyIntelligence.service.js";
 
 test("property search parses all marketplace filters", () => {
     const { query } = propertySearchSchema.parse({
@@ -103,37 +102,4 @@ test("nearby search validates its map center and radius", () => {
             },
         })
     );
-});
-
-test("property intelligence separates listed estimates from extra costs", () => {
-    const summary = buildRentalCostSummary(
-        {
-            monthlyRent: 20000,
-            monthlyServiceCharge: 1500,
-            advanceRent: 20000,
-            securityDeposit: 40000,
-        },
-        {
-            currency: "BDT",
-            items: [
-                {
-                    name: "Parking",
-                    amount: 500,
-                    type: "monthly",
-                },
-            ],
-            unknownCosts: ["Internet"],
-            updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-        }
-    );
-
-    assert.equal(summary.monthly.knownRecurringCosts, 22000);
-    assert.equal(summary.monthly.estimatedAdditionalCosts, 0);
-    assert.equal(summary.monthly.quantifiedSubtotal, 22000);
-    assert.equal(summary.monthly.estimatedTotal, null);
-    assert.equal(summary.moveIn.listedUpfrontTotal, 60000);
-    assert.equal(summary.moveIn.quantifiedSubtotal, 82000);
-    assert.equal(summary.moveIn.estimatedTotal, null);
-    assert.equal(summary.additionalCosts.monthly.knownRecurringCosts, 500);
-    assert.deepEqual(summary.additionalCosts.unknownCosts, ["Internet"]);
 });

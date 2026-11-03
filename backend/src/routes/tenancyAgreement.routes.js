@@ -20,7 +20,6 @@ import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 import {
     addConditionEntry,
-    assignPropertyManager,
     correctConditionEntry,
     createConditionReport,
     createMaintenanceRequest,
@@ -49,7 +48,6 @@ router.use(
     allowRoles(
         "renter",
         "landlord",
-        "property_manager",
         "mediator",
         "legal_reviewer"
     )
@@ -57,11 +55,6 @@ router.use(
 
 router.post("/agreements", allowRoles("renter", "landlord"), createTenancyAgreement);
 router.get("/agreements", listTenancyAgreements);
-router.patch(
-    "/agreements/:agreementId/property-manager",
-    allowRoles("renter", "landlord"),
-    assignPropertyManager
-);
 router.get("/agreements/:agreementId/cases", listTenancyCases);
 router.post(
     "/agreements/:agreementId/cases",
@@ -150,7 +143,7 @@ router.post(
 );
 router.patch(
     "/agreements/:agreementId/obligations/:obligationId",
-    allowRoles("renter", "landlord", "property_manager"),
+    allowRoles("renter", "landlord"),
     updateAgreementObligation
 );
 router.post(

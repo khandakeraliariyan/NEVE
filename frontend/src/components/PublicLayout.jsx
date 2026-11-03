@@ -73,7 +73,7 @@ export default function PublicLayout() {
                     <div>
                         <p className="mb-2 text-lg">Neve</p>
                         <p className="text-muted">
-                            Rental discovery and tenancy records for renters, landlords and property managers in Bangladesh.
+                            Rental discovery and tenancy records for renters and landlords in Bangladesh.
                         </p>
                     </div>
                     <div>

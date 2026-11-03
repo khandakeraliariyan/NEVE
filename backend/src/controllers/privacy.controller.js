@@ -93,9 +93,6 @@ export async function exportMyData(req, res, next) {
                 $or: [
                     { renter: actorId },
                     { landlord: actorId },
-                    ...(role === "property_manager"
-                        ? [{ assignedPropertyManager: actorId }]
-                        : []),
                     ...(["mediator", "legal_reviewer"].includes(role)
                         ? [{
                             sharedWith: {

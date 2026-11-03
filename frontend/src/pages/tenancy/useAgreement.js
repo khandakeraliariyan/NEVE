@@ -11,14 +11,12 @@ export function useAgreement(agreementId) {
     const me = String(profile?._id ?? "");
     const isRenter = agreement && String(idOf(agreement.renter)) === me;
     const isLandlord = agreement && String(idOf(agreement.landlord)) === me;
-    const isManager = agreement && String(idOf(agreement.assignedPropertyManager)) === me;
 
     return {
         ...result,
         agreement,
         isParticipant: Boolean(isRenter || isLandlord),
-        isManager: Boolean(isManager),
         myParty: isRenter ? "renter" : isLandlord ? "landlord" : null,
-        readOnly: !isRenter && !isLandlord && !isManager,
+        readOnly: !isRenter && !isLandlord,
     };
 }

@@ -20,8 +20,6 @@ import LandlordDashboard from "./pages/landlord/LandlordDashboard";
 import MyProperties from "./pages/landlord/MyProperties";
 import PropertyForm from "./pages/landlord/PropertyForm";
 import MediaFloorplans from "./pages/landlord/MediaFloorplans";
-import CostDisclosures from "./pages/landlord/CostDisclosures";
-import DelegatedManagers from "./pages/landlord/DelegatedManagers";
 import ViewingManagement from "./pages/landlord/ViewingManagement";
 import TenancyDashboard from "./pages/tenancy/TenancyDashboard";
 import AgreementDetails from "./pages/tenancy/AgreementDetails";
@@ -35,7 +33,7 @@ import PlatformHealth from "./pages/admin/PlatformHealth";
 import AuditTrail from "./pages/admin/AuditTrail";
 import AIEvaluations from "./pages/admin/AIEvaluations";
 
-const TENANCY_ROLES = ["renter", "landlord", "property_manager", "mediator", "legal_reviewer"];
+const TENANCY_ROLES = ["renter", "landlord", "mediator", "legal_reviewer"];
 
 export default function App() {
     return (
@@ -62,13 +60,12 @@ export default function App() {
                         <Route path="recommendations" element={<Recommendations />} />
                         <Route path="viewings" element={<ViewingRequests />} />
                     </Route>
-                    <Route element={<RequireAuth roles={["landlord", "property_manager"]} />}>
+                    <Route element={<RequireAuth roles={["landlord"]} />}>
                         <Route path="dashboard" element={<LandlordDashboard />} />
                         <Route path="listings" element={<MyProperties />} />
                         <Route path="listings/new" element={<PropertyForm />} />
                         <Route path="listings/:id/edit" element={<PropertyForm />} />
                         <Route path="listings/:id/media" element={<MediaFloorplans />} />
-                        <Route path="listings/:id/costs" element={<CostDisclosures />} />
                         <Route path="listings/viewings" element={<ViewingManagement />} />
                     </Route>
                     <Route element={<RequireAuth roles={TENANCY_ROLES} />}>
@@ -88,9 +85,6 @@ export default function App() {
                         <Route path="admin/audit-logs" element={<AuditTrail />} />
                         <Route path="admin/ai-evaluations" element={<AIEvaluations />} />
                         <Route path="admin/ai-evaluations/:runId" element={<AIEvaluations />} />
-                    </Route>
-                    <Route element={<RequireAuth roles={["landlord"]} />}>
-                        <Route path="managers" element={<DelegatedManagers />} />
                     </Route>
                 </Route>
             </Route>

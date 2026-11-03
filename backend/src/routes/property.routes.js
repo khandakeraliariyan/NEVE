@@ -5,15 +5,13 @@ import {
     getProperties,
     getRecentProperties,
     getMyProperties,
-    getPropertyManagers,
     getPropertyById,
     getPropertyDetail,
     updateProperty,
-    updatePropertyManagers,
     updatePropertyStatus,
 } from "../controllers/property.controller.js";
 
-import { getRentalCost } from "../controllers/rentalCost.controller.js";
+import { getPropertyCosts } from "../controllers/propertyDetail.controller.js";
 import { getNearbyPlaces } from "../controllers/neighborhood.controller.js";
 import { getNeighborhoodInsights } from "../controllers/neighborhoodInsights.controller.js";
 import { compareProperties } from "../controllers/propertyComparison.controller.js";
@@ -42,7 +40,7 @@ router.get(
 router.get(
     "/mine",
     authenticateUser,
-    allowRoles("landlord", "property_manager"),
+    allowRoles("landlord"),
     getMyProperties
 );
 
@@ -60,7 +58,7 @@ router.get(
     searchNearbyProperties
 );
 
-router.get("/:id/costs", getRentalCost);
+router.get("/:id/costs", getPropertyCosts);
 router.get("/:id/nearby", getNearbyPlaces);
 router.get("/:id/neighborhood-insights", getNeighborhoodInsights);
 router.get("/:id/detail", getPropertyDetail);
@@ -77,40 +75,26 @@ router.post(
 
 router.get("/:id", getPropertyById);
 
-// Authenticated landlord/property-manager routes
+// Authenticated landlord routes
 router.post(
     "/",
     authenticateUser,
-    allowRoles("landlord", "property_manager"),
+    allowRoles("landlord"),
     createProperty
 );
 
 router.patch(
     "/:id",
     authenticateUser,
-    allowRoles("landlord", "property_manager"),
+    allowRoles("landlord"),
     updateProperty
 );
 
 router.patch(
     "/:id/status",
     authenticateUser,
-    allowRoles("landlord", "property_manager"),
+    allowRoles("landlord"),
     updatePropertyStatus
-);
-
-router.patch(
-    "/:id/managers",
-    authenticateUser,
-    allowRoles("landlord"),
-    updatePropertyManagers
-);
-
-router.get(
-    "/:id/managers",
-    authenticateUser,
-    allowRoles("landlord"),
-    getPropertyManagers
 );
 
 export default router;

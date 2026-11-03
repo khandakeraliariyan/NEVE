@@ -160,7 +160,7 @@ export default function PropertyComparison() {
                                     <Row
                                         highlight
                                         title="Estimated move-in total"
-                                        hint="First month, advance rent, fees, deposits"
+                                        hint="First month, advance rent, deposit"
                                         cells={moveInTotals.map((v) => <strong className="text-lg">{money(v)}</strong>)}
                                         best={bestIndex(moveInTotals)}
                                         bestLabel="Lowest upfront"

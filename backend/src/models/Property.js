@@ -1,23 +1,5 @@
 import mongoose from "mongoose";
 
-const propertyManagerAssignmentSchema = new mongoose.Schema(
-    {
-        manager: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-        },
-        assignedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-        },
-        assignedAt: { type: Date, default: Date.now },
-        revokedAt: { type: Date, default: null },
-    },
-    { _id: false }
-);
-
 const propertySchema = new mongoose.Schema(
     {
         landlord: {
@@ -25,12 +7,6 @@ const propertySchema = new mongoose.Schema(
             ref: "User",
             required: true,
             index: true,
-        },
-
-        managerAssignments: {
-            type: [propertyManagerAssignmentSchema],
-            default: [],
-            select: false,
         },
 
         title: {
@@ -248,7 +224,6 @@ propertySchema.index({
 });
 
 propertySchema.index({ "address.location": "2dsphere" });
-propertySchema.index({ "managerAssignments.manager": 1, status: 1 });
 
 const Property = mongoose.model("Property", propertySchema);
 

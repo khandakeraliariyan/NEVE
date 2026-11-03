@@ -187,7 +187,7 @@ export default function Landing() {
                     </ButtonLink>
                 </Card>
                 <Card className="flex flex-col gap-3 bg-sage/60 p-8">
-                    <p className="eyebrow">For landlords & managers</p>
+                    <p className="eyebrow">For landlords</p>
                     <h3 className="text-2xl">List with clear costs and attract the right renters</h3>
                     <p className="text-sm text-muted">Publish listings with itemized costs, manage inquiries and viewings, and keep tenancy records.</p>
                     <ButtonLink to="/sign-up" variant="outline" className="mt-2 self-start bg-white">

@@ -113,20 +113,14 @@ test("condition comparison reports stages that have not been recorded", () => {
     );
 });
 
-test("assigned property managers can manage only their assigned agreement", () => {
+test("only the renter and landlord can manage an agreement", () => {
     const renter = objectId();
     const landlord = objectId();
-    const manager = objectId();
     const other = objectId();
-    const agreement = {
-        renter,
-        landlord,
-        assignedPropertyManager: manager,
-        sharedWith: [],
-    };
+    const agreement = { renter, landlord, sharedWith: [] };
 
-    assert.equal(canManageAgreement(agreement, manager, "property_manager"), true);
-    assert.equal(canManageAgreement(agreement, manager, "renter"), false);
-    assert.equal(isAgreementParticipant(agreement, manager), true);
+    assert.equal(canManageAgreement(agreement, renter), true);
+    assert.equal(canManageAgreement(agreement, landlord), true);
     assert.equal(canManageAgreement(agreement, other), false);
+    assert.equal(isAgreementParticipant(agreement, other), false);
 });

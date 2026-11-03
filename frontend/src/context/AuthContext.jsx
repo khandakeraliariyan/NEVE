@@ -77,7 +77,6 @@ export function homePathForRole(role) {
         case "renter":
             return "/renter";
         case "landlord":
-        case "property_manager":
             return "/dashboard";
         case "mediator":
         case "legal_reviewer":

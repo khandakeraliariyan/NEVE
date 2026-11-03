@@ -35,11 +35,6 @@ const LANDLORD_NAV = [
         title: "Tenants & engagement",
         items: [{ to: "/listings/viewings", label: "Viewing management" }],
     },
-    {
-        title: "Governance",
-        roles: ["landlord"],
-        items: [{ to: "/managers", label: "Delegated managers" }],
-    },
 ];
 const TENANCY_NAV = [
     {
@@ -69,8 +64,7 @@ export function workspaceNav(role) {
         case "renter":
             return [...RENTER_NAV, ...TENANCY_NAV];
         case "landlord":
-        case "property_manager":
-            return [...LANDLORD_NAV, ...TENANCY_NAV].filter((group) => !group.roles || group.roles.includes(role));
+            return [...LANDLORD_NAV, ...TENANCY_NAV];
         case "mediator":
         case "legal_reviewer":
             return [...TENANCY_NAV, ...REVIEWER_NAV];
@@ -84,7 +78,6 @@ export function workspaceNav(role) {
 export const ROLE_LABELS = {
     renter: "Renter workspace",
     landlord: "Landlord workspace",
-    property_manager: "Property manager",
     mediator: "Mediator",
     legal_reviewer: "Legal reviewer",
     admin: "Admin console",

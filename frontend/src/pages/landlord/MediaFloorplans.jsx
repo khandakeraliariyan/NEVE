@@ -19,7 +19,7 @@ export default function MediaFloorplans() {
     const [progress, setProgress] = useState(null);
     const [removing, setRemoving] = useState(null);
 
-    // Drafts aren't public, so media IDs come from the manager's own listing list.
+    // Drafts aren't public, so media IDs come from the landlord's own listing list.
     const load = useCallback(async () => {
         setError(null);
         try {
@@ -190,8 +190,8 @@ export default function MediaFloorplans() {
                 <Link to={`/listings/${id}/edit`} className="text-sm text-forest underline">
                     ← Back to listing
                 </Link>
-                <Button as={Link} to={`/listings/${id}/costs`}>
-                    Next: cost disclosure →
+                <Button as={Link} to="/listings">
+                    Done →
                 </Button>
             </div>
         </div>

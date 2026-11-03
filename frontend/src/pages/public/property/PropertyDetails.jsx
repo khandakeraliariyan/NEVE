@@ -215,7 +215,7 @@ export default function PropertyDetails() {
     const compare = useCompare();
     const detail = useApi(() => api.get(`/properties/${id}/detail`, null, { auth: false }), [id]);
     const isRenter = status === "ready" && role === "renter";
-    const canReport = status === "ready" && ["renter", "landlord", "property_manager"].includes(role);
+    const canReport = status === "ready" && ["renter", "landlord"].includes(role);
 
     // Record the view for renters (dashboard analytics and recently viewed).
     useEffect(() => {

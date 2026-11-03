@@ -3,7 +3,6 @@ import ConditionReport from "../models/ConditionReport.js";
 import MaintenanceRequest from "../models/MaintenanceRequest.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import UploadedFile from "../models/UploadedFile.js";
-import User from "../models/User.js";
 import { compareConditionReports } from "../services/conditionReport.service.js";
 import {
     buildMaintenanceSearchFilter,
@@ -21,7 +20,7 @@ const isValidId = mongoose.isValidObjectId;
 const actorId = (req) => req.neveUser._id;
 const conditions = ["excellent", "good", "fair", "poor", "damaged", "not_working"];
 const meterTypes = ["electricity", "gas", "water"];
-const responsibilities = ["renter", "landlord", "shared", "property_manager"];
+const responsibilities = ["renter", "landlord", "shared"];
 const requestStatuses = [
     "submitted",
     "acknowledged",
@@ -58,7 +57,7 @@ async function getAgreement(
     ) {
         res.status(403).json({
             success: false,
-            message: "Only agreement participants or the assigned property manager can change these records.",
+            message: "Only agreement participants can change these records.",
         });
         return null;
     }
@@ -200,82 +199,6 @@ function parseConditionEntry(body) {
         photoFileIds,
         recordKey: `meter:${meterType}`,
     };
-}
-
-export async function assignPropertyManager(req, res, next) {
-    try {
-        const agreement = await getAgreement(req, res, { participantOnly: true });
-        if (!agreement) return;
-        const { managerId = null } = req.body ?? {};
-        let auditAction = "property_manager_unassigned";
-        let auditTargetId = null;
-
-        if (managerId === null) {
-            agreement.assignedPropertyManager = null;
-            agreement.propertyManagerAssignedBy = actorId(req);
-            agreement.propertyManagerAssignedAt = new Date();
-            appendAgreementAudit(
-                agreement,
-                actorId(req),
-                "property_manager_unassigned",
-                "property_manager"
-            );
-        } else {
-            if (!isValidId(managerId)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "A valid property manager ID or null is required.",
-                });
-            }
-            const manager = await User.findOne({
-                _id: managerId,
-                role: "property_manager",
-                isActive: true,
-            }).select("_id displayName role");
-            if (!manager) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Active property manager not found.",
-                });
-            }
-
-            agreement.assignedPropertyManager = manager._id;
-            agreement.propertyManagerAssignedBy = actorId(req);
-            agreement.propertyManagerAssignedAt = new Date();
-            auditAction = "property_manager_assigned";
-            auditTargetId = manager._id;
-            appendAgreementAudit(
-                agreement,
-                actorId(req),
-                "property_manager_assigned",
-                "property_manager",
-                manager._id
-            );
-        }
-
-        await agreement.save();
-        await logAgreementEvent(
-            req,
-            agreement,
-            auditAction,
-            "property_manager",
-            auditTargetId
-        );
-        await agreement.populate(
-            "assignedPropertyManager",
-            "displayName photoURL role"
-        );
-        privateResponse(res);
-        return res.json({
-            success: true,
-            data: {
-                assignedPropertyManager: agreement.assignedPropertyManager,
-                assignedAt: agreement.propertyManagerAssignedAt,
-            },
-        });
-    } catch (error) {
-        next(error);
-    }
 }
 
 export async function createConditionReport(req, res, next) {
@@ -665,7 +588,7 @@ async function getAccessibleRequest(req, res) {
     if (!canManageAgreement(agreement, actorId(req), req.neveUser.role)) {
         res.status(403).json({
             success: false,
-            message: "Only agreement participants or the assigned property manager can update maintenance requests.",
+            message: "Only agreement participants can update maintenance requests.",
         });
         return null;
     }
@@ -791,9 +714,6 @@ export async function listMaintenanceRequests(req, res, next) {
             $or: [
                 { renter: actorId(req) },
                 { landlord: actorId(req) },
-                ...(req.neveUser.role === "property_manager"
-                    ? [{ assignedPropertyManager: actorId(req) }]
-                    : []),
                 ...(["mediator", "legal_reviewer"].includes(req.neveUser.role)
                     ? [{
                         sharedWith: {
@@ -913,13 +833,11 @@ export async function updateMaintenanceRequest(req, res, next) {
         if (
             status === "cancelled" &&
             String(request.submittedBy) !== String(actorId(req)) &&
-            String(agreement.landlord) !== String(actorId(req)) &&
-            String(agreement.assignedPropertyManager ?? "") !==
-                String(actorId(req))
+            String(agreement.landlord) !== String(actorId(req))
         ) {
             return res.status(403).json({
                 success: false,
-                message: "Only the requester or assigned property manager can cancel this request.",
+                message: "Only the requester or the landlord can cancel this request.",
             });
         }
         const actorIsRenter =
@@ -931,7 +849,7 @@ export async function updateMaintenanceRequest(req, res, next) {
         ) {
             return res.status(403).json({
                 success: false,
-                message: "Renters may dispute or cancel a request, but only the landlord or assigned manager can progress it.",
+                message: "Renters may dispute or cancel a request, but only the landlord can progress it.",
             });
         }
         if (
@@ -940,7 +858,7 @@ export async function updateMaintenanceRequest(req, res, next) {
         ) {
             return res.status(403).json({
                 success: false,
-                message: "Only the landlord or assigned manager can assign repair responsibility.",
+                message: "Only the landlord can assign repair responsibility.",
             });
         }
         const evidenceFiles = await getOwnedEvidenceFiles(

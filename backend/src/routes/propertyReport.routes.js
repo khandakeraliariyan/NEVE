@@ -16,14 +16,14 @@ router.use(authenticateUser);
 // Submit a report.
 router.post(
     "/",
-    allowRoles("renter", "landlord", "property_manager"),
+    allowRoles("renter", "landlord"),
     createPropertyReport
 );
 
 // View the authenticated user's own reports.
 router.get(
     "/my-reports",
-    allowRoles("renter", "landlord", "property_manager"),
+    allowRoles("renter", "landlord"),
     getMyPropertyReports
 );
 

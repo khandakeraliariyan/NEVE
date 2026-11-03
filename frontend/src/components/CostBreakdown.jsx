@@ -3,7 +3,6 @@ import { Badge } from "./ui";
 
 // "monthlyServiceCharge" -> "Monthly service charge"
 export function humanize(key) {
-    if (key === "additionalCostDisclosure") return "Landlord's itemized cost disclosure";
     return label(String(key).replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase());
 }
 
@@ -66,4 +65,4 @@ export function MissingList({ items = [], unknownCosts = [] }) {
 }
 
 export const COST_DISCLAIMER =
-    "These figures are estimates built from the landlord's listing and cost disclosure. They are not a quote. A total shows as unknown when any cost is missing; it is never treated as zero.";
+    "These figures are estimates built from the landlord's listed prices. They are not a quote. A total shows as unknown when any cost is missing; it is never treated as zero.";

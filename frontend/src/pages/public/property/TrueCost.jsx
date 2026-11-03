@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../../lib/api";
-import { date, money } from "../../../lib/format";
+import { money } from "../../../lib/format";
 import { useApi } from "../../../hooks/useApi";
 import { COST_DISCLAIMER, CostLine, MissingList, TotalRow } from "../../../components/CostBreakdown";
 import { Card, Disclaimer, ErrorBox, Loading } from "../../../components/ui";
@@ -48,11 +48,11 @@ export default function TrueCost() {
                 <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-forest">True cost of renting</span>
                 <h1 className="mt-4 text-4xl">Move-in and monthly cost estimate</h1>
                 <p className="mt-2 max-w-2xl text-sm text-muted">
-                    Itemized from the landlord's listing and cost disclosure for{" "}
+                    Built from the landlord's listed prices for{" "}
                     <Link to={`/properties/${property.id}`} className="font-semibold text-forest underline">
                         {property.title}
                     </Link>
-                    .{cost.additionalCosts?.updatedAt && ` Disclosure last updated ${date(cost.additionalCosts.updatedAt)}.`}
+                    .
                 </p>
             </Card>
 
@@ -90,10 +90,10 @@ export default function TrueCost() {
             </Card>
 
             <div className="mb-6 grid gap-4 md:grid-cols-3">
-                <StatCard title="Move-in cash needed" value={money(moveIn.estimatedTotal)} caption="First month's costs, advance rent, fees and deposits">
+                <StatCard title="Move-in cash needed" value={money(moveIn.estimatedTotal)} caption="First month's costs, advance rent and deposit">
                     {tenants > 1 && <p className="text-xs text-muted">Per person: {money(perPerson(moveIn.estimatedTotal))}</p>}
                 </StatCard>
-                <StatCard dark title="Monthly cost" value={money(monthly.estimatedTotal)} caption="Rent plus recurring charges and estimated utilities">
+                <StatCard dark title="Monthly cost" value={money(monthly.estimatedTotal)} caption="Rent plus service charge">
                     {tenants > 1 && <p className="text-xs text-white/70">Per person: {money(perPerson(monthly.estimatedTotal))}</p>}
                 </StatCard>
                 <StatCard title="Refundable deposits" value={money(refundable)} caption="Listed security deposit and other refundable deposits">
