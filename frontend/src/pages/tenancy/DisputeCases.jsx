@@ -70,7 +70,7 @@ function ReviewerShare({ caseData, onChange }) {
     return (
         <Card className="space-y-3 text-sm">
             <p className="eyebrow">Neutral reviewer access</p>
-            <h2 className="text-lg">Mediators & legal reviewers</h2>
+            <h2 className="text-lg">Legal reviewers</h2>
             <p className="text-muted">Sharing a case gives read-only access to this case and its selected files only, not the whole agreement.</p>
             {active.length === 0 ? (
                 <p className="text-muted">Not shared yet.</p>
@@ -237,7 +237,7 @@ export default function DisputeCases() {
             <PageHeader
                 eyebrow="Dispute support"
                 title="Dispute cases & dossiers"
-                description="Collect the records behind a disagreement and share them with a mediator or legal reviewer."
+                description="Collect the records behind a disagreement and share them with a legal reviewer."
                 actions={isParticipant && !creating && <Button onClick={() => setCreating(true)}>+ Open new case</Button>}
             />
 

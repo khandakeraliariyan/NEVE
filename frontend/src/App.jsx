@@ -38,7 +38,7 @@ import ConditionReports from "./pages/tenancy/ConditionReports";
 import Maintenance from "./pages/tenancy/Maintenance";
 import ListingClaims from "./pages/landlord/ListingClaims";
 
-const TENANCY_ROLES = ["renter", "landlord", "mediator", "legal_reviewer"];
+const TENANCY_ROLES = ["renter", "landlord", "legal_reviewer"];
 
 export default function App() {
     return (
@@ -89,7 +89,7 @@ export default function App() {
                         <Route path="agreements/:agreementId/cases" element={<DisputeCases />} />
                         <Route path="cases/:caseId" element={<CaseEvidenceReview />} />
                     </Route>
-                    <Route element={<RequireAuth roles={["mediator", "legal_reviewer"]} />}>
+                    <Route element={<RequireAuth roles={["legal_reviewer"]} />}>
                         <Route path="cases" element={<CaseQueue />} />
                     </Route>
                     <Route element={<RequireAuth roles={["admin"]} />}>

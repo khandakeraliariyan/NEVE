@@ -15,7 +15,6 @@ router.use(authenticateUser);
 router.use(allowRoles(
     "renter",
     "landlord",
-    "mediator",
     "legal_reviewer",
     "admin"
 ));

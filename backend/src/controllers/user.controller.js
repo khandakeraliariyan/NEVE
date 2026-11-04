@@ -66,7 +66,7 @@ export async function createProfile(req, res, next) {
         }
 
         // Users may only pick renter or landlord (property owner) for themselves.
-        // Staff roles (admin, mediator, ...) are never self-assigned.
+        // Staff roles (admin, legal_reviewer) are never self-assigned.
         const requestedRole = req.body.role ?? "renter";
 
         if (!SELF_SELECTABLE_ROLES.includes(requestedRole)) {

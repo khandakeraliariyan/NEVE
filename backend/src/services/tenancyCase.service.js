@@ -19,7 +19,7 @@ export function resolveTenancyCaseAccessScope({
     if (isAgreementParty) return "manage";
 
     if (
-        ["mediator", "legal_reviewer"].includes(userRole) &&
+        userRole === "legal_reviewer" &&
         (agreement ||
             tenancyCase.sharedWith.some(
                 (share) =>
@@ -81,7 +81,7 @@ export async function findCaseForUser(caseId, userId, userRole) {
         $or: [
             { renter: userId },
             { landlord: userId },
-            ...(["mediator", "legal_reviewer"].includes(userRole)
+            ...(userRole === "legal_reviewer"
                 ? [
                     {
                         sharedWith: {
@@ -109,7 +109,7 @@ export async function findCaseForUser(caseId, userId, userRole) {
 }
 
 export async function findSharedCaseForEvidenceFile(fileId, userId, userRole) {
-    if (!["mediator", "legal_reviewer"].includes(userRole)) return null;
+    if (userRole !== "legal_reviewer") return null;
 
     const file = await UploadedFile.findOne({
         _id: fileId,

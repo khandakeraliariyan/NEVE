@@ -82,7 +82,6 @@ function roleNav(role) {
             return [...RENTER_NAV, ...TENANCY_NAV];
         case "landlord":
             return [...LANDLORD_NAV, ...TENANCY_NAV];
-        case "mediator":
         case "legal_reviewer":
             return [...TENANCY_NAV, ...REVIEWER_NAV];
         case "admin":
@@ -95,7 +94,6 @@ function roleNav(role) {
 export const ROLE_LABELS = {
     renter: "Renter workspace",
     landlord: "Landlord workspace",
-    mediator: "Mediator",
     legal_reviewer: "Legal reviewer",
     admin: "Admin console",
 };

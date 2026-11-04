@@ -104,7 +104,7 @@ export default function CaseEvidenceReview() {
     const detail = useApi(() => api.get(`/tenancy/cases/${caseId}`), [caseId]);
     const [selectedId, setSelectedId] = useState(null);
     const [error, setError] = useState(null);
-    const reviewer = ["mediator", "legal_reviewer"].includes(role);
+    const reviewer = role === "legal_reviewer";
     const canManage = ["renter", "landlord"].includes(role);
 
     if (detail.loading && !detail.data) return <Loading text="Loading case…" />;

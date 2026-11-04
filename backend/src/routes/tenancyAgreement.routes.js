@@ -48,7 +48,6 @@ router.use(
     allowRoles(
         "renter",
         "landlord",
-        "mediator",
         "legal_reviewer"
     )
 );
@@ -63,7 +62,7 @@ router.post(
 );
 router.get(
     "/cases",
-    allowRoles("mediator", "legal_reviewer"),
+    allowRoles("legal_reviewer"),
     listSharedTenancyCases
 );
 router.get("/cases/:caseId", getTenancyCase);

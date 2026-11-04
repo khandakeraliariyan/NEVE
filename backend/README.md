@@ -252,10 +252,10 @@ the feature inventory previously proposed.
 | `/api/v1/tenancy` | `POST /agreements`, `GET /agreements`, `GET /agreements/:agreementId`, `PATCH /agreements/:agreementId/status` | Inquiry-linked agreement records; accessible to participants, assigned managers, or explicitly shared reviewers |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses`, `POST /agreements/:agreementId/obligations`, `PATCH /agreements/:agreementId/obligations/:obligationId`, `POST /agreements/:agreementId/payments`, `PATCH /agreements/:agreementId/payments/:paymentId` | Manual clause annotations, obligations, and BDT payment/receipt records |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph`, `GET /agreements/:agreementId/evidence-report` | Traceable evidence graph and downloadable JSON report; access follows agreement permissions |
-| `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a mediator or legal reviewer |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a legal reviewer |
 | `/api/v1/tenancy` | `GET /agreements/:agreementId/cases`, `POST /agreements/:agreementId/cases`, `GET /cases/:caseId`, `POST /cases/:caseId/evidence`, `DELETE /cases/:caseId/evidence/:fileId`, `PATCH /cases/:caseId/status` | Private dispute cases with agreement-linked evidence; participants manage cases, assigned reviewers have read-only scope |
-| `/api/v1/tenancy` | `GET /cases?status=&page=&limit=` | Mediator/legal reviewer list of cases shared directly with them; removed evidence and other shares are omitted |
-| `/api/v1/tenancy` | `POST /cases/:caseId/shares`, `DELETE /cases/:caseId/shares/:userId` | Participants share/revoke a case and its selected evidence with a mediator or legal reviewer |
+| `/api/v1/tenancy` | `GET /cases?status=&page=&limit=` | Legal reviewer list of cases shared directly with them; removed evidence and other shares are omitted |
+| `/api/v1/tenancy` | `POST /cases/:caseId/shares`, `DELETE /cases/:caseId/shares/:userId` | Participants share/revoke a case and its selected evidence with a legal reviewer |
 | `/api/v1/tenancy` | `PATCH /agreements/:agreementId/property-manager` | Participants assign or unassign an active property manager for that agreement |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/condition-reports/:stage`, `POST /agreements/:agreementId/condition-reports/:reportId/entries`, `GET /agreements/:agreementId/condition-reports`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/reviews`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/corrections`, `GET /agreements/:agreementId/condition-comparison` | Room condition and utility-meter move-in/out records, participant review, preserved corrections, and comparison |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/maintenance-requests`, `GET /maintenance-requests?q=...`, `PATCH /maintenance-requests/:requestId/progress` | Authorized repair history search across request details and progress messages; responsibilities, status, and private evidence |
@@ -446,7 +446,7 @@ not perform OCR, extraction, legal interpretation, signature verification,
 payment verification, or liability determinations.
 
 Agreement documents are shared with the inquiry participants. Participants
-may grant or revoke read-only access for an active mediator or legal reviewer
+may grant or revoke read-only access for an active legal reviewer
 on that agreement only. Private download URLs are short-lived; access requests
 and agreement changes append actor/action records to a bounded 100-event
 agreement audit trail and the separate sensitive-access log. Agreement
@@ -479,7 +479,7 @@ optional user-authored annotation, not model-generated legal guidance.
 
 Participants can create a dispute case with `POST
 /api/v1/tenancy/agreements/:agreementId/cases`, attach files already linked to
-that agreement, and share the case with an active mediator or legal reviewer.
+that agreement, and share the case with an active legal reviewer.
 Sharing notifies the reviewer in-app, and the response reports
 `notificationStatus`. Case-only reviewers can find shared cases with
 `GET /api/v1/tenancy/cases`, view them, and request short-lived access URLs for
@@ -590,7 +590,7 @@ to an agreement through
 `{"managerId": null}` to unassign it. Assignment and removal are audit-logged.
 An assigned manager can access that agreement's records, update obligation
 status/notes, create and review condition entries, manage maintenance
-progress, and access attached evidence. Mediators and legal reviewers retain
+progress, and access attached evidence. Legal reviewers retain
 read-only access when explicitly shared. Managers can also manage their own
 listings and can manage another landlord's listing only after the landlord
 assigns them with `PATCH /api/v1/properties/:propertyId/managers` using

@@ -67,7 +67,7 @@ export async function listTenancyCases(req, res, next) {
             $or: [
                 { renter: req.neveUser._id },
                 { landlord: req.neveUser._id },
-                ...(["mediator", "legal_reviewer"].includes(req.neveUser.role)
+                ...(req.neveUser.role === "legal_reviewer"
                     ? [{
                         sharedWith: {
                             $elemMatch: {
@@ -435,13 +435,13 @@ export async function shareTenancyCase(req, res, next) {
         }
         const reviewer = await User.findOne({
             _id: userId,
-            role: { $in: ["mediator", "legal_reviewer"] },
+            role: "legal_reviewer",
             isActive: true,
         }).select("_id");
         if (!reviewer) {
             return res.status(404).json({
                 success: false,
-                message: "Active mediator or legal reviewer not found.",
+                message: "Active legal reviewer not found.",
             });
         }
         if (isParticipant(agreement, reviewer._id)) {
