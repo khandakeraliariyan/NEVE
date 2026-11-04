@@ -1,6 +1,13 @@
 import User from "../models/User.js";
 import Property from "../models/Property.js";
 import { buildUserLookupFilter } from "../services/userLookup.service.js";
+import { isAdminSessionAllowed } from "../middleware/role.middleware.js";
+
+const ADMIN_SIGN_IN_REQUIRED = {
+    success: false,
+    code: "ADMIN_PASSWORD_SIGN_IN_REQUIRED",
+    message: "Admins must sign in through the admin portal with email and password.",
+};
 
 const SELF_SELECTABLE_ROLES = ["renter", "landlord"];
 
@@ -124,6 +131,9 @@ export async function getMyProfile(req, res, next) {
                 message: "Profile not found. Create your profile first.",
             });
         }
+        if (!isAdminSessionAllowed(user.role, req.user.signInProvider)) {
+            return res.status(403).json(ADMIN_SIGN_IN_REQUIRED);
+        }
 
         return res.status(200).json({
             success: true,
@@ -147,6 +157,9 @@ export async function updateMyProfile(req, res, next) {
                 success: false,
                 message: "Profile not found. Create your profile first.",
             });
+        }
+        if (!isAdminSessionAllowed(user.role, req.user.signInProvider)) {
+            return res.status(403).json(ADMIN_SIGN_IN_REQUIRED);
         }
 
         const body = req.body ?? {};

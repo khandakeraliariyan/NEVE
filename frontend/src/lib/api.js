@@ -4,10 +4,11 @@ export const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api/v1";
 
 export class ApiError extends Error {
-    constructor(status, message, errors = []) {
+    constructor(status, message, errors = [], code = null) {
         super(message);
         this.status = status;
         this.errors = errors;
+        this.code = code;
     }
 }
 
@@ -58,7 +59,7 @@ export async function apiRequest(path, { method = "GET", body, params, auth: nee
             FRIENDLY[response.status] ??
             payload?.message ??
             `Request failed (${response.status}).`;
-        throw new ApiError(response.status, message, payload?.errors ?? []);
+        throw new ApiError(response.status, message, payload?.errors ?? [], payload?.code ?? null);
     }
 
     return payload;

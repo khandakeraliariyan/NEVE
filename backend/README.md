@@ -719,8 +719,15 @@ specific shapes and pagination logic.
 These are known issues in the source at the time this README was written:
 
 1. **Role assignment:** users choose renter or landlord themselves, and admins
-   appoint legal reviewers through `/api/v1/admin/users`. Admin accounts and an
-   account's active state still require a direct database edit.
+   appoint legal reviewers through `/api/v1/admin/users`. Admin accounts are
+   created with `npm run create-admin -- --email <email> --name "<name>"`
+   (password from `NEVE_ADMIN_PASSWORD` or a prompt; add `--promote` to convert
+   an existing profile). An account's active state still requires a direct
+   database edit.
+   Admins sign in only at the frontend's `/admin/sign-in` portal with email and
+   password. The API refuses any admin session whose Firebase sign-in provider
+   isn't `password` (error code `ADMIN_PASSWORD_SIGN_IN_REQUIRED`), so Google
+   sign-in never grants admin access.
 2. **Profile editing:** users can create and read a profile, but no endpoint
    updates the name, photo, or phone number.
 3. **Inquiry status flows:** `PATCH /api/v1/inquiries/:inquiryId/respond` accepts

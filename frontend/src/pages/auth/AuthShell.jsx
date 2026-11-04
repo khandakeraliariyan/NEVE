@@ -4,7 +4,7 @@ import Logo from "../../components/Logo";
 import { auth, firebaseConfigured } from "../../lib/firebase";
 import { Button } from "../../components/ui";
 
-export default function AuthShell({ title, subtitle, children }) {
+export default function AuthShell({ title, subtitle, eyebrow, children }) {
     return (
         <div className="flex min-h-screen items-center justify-center px-4 py-12">
             <div className="w-full max-w-md">
@@ -12,6 +12,7 @@ export default function AuthShell({ title, subtitle, children }) {
                     <Logo />
                 </div>
                 <div className="rounded-2xl border border-line bg-panel p-8 shadow-sm">
+                    {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
                     <h1 className="text-2xl">{title}</h1>
                     {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
                     {!firebaseConfigured && (
