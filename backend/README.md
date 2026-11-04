@@ -26,7 +26,7 @@ frontend work.
 | 1 | **Neve Discover — Rental Marketplace** | **Mostly implemented** | Listing search/filtering, recent listings, favorites, comparisons, saved searches and alerts, and suspicious/inaccurate listing reports. List/map view switching is frontend behavior. |
 | 2 | **Neve Property Intelligence** | **Mostly implemented** | Listing details and media, cost disclosures, landlord/manager profiles, inquiries, and viewing requests. Identity and property-ownership verification are not implemented. |
 | 3 | **Neve Neighborhood Intelligence** | **Partial** | OpenStreetMap nearby places, categories, caching, source/freshness metadata, and straight-line distances. No walking/driving routes or travel times; interactive maps are frontend behavior. |
-| 4 | **Neve True Cost of Renting** | **Implemented** | Upfront and monthly estimates, itemized charges, assumptions, and supplied/calculated/estimated labels, including explicit unknowns. |
+| 4 | **Neve True Cost of Renting** | **Implemented** | Upfront and monthly estimates; rent, service charge, utilities (included, fixed, estimated, or undisclosed) and other one-time or monthly fees; landlord-provided/landlord-estimate/calculated labels; assumptions; and explicit unknowns. An undisclosed utility makes the total unknown rather than zero. |
 | 5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate and consistency heuristics, renter reports, human review, and reviewed public summaries. Signals are not verification or fraud findings; identity/ownership checks are absent. |
 | 6 | **Neve Smart Choice — Explainable Property Matching** | **Partial** | Deterministic preference matching with scores, reasons, shortfalls, missing-data indicators, and saved-search alerts. This is not AI and does not include every planned preference, such as commute destinations or walking distance. |
 | 7 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewings, availability workflows, in-app notifications, saved-search alerts, and suspicious-message reporting. Email/push alerts are absent; inquiries have two separate status flows, and viewings can't yet be marked completed. |
@@ -174,22 +174,6 @@ It returns a JSON success response when the app is running. Run the backend test
 ```sh
 npm test
 ```
-
-Run the evaluation suites (versioned datasets in `eval/datasets/`):
-
-```sh
-npm run eval                                   # offline suites
-npm run eval -- --suite duplicates             # one suite
-npm run eval -- --live                         # adds paid Claude extraction cases
-npm run eval -- --save --admin-email <email>   # also stores AIEvaluationRun records
-```
-
-Regression suites (cost, distance, matching, evidence conflicts) must match
-their hand-labelled ground truth; a failure that isn't a documented known gap
-exits with code 1, and `npm test` enforces the same check. Quality suites
-(duplicate listings, listing consistency, agreement extraction) are measured
-and reported, including false-positive rates, but not gated. Full results are
-written to `eval/results/` (not committed).
 
 To check whether the Express app's modules can be loaded:
 

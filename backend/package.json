@@ -7,8 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "node --test",
-    "create-admin": "node scripts/createAdmin.js",
-    "eval": "node eval/run.js"
+    "create-admin": "node scripts/createAdmin.js"
   },
   "keywords": [],
   "type": "module",
