@@ -113,8 +113,9 @@ export default function WorkspaceLayout() {
                         <button
                             type="button"
                             onClick={async () => {
+                                const wasAdmin = role === "admin";
                                 await signOut();
-                                navigate("/");
+                                navigate(wasAdmin ? "/admin/sign-in" : "/");
                             }}
                             className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:bg-sage"
                         >

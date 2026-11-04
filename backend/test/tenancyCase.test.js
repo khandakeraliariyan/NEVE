@@ -35,14 +35,14 @@ test("tenancy case rejects unsupported statuses", () => {
 test("case access distinguishes participants, shared reviewers, and revoked shares", () => {
     const renter = objectId();
     const outsider = objectId();
-    const mediator = objectId();
+    const reviewer = objectId();
     const agreement = {
         renter,
         landlord: objectId(),
     };
     const tenancyCase = {
         sharedWith: [
-            { user: mediator, revokedAt: null },
+            { user: reviewer, revokedAt: null },
             { user: objectId(), revokedAt: new Date() },
         ],
     };
@@ -69,8 +69,8 @@ test("case access distinguishes participants, shared reviewers, and revoked shar
         resolveTenancyCaseAccessScope({
             tenancyCase,
             agreement: null,
-            userId: mediator,
-            userRole: "mediator",
+            userId: reviewer,
+            userRole: "legal_reviewer",
         }),
         "read_only"
     );

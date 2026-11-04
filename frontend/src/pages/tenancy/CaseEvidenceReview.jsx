@@ -98,13 +98,125 @@ function AddEvidence({ agreementId, caseId, current, onDone }) {
     );
 }
 
+const ENTRY_KINDS = {
+    note: { title: "Note", tone: "gray" },
+    question: { title: "Question for the parties", tone: "amber" },
+    opinion: { title: "Written opinion", tone: "dark" },
+    response: { title: "Reply", tone: "green" },
+};
+
+function ReviewDiscussion({ caseId, entries, reviewer, canReply, closed, onPosted }) {
+    const [kind, setKind] = useState(reviewer ? "note" : "response");
+    const [body, setBody] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const canPost = (reviewer || canReply) && !closed;
+
+    async function submit(e) {
+        e.preventDefault();
+        if (kind === "opinion" && !window.confirm("Post this as your written opinion? Both parties will see it, and entries can't be edited or deleted.")) return;
+        setBusy(true);
+        setError(null);
+        try {
+            await api.post(`/tenancy/cases/${caseId}/review-entries`, { kind, body });
+            setBody("");
+            onPosted();
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <Card className="mt-6 space-y-4">
+            <div>
+                <p className="eyebrow">Independent review</p>
+                <h2 className="text-xl">Review discussion</h2>
+                <p className="text-sm text-muted">
+                    Visible to both parties and every reviewer on this case. Entries can't be edited or deleted.
+                </p>
+            </div>
+
+            {entries.length === 0 && (
+                <p className="text-sm text-muted">
+                    {reviewer ? "No entries yet. Start with a note or a question for the parties." : "No reviewer has posted yet."}
+                </p>
+            )}
+            <ol className="space-y-3">
+                {entries.map((entry) => {
+                    const meta = ENTRY_KINDS[entry.kind] ?? ENTRY_KINDS.note;
+                    return (
+                        <li
+                            key={entry._id}
+                            className={`rounded-xl border p-4 text-sm ${entry.kind === "opinion" ? "border-forest bg-sage/40" : "border-line bg-panel"}`}
+                        >
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <Badge tone={meta.tone}>{meta.title}</Badge>
+                                <span className="font-semibold">{entry.author?.displayName ?? "Former participant"}</span>
+                                <span className="text-xs text-muted">
+                                    {label(entry.authorRole)} · {dateTime(entry.createdAt)}
+                                </span>
+                            </div>
+                            <p className="whitespace-pre-line">{entry.body}</p>
+                        </li>
+                    );
+                })}
+            </ol>
+
+            {closed && <p className="text-sm text-muted">This case is closed, so the discussion is read-only.</p>}
+            {canPost && (
+                <form className="space-y-3 border-t border-line pt-4" onSubmit={submit}>
+                    {reviewer && (
+                        <div className="flex flex-wrap gap-1 rounded-xl bg-mist p-1 text-sm">
+                            {["note", "question", "opinion"].map((k) => (
+                                <button
+                                    key={k}
+                                    type="button"
+                                    onClick={() => setKind(k)}
+                                    className={`rounded-lg px-3 py-1 ${kind === k ? "bg-forest text-white" : "text-muted"}`}
+                                >
+                                    {ENTRY_KINDS[k].title}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    <textarea
+                        required
+                        maxLength={4000}
+                        className="field min-h-28"
+                        placeholder={
+                            kind === "opinion"
+                                ? "Your view on the dispute, based on the evidence shared, and what you recommend."
+                                : kind === "question"
+                                    ? "What do you need the parties to clarify or provide?"
+                                    : reviewer
+                                        ? "Observations about the evidence."
+                                        : "Answer the reviewer, or add context."
+                        }
+                        value={body}
+                        onChange={(e) => setBody(e.target.value)}
+                    />
+                    <ErrorBox error={error} />
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted">{body.length}/4000</span>
+                        <Button type="submit" disabled={busy || !body.trim()}>
+                            {busy ? "Posting…" : kind === "opinion" ? "Post opinion" : reviewer ? "Post" : "Post reply"}
+                        </Button>
+                    </div>
+                </form>
+            )}
+        </Card>
+    );
+}
+
 export default function CaseEvidenceReview() {
     const { caseId } = useParams();
     const { role } = useAuth();
     const detail = useApi(() => api.get(`/tenancy/cases/${caseId}`), [caseId]);
     const [selectedId, setSelectedId] = useState(null);
     const [error, setError] = useState(null);
-    const reviewer = ["mediator", "legal_reviewer"].includes(role);
+    const reviewer = role === "legal_reviewer";
     const canManage = ["renter", "landlord"].includes(role);
 
     if (detail.loading && !detail.data) return <Loading text="Loading case…" />;
@@ -142,7 +254,7 @@ export default function CaseEvidenceReview() {
                     <div className="mb-2 flex gap-2">
                         <Badge tone="dark">Evidence review</Badge>
                         <StatusBadge status={c.status} />
-                        {reviewer && <Badge tone="amber">Read-only</Badge>}
+                        {reviewer && <Badge tone="amber">Evidence is read-only</Badge>}
                     </div>
                     <h1 className="text-3xl">{c.title}</h1>
                     <p className="mt-1 text-sm text-muted">
@@ -198,10 +310,18 @@ export default function CaseEvidenceReview() {
                     </Card>
                     {canManage && <AddEvidence agreementId={c.agreement} caseId={c._id} current={current.map((e) => String(e.file?._id))} onDone={detail.reload} />}
                     <Disclaimer title="Review aid only">
-                        Files are shown as the parties uploaded them. Neve doesn't verify, score or rule on evidence, and nothing here is a determination.
+                        Files are shown as the parties uploaded them. Neve doesn't verify, score or rule on evidence. A reviewer's opinion is their own independent view, not a ruling by Neve.
                     </Disclaimer>
                 </aside>
             </div>
+            <ReviewDiscussion
+                caseId={c._id}
+                entries={c.reviewEntries ?? []}
+                reviewer={reviewer}
+                canReply={canManage}
+                closed={c.status === "closed"}
+                onPosted={detail.reload}
+            />
         </div>
     );
 }

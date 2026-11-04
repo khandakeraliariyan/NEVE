@@ -41,7 +41,7 @@ depends on new backend work.
 | Renter | 7 | Renter |
 | Shared signed-in | 5 | Varies by page |
 | Landlord and property manager | 7 | Landlord, property manager |
-| Tenancy and disputes | 8 | Renter, landlord, property manager, mediator, legal reviewer |
+| Tenancy and disputes | 8 | Renter, landlord, property manager, legal reviewer |
 | Admin | 12 | Admin |
 | System | 2 | Everyone |
 | **Total** | **49** | |
@@ -53,7 +53,7 @@ depends on new backend work.
 | **Renter** | Public, renter, shared, tenancy |
 | **Landlord** | Public, landlord, shared, tenancy |
 | **Property manager** | Public, landlord (except Listing claims), shared (except Message thread), and tenancy for agreements they are assigned to |
-| **Mediator / legal reviewer** | Notifications, Account, Privacy and data, and read-only tenancy pages for what is shared with them |
+| **Legal reviewer** | Notifications, Account, Privacy and data, and read-only tenancy pages for what is shared with them |
 | **Admin** | Public, admin, Notifications, Account, Privacy and data. Admins have **no access** to tenancy pages, by design |
 
 ### Suggested landing page after sign-in
@@ -62,7 +62,7 @@ depends on new backend work.
 |---|---|
 | Renter | `/recommendations` |
 | Landlord, property manager | `/dashboard` |
-| Mediator, legal reviewer | `/agreements` |
+| Legal reviewer | `/agreements` |
 | Admin | `/admin` |
 
 ---
@@ -613,7 +613,7 @@ All pages must hide edit controls for read-only users. The API also refuses thos
 List with title, property, other party, status and dates. Statuses are `draft`, `shared`,
 `under_review`, `disputed`, `archived`. Page size can go up to 100.
 
-Mediators and legal reviewers also get a **Shared cases** tab, because a case can be shared
+Legal reviewers also get a **Shared cases** tab, because a case can be shared
 without its agreement. Filter it by status.
 
 **API:** `GET /tenancy/agreements?page=&limit=`, `GET /tenancy/cases?status=&page=&limit=`
@@ -747,7 +747,7 @@ so don't design one.
 
 - Title, summary and status: `open`, `resolved`, `closed`
 - Selected evidence, with add and remove. Removal history is kept
-- Share or revoke access for a mediator or legal reviewer
+- Share or revoke access for a legal reviewer
 - Reviewers get a read-only view of this case and its selected files
 
 **API:** `GET /tenancy/cases/:caseId`, `POST /tenancy/cases/:caseId/evidence`, with `{ fileId }`,

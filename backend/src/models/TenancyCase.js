@@ -46,6 +46,38 @@ const caseShareSchema = new mongoose.Schema(
     { _id: false }
 );
 
+// Review discussion: reviewers post notes, questions, and written opinions;
+// the parties reply. Entries are append-only so the record can't be rewritten.
+export const REVIEWER_ENTRY_KINDS = ["note", "question", "opinion"];
+export const PARTY_ENTRY_KINDS = ["response"];
+
+const caseReviewEntrySchema = new mongoose.Schema(
+    {
+        author: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+        authorRole: {
+            type: String,
+            enum: ["renter", "landlord", "legal_reviewer"],
+            required: true,
+        },
+        kind: {
+            type: String,
+            enum: [...REVIEWER_ENTRY_KINDS, ...PARTY_ENTRY_KINDS],
+            required: true,
+        },
+        body: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: 4000,
+        },
+        createdAt: { type: Date, default: Date.now },
+    }
+);
+
 const tenancyCaseSchema = new mongoose.Schema(
     {
         agreement: {
@@ -79,6 +111,7 @@ const tenancyCaseSchema = new mongoose.Schema(
         },
         evidence: { type: [caseEvidenceSchema], default: [] },
         sharedWith: { type: [caseShareSchema], default: [] },
+        reviewEntries: { type: [caseReviewEntrySchema], default: [] },
     },
     { timestamps: true }
 );

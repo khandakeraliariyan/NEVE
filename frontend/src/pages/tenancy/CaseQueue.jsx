@@ -3,9 +3,19 @@ import { api } from "../../lib/api";
 import { dateTime, label, relativeTime } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { useAuth } from "../../context/AuthContext";
-import { ButtonLink, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, Pagination, Stat, StatusBadge } from "../../components/ui";
+import { Badge, ButtonLink, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, Pagination, Stat, StatusBadge } from "../../components/ui";
 
 const PAGE_SIZE = 10;
+// Where this reviewer stands on a case, from entry metadata in the list.
+function reviewProgress(c, myId) {
+    const mine = (c.reviewEntries ?? []).filter((e) => String(e.author) === String(myId));
+    if (mine.some((e) => e.kind === "opinion")) return { text: "Opinion given", tone: "green" };
+    const last = (c.reviewEntries ?? []).at(-1);
+    if (last?.kind === "response" && mine.length > 0) return { text: "Parties replied", tone: "amber" };
+    if (mine.length > 0) return { text: "In review", tone: "gray" };
+    return { text: "Not started", tone: "amber" };
+}
+
 const STATUSES = [
     ["", "All cases"],
     ["open", "Open"],
@@ -28,7 +38,7 @@ export default function CaseQueue() {
             <PageHeader
                 eyebrow="Shared with you"
                 title="Case queue"
-                description="Dispute cases that renters and landlords have shared with you for independent review. Access is read-only."
+                description="Dispute cases that renters and landlords have shared with you for independent review. Read the evidence, ask the parties questions, and post your written opinion."
             />
 
             <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -72,7 +82,10 @@ export default function CaseQueue() {
                                         <p className="eyebrow">Case #{String(c._id).slice(-6).toUpperCase()}</p>
                                         <h2 className="text-xl">{c.title}</h2>
                                     </div>
-                                    <StatusBadge status={c.status} />
+                                    <div className="flex gap-2">
+                                        <Badge tone={reviewProgress(c, profile?._id).tone}>{reviewProgress(c, profile?._id).text}</Badge>
+                                        <StatusBadge status={c.status} />
+                                    </div>
                                 </div>
                                 <div className="rounded-xl bg-mist p-3 text-sm">
                                     <p className="eyebrow mb-1">Matter summary</p>
@@ -107,7 +120,7 @@ export default function CaseQueue() {
                                 <p className="text-xs text-muted">{label(role)}</p>
                             </div>
                         </div>
-                        <p className="text-muted">You can view each shared case and its selected files. You can't edit records or see the rest of the agreement.</p>
+                        <p className="text-muted">You can view each shared case and its selected files, and post notes, questions and a written opinion that both parties see. You can't change the evidence or the case status.</p>
                     </Card>
                     <Disclaimer title="Access is logged">Opening a case or a file is recorded in the sensitive-access log. Access ends when a party revokes it.</Disclaimer>
                 </aside>

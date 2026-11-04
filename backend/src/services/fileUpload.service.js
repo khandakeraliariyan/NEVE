@@ -101,6 +101,18 @@ export async function createDownloadUrl(storageKey) {
     });
 }
 
+export async function readStoredObject(storageKey) {
+    const { client, bucket } = requireR2();
+    const response = await client.send(
+        new GetObjectCommand({
+            Bucket: bucket,
+            Key: storageKey,
+        })
+    );
+
+    return Buffer.from(await response.Body.transformToByteArray());
+}
+
 export async function deleteStoredObject(storageKey) {
     const { client, bucket } = requireR2();
     return client.send(

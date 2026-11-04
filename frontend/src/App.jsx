@@ -3,6 +3,7 @@ import PublicLayout from "./components/PublicLayout";
 import WorkspaceLayout from "./components/WorkspaceLayout";
 import RequireAuth from "./components/RequireAuth";
 import SignIn from "./pages/auth/SignIn";
+import AdminSignIn from "./pages/auth/AdminSignIn";
 import SignUp from "./pages/auth/SignUp";
 import CompleteProfile from "./pages/auth/CompleteProfile";
 import NotFound from "./pages/NotFound";
@@ -37,13 +38,15 @@ import Inquiries from "./pages/shared/Inquiries";
 import ConditionReports from "./pages/tenancy/ConditionReports";
 import Maintenance from "./pages/tenancy/Maintenance";
 import ListingClaims from "./pages/landlord/ListingClaims";
+import LegalReviewers from "./pages/admin/LegalReviewers";
 
-const TENANCY_ROLES = ["renter", "landlord", "mediator", "legal_reviewer"];
+const TENANCY_ROLES = ["renter", "landlord", "legal_reviewer"];
 
 export default function App() {
     return (
         <Routes>
             <Route path="/sign-in" element={<SignIn />} />
+            <Route path="/admin/sign-in" element={<AdminSignIn />} />
             <Route path="/sign-up" element={<SignUp />} />
             <Route path="/complete-profile" element={<CompleteProfile />} />
 
@@ -89,12 +92,13 @@ export default function App() {
                         <Route path="agreements/:agreementId/cases" element={<DisputeCases />} />
                         <Route path="cases/:caseId" element={<CaseEvidenceReview />} />
                     </Route>
-                    <Route element={<RequireAuth roles={["mediator", "legal_reviewer"]} />}>
+                    <Route element={<RequireAuth roles={["legal_reviewer"]} />}>
                         <Route path="cases" element={<CaseQueue />} />
                     </Route>
-                    <Route element={<RequireAuth roles={["admin"]} />}>
+                    <Route element={<RequireAuth roles={["admin"]} signInPath="/admin/sign-in" />}>
                         <Route path="admin" element={<PlatformHealth />} />
                         <Route path="admin/audit-logs" element={<AuditTrail />} />
+                        <Route path="admin/reviewers" element={<LegalReviewers />} />
                         <Route path="admin/ai-evaluations" element={<AIEvaluations />} />
                         <Route path="admin/ai-evaluations/:runId" element={<AIEvaluations />} />
                     </Route>

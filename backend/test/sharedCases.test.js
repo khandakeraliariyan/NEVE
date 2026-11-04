@@ -102,7 +102,7 @@ test("shared case list hides removed evidence and logs each case", async (t) => 
     );
 
     assert.equal(nextError, undefined);
-    assert.equal(selected, "-sharedWith");
+    assert.equal(selected, "-sharedWith -reviewEntries.body");
     assert.equal(res.headers["Cache-Control"], "private, no-store");
     assert.equal(res.body.pagination.total, 1);
     assert.deepEqual(

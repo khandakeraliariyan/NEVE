@@ -43,6 +43,9 @@ const getImageMatches = (firstImages = [], secondImages = []) => {
     return secondImages.filter((image) => image && first.has(String(image)));
 };
 
+// Pairs scoring at or above this are listed for manual review.
+export const DUPLICATE_REVIEW_THRESHOLD = 40;
+
 export const getDuplicateSignals = (
     first,
     second,
@@ -273,7 +276,7 @@ export const findPotentialDuplicates = async (propertyId) => {
                 matchingImageCount: comparison.matchingImageCount,
             };
         })
-        .filter((result) => result.similarityScore >= 40)
+        .filter((result) => result.similarityScore >= DUPLICATE_REVIEW_THRESHOLD)
         .sort((a, b) => b.similarityScore - a.similarityScore);
 
     return {

@@ -9,6 +9,7 @@ import {
     buildSharedCaseFilter,
     findCaseForUser,
     isEvidenceForAgreement,
+    validateCaseReviewEntry,
 } from "../services/tenancyCase.service.js";
 
 const setPrivateResponse = (res) => res.set("Cache-Control", "private, no-store");
@@ -67,7 +68,7 @@ export async function listTenancyCases(req, res, next) {
             $or: [
                 { renter: req.neveUser._id },
                 { landlord: req.neveUser._id },
-                ...(["mediator", "legal_reviewer"].includes(req.neveUser.role)
+                ...(req.neveUser.role === "legal_reviewer"
                     ? [{
                         sharedWith: {
                             $elemMatch: {
@@ -89,7 +90,7 @@ export async function listTenancyCases(req, res, next) {
         const filter = { agreement: agreement._id };
         const [cases, total] = await Promise.all([
             TenancyCase.find(filter)
-                .select("-sharedWith")
+                .select("-sharedWith -reviewEntries.body")
                 .populate("createdBy", "displayName role")
                 .populate(
                     "evidence.file",
@@ -158,7 +159,7 @@ export async function listSharedTenancyCases(req, res, next) {
 
         const [cases, total] = await Promise.all([
             TenancyCase.find(filter)
-                .select("-sharedWith")
+                .select("-sharedWith -reviewEntries.body")
                 .populate("createdBy", "displayName role")
                 .populate(
                     "evidence.file",
@@ -269,6 +270,7 @@ export async function getTenancyCase(req, res, next) {
         const populated = await TenancyCase.findById(tenancyCase._id)
             .populate("evidence.file", "originalName mimeType sizeBytes status")
             .populate("createdBy", "displayName role")
+            .populate("reviewEntries.author", "displayName role")
             .lean();
         await recordSensitiveAccess({
             actor: req.neveUser._id,
@@ -435,13 +437,13 @@ export async function shareTenancyCase(req, res, next) {
         }
         const reviewer = await User.findOne({
             _id: userId,
-            role: { $in: ["mediator", "legal_reviewer"] },
+            role: "legal_reviewer",
             isActive: true,
         }).select("_id");
         if (!reviewer) {
             return res.status(404).json({
                 success: false,
-                message: "Active mediator or legal reviewer not found.",
+                message: "Active legal reviewer not found.",
             });
         }
         if (isParticipant(agreement, reviewer._id)) {
@@ -552,6 +554,127 @@ export async function revokeTenancyCaseShare(req, res, next) {
         });
         setPrivateResponse(res);
         return res.json({ success: true, message: "Case access revoked." });
+    } catch (error) {
+        next(error);
+    }
+}
+
+const REVIEW_ENTRY_TITLES = {
+    note: "A reviewer added a note to a tenancy case",
+    question: "A reviewer asked a question on a tenancy case",
+    opinion: "A reviewer gave a written opinion on a tenancy case",
+    response: "A party replied on a tenancy case you are reviewing",
+};
+
+// Who should hear about a new entry: the parties when a reviewer posts, and
+// reviewers with live access when a party posts. Never the author.
+async function reviewEntryRecipients(tenancyCase, authorId, authorIsReviewer) {
+    const agreement = await TenancyAgreement.findById(tenancyCase.agreement)
+        .select("renter landlord sharedWith")
+        .lean();
+    const ids = new Set();
+    if (authorIsReviewer) {
+        if (agreement) {
+            ids.add(String(agreement.renter));
+            ids.add(String(agreement.landlord));
+        }
+    } else {
+        const activeShares = [
+            ...tenancyCase.sharedWith,
+            ...(agreement?.sharedWith ?? []),
+        ].filter((share) => share.revokedAt === null);
+        activeShares.forEach((share) => ids.add(String(share.user)));
+    }
+    ids.delete(String(authorId));
+    if (authorIsReviewer || ids.size === 0) return [...ids];
+
+    // Only reviewers who are still active staff hear about party replies.
+    const reviewers = await User.find({
+        _id: { $in: [...ids] },
+        role: "legal_reviewer",
+        isActive: true,
+    }).select("_id").lean();
+    return reviewers.map((user) => String(user._id));
+}
+
+export async function addCaseReviewEntry(req, res, next) {
+    try {
+        const result = await getCase(req, res);
+        if (!result) return;
+        const { tenancyCase, agreement, isSharedReviewer } = result;
+        if (!isSharedReviewer && !isParticipant(agreement, req.neveUser._id)) {
+            return res.status(403).json({
+                success: false,
+                message: "Only shared reviewers and agreement participants can post here.",
+            });
+        }
+
+        const { value, error, status } = validateCaseReviewEntry({
+            kind: req.body?.kind,
+            body: req.body?.body,
+            isReviewer: isSharedReviewer,
+            caseStatus: tenancyCase.status,
+        });
+        if (error) {
+            return res.status(status).json({ success: false, message: error });
+        }
+
+        tenancyCase.reviewEntries.push({
+            author: req.neveUser._id,
+            authorRole: req.neveUser.role,
+            kind: value.kind,
+            body: value.body,
+        });
+        await tenancyCase.save();
+        const entry = tenancyCase.reviewEntries.at(-1);
+        await recordSensitiveAccess({
+            actor: req.neveUser._id,
+            action: "case_review_entry_added",
+            resourceType: "case",
+            resourceId: tenancyCase._id,
+            agreement: tenancyCase.agreement,
+            details: { entryId: String(entry._id), kind: value.kind },
+            outcome: "completed",
+            ipAddress: req.ip,
+        });
+
+        // Keep the entry text out of notifications, as they outlive access.
+        let notificationStatus = "created";
+        try {
+            const recipients = await reviewEntryRecipients(
+                tenancyCase,
+                req.neveUser._id,
+                isSharedReviewer
+            );
+            await Promise.all(
+                recipients.map((recipient) =>
+                    createNotification({
+                        recipient,
+                        type: "tenancy_case_review_activity",
+                        title: REVIEW_ENTRY_TITLES[value.kind],
+                        message: "Open the case to read the new entry.",
+                        relatedCase: tenancyCase._id,
+                    })
+                )
+            );
+        } catch (notifyError) {
+            console.error("Create case review notification error:", notifyError);
+            notificationStatus = "failed";
+        }
+
+        setPrivateResponse(res);
+        return res.status(201).json({
+            success: true,
+            data: {
+                ...entry.toObject(),
+                author: {
+                    _id: req.neveUser._id,
+                    displayName: req.neveUser.displayName,
+                    role: req.neveUser.role,
+                },
+            },
+            notificationStatus,
+        });
     } catch (error) {
         next(error);
     }

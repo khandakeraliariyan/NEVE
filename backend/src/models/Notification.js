@@ -20,6 +20,8 @@ const notificationSchema = new mongoose.Schema(
                 "inquiry_message_received",
                 "matching_listing_available",
                 "tenancy_case_shared",
+                "tenancy_case_review_activity",
+                "staff_role_changed",
             ],
             required: true,
         },

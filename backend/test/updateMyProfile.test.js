@@ -26,7 +26,7 @@ async function call(user, body, publishedListings = 0) {
         },
     };
     let nextError = null;
-    await updateMyProfile({ user: { uid: "firebase-1" }, body }, res, (err) => {
+    await updateMyProfile({ user: { uid: "firebase-1", signInProvider: "password" }, body }, res, (err) => {
         nextError = err;
     });
     if (nextError) throw nextError;

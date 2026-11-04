@@ -31,6 +31,21 @@ export function buildAgreementEvidenceReport({
             depositBdt: agreement.depositBdt,
             advanceRentBdt: agreement.advanceRentBdt,
         },
+        // Values the extraction service proposed from the agreement file.
+        // They are not participant-recorded values.
+        extraction:
+            agreement.extraction?.status === "completed"
+                ? {
+                      model: agreement.extraction.model,
+                      extractedAt: agreement.extraction.extractedAt,
+                      documentLanguage: agreement.extraction.documentLanguage,
+                      parties: agreement.extraction.parties,
+                      facts: agreement.extraction.facts,
+                      proposedObligations:
+                          agreement.extraction.proposedObligations,
+                      limitations: agreement.extraction.limitations,
+                  }
+                : null,
         sources: {
             files: files.map((file) => ({
                 id: idOf(file._id),
@@ -46,6 +61,11 @@ export function buildAgreementEvidenceReport({
                 text: clause.text,
                 plainLanguageNote: clause.plainLanguageNote,
                 sourcePage: clause.sourcePage,
+                origin: clause.origin ?? "user",
+                reviewStatus: clause.reviewStatus ?? "confirmed",
+                sourceText: clause.sourceText ?? "",
+                sourceVerified: clause.sourceVerified ?? null,
+                ambiguityNote: clause.ambiguityNote ?? "",
                 createdAt: clause.createdAt,
                 updatedAt: clause.updatedAt,
             })),

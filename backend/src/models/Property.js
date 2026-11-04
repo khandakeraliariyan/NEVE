@@ -1,5 +1,74 @@
 import mongoose from "mongoose";
 
+export const UTILITY_TYPES = [
+    "electricity",
+    "gas",
+    "water",
+    "internet",
+    "waste_collection",
+    "other",
+];
+
+// included:       covered by the rent; no separate charge.
+// fixed:          the same landlord-stated amount every month.
+// estimated:      varies with use; the amount is the landlord's monthly estimate.
+// not_disclosed:  the renter pays it, but no amount has been given.
+export const UTILITY_BILLING = ["included", "fixed", "estimated", "not_disclosed"];
+
+const utilitySchema = new mongoose.Schema(
+    {
+        utility: { type: String, enum: UTILITY_TYPES, required: true },
+        label: {
+            type: String,
+            trim: true,
+            maxlength: 60,
+            default: "",
+            validate: {
+                validator(value) {
+                    return this.utility !== "other" || Boolean(value?.trim());
+                },
+                message: "Name the utility when its type is \"other\"",
+            },
+        },
+        billing: { type: String, enum: UTILITY_BILLING, required: true },
+        monthlyAmount: {
+            type: Number,
+            min: 0,
+            default: null,
+            validate: {
+                validator(value) {
+                    const needsAmount = ["fixed", "estimated"].includes(this.billing);
+                    return needsAmount ? value !== null && value !== undefined : value == null;
+                },
+                message:
+                    "Fixed and estimated utilities need a monthly amount; included and undisclosed utilities must not have one",
+            },
+        },
+        notes: { type: String, trim: true, maxlength: 200, default: "" },
+    },
+    { _id: false }
+);
+
+const otherFeeSchema = new mongoose.Schema(
+    {
+        name: { type: String, trim: true, required: true, maxlength: 80 },
+        amount: { type: Number, required: true, min: 0 },
+        frequency: { type: String, enum: ["one_time", "monthly"], required: true },
+        refundable: {
+            type: Boolean,
+            default: false,
+            validate: {
+                validator(value) {
+                    return !value || this.frequency === "one_time";
+                },
+                message: "Only one-time fees can be refundable",
+            },
+        },
+        notes: { type: String, trim: true, maxlength: 200, default: "" },
+    },
+    { _id: false }
+);
+
 const propertySchema = new mongoose.Schema(
     {
         landlord: {
@@ -185,6 +254,39 @@ const propertySchema = new mongoose.Schema(
                 type: Number,
                 default: null,
                 min: 0,
+            },
+
+            // How each utility is paid. An empty list means the landlord has
+            // not described utilities; it does not mean they are free.
+            utilities: {
+                type: [utilitySchema],
+                default: [],
+                validate: [
+                    {
+                        validator: (items) => items.length <= 8,
+                        message: "A maximum of 8 utilities is allowed",
+                    },
+                    {
+                        validator: (items) => {
+                            const keys = items.map((item) =>
+                                item.utility === "other"
+                                    ? `other:${(item.label || "").trim().toLowerCase()}`
+                                    : item.utility
+                            );
+                            return new Set(keys).size === keys.length;
+                        },
+                        message: "Each utility can only be listed once",
+                    },
+                ],
+            },
+
+            otherFees: {
+                type: [otherFeeSchema],
+                default: [],
+                validate: {
+                    validator: (items) => items.length <= 10,
+                    message: "A maximum of 10 other fees is allowed",
+                },
             },
         },
 

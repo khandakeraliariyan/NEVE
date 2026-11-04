@@ -31,7 +31,7 @@ const sensitiveAccessLogSchema = new mongoose.Schema(
         },
         outcome: {
             type: String,
-            enum: ["allowed", "denied", "completed", "requested"],
+            enum: ["allowed", "denied", "completed", "requested", "failed"],
             default: "allowed",
         },
         details: {

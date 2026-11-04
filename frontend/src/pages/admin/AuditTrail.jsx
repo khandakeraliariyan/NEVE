@@ -5,7 +5,7 @@ import { useApi } from "../../hooks/useApi";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Loading, PageHeader, Pagination, Stat, Tabs } from "../../components/ui";
 
 const PAGE_SIZE = 20;
-const TARGET_TYPES = ["property_report", "listing_warning", "property_claim", "communication_report", "ai_evaluation"];
+const TARGET_TYPES = ["property_report", "listing_warning", "property_claim", "communication_report", "ai_evaluation", "user"];
 const OUTCOME_TONES = { allowed: "green", completed: "green", requested: "amber", denied: "rose" };
 
 function Details({ value }) {

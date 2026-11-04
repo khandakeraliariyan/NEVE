@@ -714,7 +714,7 @@ export async function listMaintenanceRequests(req, res, next) {
             $or: [
                 { renter: actorId(req) },
                 { landlord: actorId(req) },
-                ...(["mediator", "legal_reviewer"].includes(req.neveUser.role)
+                ...(req.neveUser.role === "legal_reviewer"
                     ? [{
                         sharedWith: {
                             $elemMatch: {
