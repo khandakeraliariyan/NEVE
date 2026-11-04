@@ -30,7 +30,7 @@ frontend work.
 | 5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate and consistency heuristics, renter reports, human review, and reviewed public summaries. Signals are not verification or fraud findings; identity/ownership checks are absent. |
 | 6 | **Neve Smart Choice — Explainable Property Matching** | **Partial** | Deterministic preference matching with scores, reasons, shortfalls, missing-data indicators, and saved-search alerts. This is not AI and does not include every planned preference, such as commute destinations or walking distance. |
 | 7 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewings, availability workflows, in-app notifications, saved-search alerts, and suspicious-message reporting. Email/push alerts are absent; inquiries have two separate status flows, and viewings can't yet be marked completed. |
-| 8 | **Neve Agreement & Trust** | **Partial** | Private agreement uploads, manually entered clauses, obligations, payment/receipt records, and agreement sharing. OCR/extraction, generated explanations or wording, and legal-source retrieval are not implemented. |
+| 8 | **Neve Agreement & Trust** | **Partial** | Private agreement uploads, manual and Claude-extracted clauses (with verbatim source quotes, plain-language summaries, and participant confirm/reject review), obligations, payment/receipt records, and agreement sharing. Suggested clause rewrites and legal-source retrieval are not implemented. |
 | 9 | **Neve Evidence Graph** | **Partial** | Typed evidence links, confidence and relationship history, deterministic missing/conflict/uncertainty flags, and a traceable JSON report. AI-proposed links, legal-source links, and hash-based tamper evidence are absent; analysis does not verify facts or liability. |
 | 10 | **Neve Move-In & Move-Out Records** | **Implemented** | Room and meter entries, photos, participant reviews, append-only corrections, and move-in/out comparisons. Comparisons report recorded differences; they do not assign fault. |
 | 11 | **Neve Maintenance & Repair** | **Mostly implemented** | Repair requests, private evidence, status/progress history, responsibility, and authorized searchable maintenance records. A complete repair assignment workflow is not present. |
@@ -140,6 +140,8 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `MAX_TENANCY_EVIDENCE_SIZE_MB` | No | `15`; positive number | Tenancy-evidence upload limit |
 | `MAX_PROPERTY_VIDEO_SIZE_MB` | No | `50`; positive number | Property-video upload limit |
 | `MAX_FLOOR_PLAN_SIZE_MB` | No | `10`; positive number | Floor-plan upload limit |
+| `ANTHROPIC_API_KEY` | For extraction | Optional | Enables agreement extraction; without it the extract endpoint returns 503 |
+| `AGREEMENT_EXTRACTION_MODEL` | No | `claude-opus-5-5` | Claude model used for agreement extraction |
 | `OVERPASS_API_URL` | No | `https://overpass-api.de/api/interpreter` | Overpass endpoint for nearby-place data |
 | `NEVE_API_BASE_URL` | No | `http://localhost:5000/api/v1` | Configured API base URL |
 
@@ -251,6 +253,7 @@ the feature inventory previously proposed.
 | `/api/v1/evidence-graph` | `PATCH /properties/:propertyId/evidence/:linkId` | Property owner/admin updates an evidence relationship; changes are retained in link history |
 | `/api/v1/tenancy` | `POST /agreements`, `GET /agreements`, `GET /agreements/:agreementId`, `PATCH /agreements/:agreementId/status` | Inquiry-linked agreement records; accessible to participants, assigned managers, or explicitly shared reviewers |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses`, `POST /agreements/:agreementId/obligations`, `PATCH /agreements/:agreementId/obligations/:obligationId`, `POST /agreements/:agreementId/payments`, `PATCH /agreements/:agreementId/payments/:paymentId` | Manual clause annotations, obligations, and BDT payment/receipt records |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/extract`, `PATCH /agreements/:agreementId/clauses/:clauseId/review` | Extract parties, dates, amounts, clauses, and obligations from the agreement file with Claude (proposals only; 10 requests per 15 minutes), then confirm or reject each proposed clause |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links`, `PATCH /agreements/:agreementId/evidence-links/:linkId`, `GET /agreements/:agreementId/evidence-graph`, `GET /agreements/:agreementId/evidence-report` | Traceable evidence graph and downloadable JSON report; access follows agreement permissions |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/shares`, `DELETE /agreements/:agreementId/shares/:userId` | Participants grant/revoke read-only access for a legal reviewer |
 | `/api/v1/tenancy` | `GET /agreements/:agreementId/cases`, `POST /agreements/:agreementId/cases`, `GET /cases/:caseId`, `POST /cases/:caseId/evidence`, `DELETE /cases/:caseId/evidence/:fileId`, `PATCH /cases/:caseId/status` | Private dispute cases with agreement-linked evidence; participants manage cases, assigned reviewers have read-only scope |

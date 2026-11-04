@@ -1069,6 +1069,10 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 text: clause.text,
                 plainLanguageNote: clause.plainLanguageNote,
                 sourcePage: clause.sourcePage,
+                origin: clause.origin ?? "user",
+                reviewStatus: clause.reviewStatus ?? "confirmed",
+                sourceText: clause.sourceText ?? "",
+                sourceVerified: clause.sourceVerified ?? null,
             })),
             ...agreement.obligations.map((obligation) => ({
                 id: String(obligation._id),

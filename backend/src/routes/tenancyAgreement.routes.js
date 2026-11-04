@@ -16,7 +16,12 @@ import {
     updateAgreementPayment,
     updateTenancyAgreementStatus,
 } from "../controllers/tenancyAgreement.controller.js";
+import {
+    extractAgreement,
+    reviewAgreementClause,
+} from "../controllers/agreementExtraction.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
+import { extractionLimiter } from "../middleware/rateLimit.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 import {
     addConditionEntry,
@@ -137,6 +142,17 @@ router.post(
     "/agreements/:agreementId/clauses",
     allowRoles("renter", "landlord"),
     addAgreementClause
+);
+router.post(
+    "/agreements/:agreementId/extract",
+    allowRoles("renter", "landlord"),
+    extractionLimiter,
+    extractAgreement
+);
+router.patch(
+    "/agreements/:agreementId/clauses/:clauseId/review",
+    allowRoles("renter", "landlord"),
+    reviewAgreementClause
 );
 router.post(
     "/agreements/:agreementId/obligations",
