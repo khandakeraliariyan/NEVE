@@ -256,6 +256,7 @@ the feature inventory previously proposed.
 | `/api/v1/tenancy` | `GET /agreements/:agreementId/cases`, `POST /agreements/:agreementId/cases`, `GET /cases/:caseId`, `POST /cases/:caseId/evidence`, `DELETE /cases/:caseId/evidence/:fileId`, `PATCH /cases/:caseId/status` | Private dispute cases with agreement-linked evidence; participants manage cases, assigned reviewers have read-only scope |
 | `/api/v1/tenancy` | `GET /cases?status=&page=&limit=` | Legal reviewer list of cases shared directly with them; removed evidence and other shares are omitted |
 | `/api/v1/tenancy` | `POST /cases/:caseId/shares`, `DELETE /cases/:caseId/shares/:userId` | Participants share/revoke a case and its selected evidence with a legal reviewer |
+| `/api/v1/tenancy` | `POST /cases/:caseId/review-entries` | Review discussion. Shared legal reviewers post `note`, `question`, or `opinion` entries; participants post `response` entries. Entries are append-only, closed cases accept none, and the other side is notified without the entry text |
 | `/api/v1/tenancy` | `PATCH /agreements/:agreementId/property-manager` | Participants assign or unassign an active property manager for that agreement |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/condition-reports/:stage`, `POST /agreements/:agreementId/condition-reports/:reportId/entries`, `GET /agreements/:agreementId/condition-reports`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/reviews`, `POST /agreements/:agreementId/condition-reports/:reportId/entries/:entryId/corrections`, `GET /agreements/:agreementId/condition-comparison` | Room condition and utility-meter move-in/out records, participant review, preserved corrections, and comparison |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/maintenance-requests`, `GET /maintenance-requests?q=...`, `PATCH /maintenance-requests/:requestId/progress` | Authorized repair history search across request details and progress messages; responsibilities, status, and private evidence |
@@ -263,6 +264,7 @@ the feature inventory previously proposed.
 | `/api/v1/admin/dashboard` | `GET /overview`, `GET /reports`, `GET /warnings`, `GET /claims`, `GET /communication-reports` | Admin dashboard and communication-report review queue |
 | `/api/v1/admin/moderation` | `PATCH /reports/:reportId/status`, `PATCH /communication-reports/:reportId/status`, `PATCH /warnings/:warningId/status`, `PATCH /warnings/:warningId/public-visibility`, `PATCH /claims/:claimId/review`, `PATCH /claims/:claimId/public-visibility` | Admin moderation |
 | `/api/v1/admin/audit-logs` | `GET /` | Admin audit-log query |
+| `/api/v1/admin/users` | `GET /?q=&role=&page=&limit=`, `PATCH /:userId/role` | Admin user search, and appointing or removing legal reviewers with `{ action: "grant_reviewer" \| "revoke_reviewer" }`. Only active renters who aren't party to any agreement can be appointed; changes are audit-logged and the user is notified |
 | `/api/v1/privacy` | `GET /export`, `GET /documents/deletion-requests`, `POST /documents/:fileId/deletion-requests` | Authenticated personal-data export and private document deletion requests |
 | `/api/v1/admin/privacy` | `GET /deletion-requests`, `PATCH /deletion-requests/:requestId`, `GET /retention-due`, `PATCH /files/:fileId/retention`, `GET /access-logs` | Admin review of private-document deletion, retention/legal holds, and sensitive access history |
 | `/api/v1/admin/ai-evaluations` | `POST /runs`, `GET /runs`, `GET /runs/:runId` | Admin-only benchmark metric submission and review |
@@ -716,9 +718,9 @@ specific shapes and pagination logic.
 
 These are known issues in the source at the time this README was written:
 
-1. **Role assignment:** every new profile is created as `renter`, and no endpoint
-   changes a role or an account's active state. Landlord, property-manager,
-   reviewer, and admin accounts currently require a direct database edit.
+1. **Role assignment:** users choose renter or landlord themselves, and admins
+   appoint legal reviewers through `/api/v1/admin/users`. Admin accounts and an
+   account's active state still require a direct database edit.
 2. **Profile editing:** users can create and read a profile, but no endpoint
    updates the name, photo, or phone number.
 3. **Inquiry status flows:** `PATCH /api/v1/inquiries/:inquiryId/respond` accepts

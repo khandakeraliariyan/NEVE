@@ -37,6 +37,7 @@ import Inquiries from "./pages/shared/Inquiries";
 import ConditionReports from "./pages/tenancy/ConditionReports";
 import Maintenance from "./pages/tenancy/Maintenance";
 import ListingClaims from "./pages/landlord/ListingClaims";
+import LegalReviewers from "./pages/admin/LegalReviewers";
 
 const TENANCY_ROLES = ["renter", "landlord", "legal_reviewer"];
 
@@ -95,6 +96,7 @@ export default function App() {
                     <Route element={<RequireAuth roles={["admin"]} />}>
                         <Route path="admin" element={<PlatformHealth />} />
                         <Route path="admin/audit-logs" element={<AuditTrail />} />
+                        <Route path="admin/reviewers" element={<LegalReviewers />} />
                         <Route path="admin/ai-evaluations" element={<AIEvaluations />} />
                         <Route path="admin/ai-evaluations/:runId" element={<AIEvaluations />} />
                     </Route>

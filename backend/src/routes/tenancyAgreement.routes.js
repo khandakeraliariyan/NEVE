@@ -39,6 +39,7 @@ import {
     revokeTenancyCaseShare,
     shareTenancyCase,
     updateTenancyCaseStatus,
+    addCaseReviewEntry,
 } from "../controllers/tenancyCase.controller.js";
 
 const router = express.Router();
@@ -78,6 +79,8 @@ router.delete(
     allowRoles("renter", "landlord"),
     revokeTenancyCaseShare
 );
+// Reviewers and parties both post; the controller limits which kinds each may use.
+router.post("/cases/:caseId/review-entries", addCaseReviewEntry);
 router.patch(
     "/cases/:caseId/status",
     allowRoles("renter", "landlord"),

@@ -60,6 +60,7 @@ const ADMIN_NAV = [
         items: [
             { to: "/admin", label: "Platform health", end: true },
             { to: "/admin/audit-logs", label: "Audit trail" },
+            { to: "/admin/reviewers", label: "Legal reviewers" },
             { to: "/admin/ai-evaluations", label: "AI evaluations" },
         ],
     },

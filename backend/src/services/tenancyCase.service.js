@@ -1,7 +1,10 @@
 import ConditionReport from "../models/ConditionReport.js";
 import MaintenanceRequest from "../models/MaintenanceRequest.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
-import TenancyCase from "../models/TenancyCase.js";
+import TenancyCase, {
+    PARTY_ENTRY_KINDS,
+    REVIEWER_ENTRY_KINDS,
+} from "../models/TenancyCase.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
 import UploadedFile from "../models/UploadedFile.js";
 
@@ -30,6 +33,25 @@ export function resolveTenancyCaseAccessScope({
         return "read_only";
     }
     return null;
+}
+
+// Reviewers post notes, questions, and opinions; parties reply with responses.
+// Closed cases are frozen so the record of a finished review can't grow.
+export function validateCaseReviewEntry({ kind, body, isReviewer, caseStatus }) {
+    if (caseStatus === "closed") {
+        return { error: "This case is closed, so no new review entries can be added.", status: 409 };
+    }
+    const allowedKinds = isReviewer ? REVIEWER_ENTRY_KINDS : PARTY_ENTRY_KINDS;
+    if (!allowedKinds.includes(kind)) {
+        return {
+            error: `kind must be one of: ${allowedKinds.join(", ")}.`,
+            status: 400,
+        };
+    }
+    if (typeof body !== "string" || !body.trim() || body.trim().length > 4000) {
+        return { error: "body must be text of 1 to 4000 characters.", status: 400 };
+    }
+    return { value: { kind, body: body.trim() } };
 }
 
 export async function isEvidenceForAgreement(fileId, agreementId) {
