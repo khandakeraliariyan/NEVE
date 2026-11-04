@@ -175,6 +175,22 @@ It returns a JSON success response when the app is running. Run the backend test
 npm test
 ```
 
+Run the evaluation suites (versioned datasets in `eval/datasets/`):
+
+```sh
+npm run eval                                   # offline suites
+npm run eval -- --suite duplicates             # one suite
+npm run eval -- --live                         # adds paid Claude extraction cases
+npm run eval -- --save --admin-email <email>   # also stores AIEvaluationRun records
+```
+
+Regression suites (cost, distance, matching, evidence conflicts) must match
+their hand-labelled ground truth; a failure that isn't a documented known gap
+exits with code 1, and `npm test` enforces the same check. Quality suites
+(duplicate listings, listing consistency, agreement extraction) are measured
+and reported, including false-positive rates, but not gated. Full results are
+written to `eval/results/` (not committed).
+
 To check whether the Express app's modules can be loaded:
 
 ```sh

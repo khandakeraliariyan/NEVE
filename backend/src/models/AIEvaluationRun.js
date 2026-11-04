@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { AI_EVALUATION_TASKS } from "../services/aiEvaluation.service.js";
 
 const caseMetricSchema = new mongoose.Schema(
     {
@@ -21,14 +22,7 @@ const aiEvaluationRunSchema = new mongoose.Schema(
     {
         task: {
             type: String,
-            enum: [
-                "ocr",
-                "agreement_extraction",
-                "evidence_link_accuracy",
-                "missing_information",
-                "legal_citation",
-                "suspicious_listing",
-            ],
+            enum: AI_EVALUATION_TASKS,
             required: true,
             index: true,
         },
