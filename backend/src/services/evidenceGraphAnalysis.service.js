@@ -41,7 +41,10 @@ export function findExtractionMismatches(agreement) {
     return mismatches;
 }
 
-export function analyzeAgreementEvidence(agreement, links, recordLinks = [], conditionReports = []) {
+export function analyzeAgreementEvidence(agreement, allLinks, recordLinks = [], conditionReports = []) {
+    // AI proposals count only once a participant accepts them.
+    const links = allLinks.filter((link) => (link.reviewStatus ?? "accepted") === "accepted");
+    const proposedLinks = allLinks.filter((link) => link.reviewStatus === "proposed");
     const missingInformation = [];
     const potentialConflicts = [];
     const uncertainInterpretations = [];
@@ -196,6 +199,17 @@ export function analyzeAgreementEvidence(agreement, links, recordLinks = [], con
                 message: `A participant marked this ${link.fromType} as contradicting a ${link.toType}.`,
             });
         }
+    }
+
+    for (const link of proposedLinks) {
+        uncertainInterpretations.push({
+            type: "unreviewed_ai_link",
+            linkId: String(link._id),
+            targetId: String(link.targetId),
+            relationship: link.relationship,
+            confidence: link.confidence ?? null,
+            message: "This link was suggested automatically and has not been accepted by a participant.",
+        });
     }
 
     const factStates = buildFactStates(agreement, links, recordLinks);

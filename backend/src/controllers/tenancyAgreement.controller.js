@@ -10,6 +10,16 @@ import TenancyRecordLink, {
     RECORD_LINK_RELATIONSHIPS,
 } from "../models/TenancyRecordLink.js";
 import { validateRecordLinkInput } from "../services/evidenceFacts.service.js";
+import {
+    EXTRACTABLE_MIME_TYPES,
+    ExtractionError,
+    isExtractionConfigured,
+} from "../services/agreementExtraction.service.js";
+import {
+    normalizeSuggestions,
+    requestEvidenceLinkSuggestions,
+} from "../services/evidenceLinkSuggestion.service.js";
+import { readStoredObject } from "../services/fileUpload.service.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import { analyzeAgreementEvidence } from "../services/evidenceGraphAnalysis.service.js";
@@ -1159,6 +1169,9 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 explanation: link.explanation,
                 confidence: link.confidence ?? null,
                 confirmedBy: (link.confirmations ?? []).map((entry) => String(entry.user)),
+                origin: link.origin ?? "user",
+                reviewStatus: link.reviewStatus ?? "accepted",
+                sourceQuote: link.sourceQuote ?? "",
                 linkedBy: link.linkedBy,
                 createdAt: link.createdAt,
                 file: link.uploadedFile
@@ -1290,6 +1303,12 @@ export async function confirmAgreementEvidenceLink(req, res, next) {
                 message: "Assess the relationship before confirming it.",
             });
         }
+        if ((link.reviewStatus ?? "accepted") !== "accepted") {
+            return res.status(409).json({
+                success: false,
+                message: "Accept this suggested link before confirming it.",
+            });
+        }
         if ((link.confirmations ?? []).some((entry) => String(entry.user) === String(userId(req)))) {
             return res.status(409).json({ success: false, message: "You already confirmed this link." });
         }
@@ -1380,6 +1399,151 @@ export async function removeAgreementRecordLink(req, res, next) {
         await saveAuditedChange(agreement, req, "record_link_removed", link.fromType, link.fromId);
         setPrivateResponse(res);
         return res.json({ success: true, message: "Record link removed." });
+    } catch (error) {
+        next(error);
+    }
+}
+
+const suggestionsInProgress = new Set();
+
+// POST /api/v1/tenancy/agreements/:agreementId/evidence-links/suggest  { fileId }
+// Claude proposes how one evidence file relates to the agreement's records.
+// Proposals are saved as "proposed" links for a participant to accept.
+export async function suggestAgreementEvidenceLinks(req, res, next) {
+    let key = null;
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        if (!isExtractionConfigured()) {
+            return res.status(503).json({ success: false, message: "Link suggestions are not configured." });
+        }
+        const { fileId } = req.body ?? {};
+        if (!validId(fileId)) {
+            return res.status(400).json({ success: false, message: "A valid fileId is required." });
+        }
+        const file = await UploadedFile.findOne({
+            _id: fileId,
+            purpose: "tenancy_evidence",
+            status: "uploaded",
+            uploadedBy: { $in: [agreement.renter, agreement.landlord] },
+        });
+        if (!file) {
+            return res.status(404).json({ success: false, message: "Uploaded evidence file not found." });
+        }
+        if (!EXTRACTABLE_MIME_TYPES.includes(file.mimeType)) {
+            return res.status(415).json({ success: false, message: "This file type cannot be analyzed." });
+        }
+
+        key = String(agreement._id);
+        if (suggestionsInProgress.has(key)) {
+            key = null;
+            return res.status(409).json({
+                success: false,
+                message: "Suggestions are already running for this agreement.",
+            });
+        }
+        suggestionsInProgress.add(key);
+
+        const existing = await TenancyEvidenceLink.find({ agreement: agreement._id, uploadedFile: file._id })
+            .select("targetType targetId")
+            .lean();
+        const bytes = await readStoredObject(file.storageKey);
+        const result = await requestEvidenceLinkSuggestions({ agreement, mimeType: file.mimeType, bytes });
+        const normalized = normalizeSuggestions(result.suggestions, agreement, existing);
+
+        const created = [];
+        for (const suggestion of normalized.links) {
+            try {
+                created.push(
+                    await TenancyEvidenceLink.create({
+                        agreement: agreement._id,
+                        targetType: suggestion.targetType,
+                        targetId: suggestion.targetId,
+                        uploadedFile: file._id,
+                        relationship: suggestion.relationship,
+                        explanation: suggestion.explanation,
+                        confidence: suggestion.confidence,
+                        sourceQuote: suggestion.sourceQuote,
+                        origin: "ai_proposed",
+                        reviewStatus: "proposed",
+                        suggestionModel: result.model,
+                        linkedBy: userId(req),
+                    })
+                );
+            } catch (createError) {
+                if (createError.code !== 11000) throw createError;
+            }
+        }
+        await saveAuditedChange(agreement, req, "evidence_links_suggested", "file", file._id);
+
+        setPrivateResponse(res);
+        return res.status(201).json({
+            success: true,
+            data: created,
+            fileSummary: normalized.fileSummary,
+            limitations: normalized.limitations,
+            model: result.model,
+            usage: result.usage,
+            latencyMs: result.latencyMs,
+            disclaimer:
+                "These links were suggested automatically. They don't count in the Evidence Graph until a participant accepts them, and they don't determine who is right.",
+        });
+    } catch (error) {
+        if (error instanceof ExtractionError) {
+            return res.status(error.status).json({ success: false, message: error.publicMessage });
+        }
+        next(error);
+    } finally {
+        if (key) suggestionsInProgress.delete(key);
+    }
+}
+
+// PATCH /api/v1/tenancy/agreements/:agreementId/evidence-links/:linkId/review
+// { decision: "accept" | "reject" }
+export async function reviewSuggestedEvidenceLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const { linkId } = req.params;
+        const { decision } = req.body ?? {};
+        if (!validId(linkId)) {
+            return res.status(400).json({ success: false, message: "Invalid evidence link ID." });
+        }
+        if (!["accept", "reject"].includes(decision)) {
+            return res.status(400).json({ success: false, message: "decision must be accept or reject." });
+        }
+        const link = await TenancyEvidenceLink.findOne({
+            _id: linkId,
+            agreement: agreement._id,
+            reviewStatus: "proposed",
+        });
+        if (!link) {
+            return res.status(404).json({ success: false, message: "Suggested link not found." });
+        }
+        link.reviewStatus = decision === "accept" ? "accepted" : "rejected";
+        link.reviewedBy = userId(req);
+        link.reviewedAt = new Date();
+        link.history.push({
+            actor: userId(req),
+            relationship: link.relationship,
+            explanation: decision === "accept" ? "Accepted suggested link." : "Rejected suggested link.",
+            confidence: link.confidence,
+            createdAt: new Date(),
+        });
+        await link.save();
+        await saveAuditedChange(
+            agreement,
+            req,
+            decision === "accept" ? "suggested_link_accepted" : "suggested_link_rejected",
+            link.targetType,
+            link.targetId
+        );
+        setPrivateResponse(res);
+        return res.json({ success: true, data: link });
     } catch (error) {
         next(error);
     }

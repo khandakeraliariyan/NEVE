@@ -14,6 +14,8 @@ import {
     updateAgreementObligation,
     updateAgreementEvidenceLink,
     confirmAgreementEvidenceLink,
+    suggestAgreementEvidenceLinks,
+    reviewSuggestedEvidenceLink,
     addAgreementRecordLink,
     removeAgreementRecordLink,
     updateAgreementPayment,
@@ -146,6 +148,16 @@ router.post(
 router.patch(
     "/agreements/:agreementId/evidence-links/:linkId",
     updateAgreementEvidenceLink
+);
+router.post(
+    "/agreements/:agreementId/evidence-links/suggest",
+    allowRoles("renter", "landlord"),
+    suggestAgreementEvidenceLinks
+);
+router.patch(
+    "/agreements/:agreementId/evidence-links/:linkId/review",
+    allowRoles("renter", "landlord"),
+    reviewSuggestedEvidenceLink
 );
 router.post(
     "/agreements/:agreementId/evidence-links/:linkId/confirm",

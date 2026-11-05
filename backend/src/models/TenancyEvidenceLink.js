@@ -70,6 +70,18 @@ const tenancyEvidenceLinkSchema = new mongoose.Schema(
             required: true,
         },
         history: { type: [relationshipEventSchema], default: [] },
+        // "ai_proposed" links come from Claude and stay "proposed" until a
+        // participant accepts or rejects them. Participant links are accepted.
+        origin: { type: String, enum: ["user", "ai_proposed"], default: "user" },
+        reviewStatus: {
+            type: String,
+            enum: ["proposed", "accepted", "rejected"],
+            default: "accepted",
+        },
+        sourceQuote: { type: String, trim: true, maxlength: 1000, default: "" },
+        suggestionModel: { type: String, default: null },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        reviewedAt: { type: Date, default: null },
         // Participants who confirmed this relationship. A "supports" link
         // confirmed by both the renter and the landlord is a documented fact.
         // Changing the relationship clears confirmations.
