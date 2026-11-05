@@ -1,6 +1,8 @@
 
 import mongoose from "mongoose";
 import AdminAuditLog from "../models/AdminAuditLog.js";
+import SensitiveAccessLog from "../models/SensitiveAccessLog.js";
+import { verifyLogChain } from "../services/logChain.service.js";
 
 export const getAdminAuditLogs = async (req, res, next) => {
     try {
@@ -75,3 +77,24 @@ export const getAdminAuditLogs = async (req, res, next) => {
         next(error);
     }
 };
+
+// GET /api/v1/admin/audit-logs/integrity?log=admin|access
+// Verifies the hash chain of the admin audit log or the sensitive-access log.
+export async function getAuditLogIntegrity(req, res, next) {
+    try {
+        const log = req.query.log ?? "admin";
+        const models = { admin: AdminAuditLog, access: SensitiveAccessLog };
+        if (!Object.hasOwn(models, log)) {
+            return res.status(400).json({ success: false, message: "log must be admin or access." });
+        }
+        const result = await verifyLogChain(models[log]);
+        res.set("Cache-Control", "private, no-store");
+        return res.json({
+            success: true,
+            data: { log, ...result, checkedAt: new Date().toISOString() },
+            note: "Entries written before hash chaining was added aren't covered.",
+        });
+    } catch (error) {
+        next(error);
+    }
+}

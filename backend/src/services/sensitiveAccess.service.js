@@ -1,3 +1,4 @@
+import { createChainedLogEntry } from "./logChain.service.js";
 import SensitiveAccessLog from "../models/SensitiveAccessLog.js";
 
 export async function recordSensitiveAccess({
@@ -14,7 +15,7 @@ export async function recordSensitiveAccess({
         throw new Error("Sensitive access event requires an authenticated actor.");
     }
 
-    return SensitiveAccessLog.create({
+    return createChainedLogEntry(SensitiveAccessLog, {
         actor,
         action,
         resourceType,

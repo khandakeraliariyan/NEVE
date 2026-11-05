@@ -1,3 +1,4 @@
+import { createChainedLogEntry } from "./logChain.service.js";
 
 import AdminAuditLog from "../models/AdminAuditLog.js";
 
@@ -14,7 +15,7 @@ export const recordAdminAction = async ({
         throw new Error("Authenticated admin ID is missing.");
     }
 
-    return AdminAuditLog.create({
+    return createChainedLogEntry(AdminAuditLog, {
         actor: actorId,
         action,
         targetType,
