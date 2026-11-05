@@ -16,7 +16,12 @@ import {
     updateAgreementPayment,
     updateTenancyAgreementStatus,
 } from "../controllers/tenancyAgreement.controller.js";
+import {
+    extractAgreement,
+    reviewAgreementClause,
+} from "../controllers/agreementExtraction.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
+import { extractionLimiter } from "../middleware/rateLimit.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 import {
     addConditionEntry,
@@ -39,6 +44,7 @@ import {
     revokeTenancyCaseShare,
     shareTenancyCase,
     updateTenancyCaseStatus,
+    addCaseReviewEntry,
 } from "../controllers/tenancyCase.controller.js";
 
 const router = express.Router();
@@ -48,7 +54,6 @@ router.use(
     allowRoles(
         "renter",
         "landlord",
-        "mediator",
         "legal_reviewer"
     )
 );
@@ -63,7 +68,7 @@ router.post(
 );
 router.get(
     "/cases",
-    allowRoles("mediator", "legal_reviewer"),
+    allowRoles("legal_reviewer"),
     listSharedTenancyCases
 );
 router.get("/cases/:caseId", getTenancyCase);
@@ -79,6 +84,8 @@ router.delete(
     allowRoles("renter", "landlord"),
     revokeTenancyCaseShare
 );
+// Reviewers and parties both post; the controller limits which kinds each may use.
+router.post("/cases/:caseId/review-entries", addCaseReviewEntry);
 router.patch(
     "/cases/:caseId/status",
     allowRoles("renter", "landlord"),
@@ -135,6 +142,17 @@ router.post(
     "/agreements/:agreementId/clauses",
     allowRoles("renter", "landlord"),
     addAgreementClause
+);
+router.post(
+    "/agreements/:agreementId/extract",
+    allowRoles("renter", "landlord"),
+    extractionLimiter,
+    extractAgreement
+);
+router.patch(
+    "/agreements/:agreementId/clauses/:clauseId/review",
+    allowRoles("renter", "landlord"),
+    reviewAgreementClause
 );
 router.post(
     "/agreements/:agreementId/obligations",

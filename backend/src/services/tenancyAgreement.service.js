@@ -37,7 +37,7 @@ export async function findAccessibleAgreement(
         $or: [
             { renter: userId },
             { landlord: userId },
-            ...(["mediator", "legal_reviewer"].includes(userRole)
+            ...(userRole === "legal_reviewer"
                 ? [{
                     sharedWith: {
                         $elemMatch: { user: userId, revokedAt: null },
@@ -94,7 +94,7 @@ export async function findAgreementForEvidenceFile(
                 $or: [
                     { renter: userId },
                     { landlord: userId },
-                    ...(["mediator", "legal_reviewer"].includes(userRole)
+                    ...(userRole === "legal_reviewer"
                         ? [{
                             sharedWith: {
                                 $elemMatch: {

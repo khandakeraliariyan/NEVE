@@ -1,5 +1,5 @@
 const LOOKUP_ROLES = {
-    reviewer: ["mediator", "legal_reviewer"],
+    reviewer: ["legal_reviewer"],
 };
 
 export function buildUserLookupFilter({ type, q, requesterId }) {

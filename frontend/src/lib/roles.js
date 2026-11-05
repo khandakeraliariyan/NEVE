@@ -3,7 +3,7 @@ export const ROLES = {
     RENTER: ["renter"],
     LANDLORD: ["landlord"],
     INQUIRY: ["renter", "landlord"],
-    TENANCY: ["renter", "landlord", "mediator", "legal_reviewer"],
-    REVIEWER: ["mediator", "legal_reviewer"],
+    TENANCY: ["renter", "landlord", "legal_reviewer"],
+    REVIEWER: ["legal_reviewer"],
     ADMIN: ["admin"],
 };

@@ -1,3 +1,43 @@
+// Compares values extracted from the agreement file with the values a
+// participant recorded. A mismatch is a conflict to review, not a finding of
+// which value is right.
+export function findExtractionMismatches(agreement) {
+    const extraction = agreement.extraction;
+    if (!extraction || extraction.status !== "completed" || !extraction.facts) {
+        return [];
+    }
+
+    const day = (value) => new Date(value).toISOString().slice(0, 10);
+    const fields = [
+        ["startAt", day],
+        ["endAt", day],
+        ["monthlyRentBdt", Number],
+        ["depositBdt", Number],
+        ["advanceRentBdt", Number],
+    ];
+
+    const mismatches = [];
+    for (const [field, normalize] of fields) {
+        const fact = extraction.facts[field];
+        const extracted = fact?.value;
+        const recorded = agreement[field];
+        if (extracted == null || recorded == null) {
+            continue;
+        }
+        if (normalize(extracted) !== normalize(recorded)) {
+            mismatches.push({
+                field,
+                recordedValue: recorded,
+                extractedValue: extracted,
+                sourceText: fact.sourceText ?? "",
+                sourcePage: fact.sourcePage ?? null,
+            });
+        }
+    }
+
+    return mismatches;
+}
+
 export function analyzeAgreementEvidence(agreement, links) {
     const missingInformation = [];
     const potentialConflicts = [];
@@ -18,10 +58,60 @@ export function analyzeAgreementEvidence(agreement, links) {
         }
     }
 
-    if (agreement.clauses.length === 0) {
+    const clauses = agreement.clauses ?? [];
+    const activeClauses = clauses.filter(
+        (clause) => (clause.reviewStatus ?? "confirmed") === "confirmed"
+    );
+    const proposedClauses = clauses.filter(
+        (clause) => clause.reviewStatus === "proposed"
+    );
+
+    if (activeClauses.length === 0) {
         missingInformation.push({
             type: "clause_annotations",
-            message: "No clauses have been manually annotated.",
+            message:
+                proposedClauses.length > 0
+                    ? "No clauses have been confirmed yet; extracted clauses are awaiting participant review."
+                    : "No clauses have been annotated or extracted.",
+        });
+    }
+
+    for (const clause of proposedClauses) {
+        uncertainInterpretations.push({
+            type: "unreviewed_extracted_clause",
+            targetId: String(clause._id),
+            message:
+                "This clause was extracted automatically and has not been confirmed by a participant.",
+        });
+    }
+
+    for (const clause of activeClauses) {
+        if (clause.sourceVerified === false) {
+            uncertainInterpretations.push({
+                type: "unverified_clause_quote",
+                targetId: String(clause._id),
+                message:
+                    "This clause's quote was not found word-for-word in the agreement text.",
+            });
+        }
+        if (clause.ambiguityNote) {
+            uncertainInterpretations.push({
+                type: "ambiguous_clause",
+                targetId: String(clause._id),
+                message: clause.ambiguityNote,
+            });
+        }
+    }
+
+    for (const mismatch of findExtractionMismatches(agreement)) {
+        potentialConflicts.push({
+            type: "extracted_value_mismatch",
+            field: mismatch.field,
+            recordedValue: mismatch.recordedValue,
+            extractedValue: mismatch.extractedValue,
+            sourceText: mismatch.sourceText,
+            sourcePage: mismatch.sourcePage,
+            message: `The recorded ${mismatch.field} differs from the value extracted from the agreement file.`,
         });
     }
 
@@ -94,6 +184,6 @@ export function analyzeAgreementEvidence(agreement, links) {
         potentialConflicts,
         uncertainInterpretations,
         disclaimer:
-            "These flags reflect recorded fields and participant assessments only. Files are not analyzed, and flags do not verify facts or determine legal liability.",
+            "These flags reflect recorded fields, participant assessments, and any automated extraction of the agreement file. Extracted clauses are proposals until a participant confirms them. Flags do not verify facts or determine legal liability.",
     };
 }

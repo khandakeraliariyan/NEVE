@@ -96,7 +96,7 @@ export default function TrueCost() {
                 <StatCard title="Move-in cash needed" value={money(moveIn.estimatedTotal)} caption="First month's costs, advance rent and deposit">
                     {tenants > 1 && <p className="text-xs text-muted">Per person: {money(perPerson(moveIn.estimatedTotal))}</p>}
                 </StatCard>
-                <StatCard dark title="Monthly cost" value={money(monthly.estimatedTotal)} caption="Rent plus service charge">
+                <StatCard dark title="Monthly cost" value={money(monthly.estimatedTotal)} caption="Rent, service charge, utilities and monthly fees">
                     {tenants > 1 && <p className="text-xs text-white/70">Per person: {money(perPerson(monthly.estimatedTotal))}</p>}
                 </StatCard>
                 <StatCard title="Refundable deposits" value={money(refundable)} caption="Listed security deposit and other refundable deposits">
@@ -130,6 +130,12 @@ export default function TrueCost() {
                                 <CostLine key={`${item.type}-${item.name}`} item={item} />
                             ))}
                         </ul>
+                        {monthly.includedInRent?.length > 0 && (
+                            <p className="mt-2 text-xs text-muted">Included in the rent, according to the landlord: {monthly.includedInRent.join(", ")}.</p>
+                        )}
+                        {!cost.utilitiesDescribed && (
+                            <p className="mt-2 text-xs text-amber-ink">The landlord hasn't said how utilities are paid. Bills such as electricity and gas may be extra.</p>
+                        )}
                         <TotalRow title="Estimated monthly total" value={monthly.estimatedTotal} complete={monthly.complete} subtotal={monthly.quantifiedSubtotal} />
                     </Card>
 
@@ -170,7 +176,7 @@ export default function TrueCost() {
                     <Card>
                         <p className="mb-2 font-semibold">Missing or unknown costs</p>
                         {!moveIn.missingComponents?.length && !cost.unknownCosts?.length ? (
-                            <p className="text-sm text-muted">The landlord has disclosed every cost component Neve asks for.</p>
+                            <p className="text-sm text-muted">{cost.utilitiesDescribed ? "The landlord has disclosed every cost component Neve asks for." : "Rent, charges and deposits are disclosed, but utilities haven't been described."}</p>
                         ) : (
                             <MissingList items={moveIn.missingComponents} unknownCosts={cost.unknownCosts} />
                         )}

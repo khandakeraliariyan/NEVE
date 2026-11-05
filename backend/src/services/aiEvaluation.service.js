@@ -1,5 +1,20 @@
 import { createHash, randomBytes } from "node:crypto";
 
+// The first six are model-backed tasks. The last four are deterministic
+// features measured by the regression suites in backend/eval.
+export const AI_EVALUATION_TASKS = [
+    "ocr",
+    "agreement_extraction",
+    "evidence_link_accuracy",
+    "missing_information",
+    "legal_citation",
+    "suspicious_listing",
+    "cost_calculation",
+    "distance_calculation",
+    "property_matching",
+    "evidence_conflict",
+];
+
 const maximumCases = 1000;
 const maximumLabelCount = 100;
 const maximumLabelLength = 300;
@@ -83,15 +98,7 @@ export function calculateEvaluationMetrics(input) {
     if (!validateMetadata(input)) {
         throw new TypeError("Invalid evaluation metadata or case count.");
     }
-    const tasks = [
-        "ocr",
-        "agreement_extraction",
-        "evidence_link_accuracy",
-        "missing_information",
-        "legal_citation",
-        "suspicious_listing",
-    ];
-    if (!tasks.includes(input.task)) {
+    if (!AI_EVALUATION_TASKS.includes(input.task)) {
         throw new TypeError("Unsupported evaluation task.");
     }
 

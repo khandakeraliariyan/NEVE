@@ -6,6 +6,8 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { api } from "../../lib/api";
 import { label, money } from "../../lib/format";
 import PinPicker from "../../components/PinPicker";
+import UtilitiesFeesEditor from "../../components/UtilitiesFeesEditor";
+import { feesFromApi, feesToApi, utilitiesFeesProblem, utilitiesFromApi, utilitiesToApi } from "../../lib/utilityCosts";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, StatusBadge, fieldErrors } from "../../components/ui";
 
 const STEPS = ["Basic details", "Location", "Rent & terms", "Media & review"];
@@ -28,6 +30,8 @@ const EMPTY = {
     securityDeposit: "",
     advanceRent: "",
     monthlyServiceCharge: "",
+    utilities: [],
+    otherFees: [],
     availabilityDate: "",
     leaseDurationMonths: "",
     amenities: "",
@@ -53,6 +57,8 @@ function fromProperty(p) {
         securityDeposit: num(p.pricing?.securityDeposit),
         advanceRent: num(p.pricing?.advanceRent),
         monthlyServiceCharge: num(p.pricing?.monthlyServiceCharge),
+        utilities: utilitiesFromApi(p.pricing?.utilities),
+        otherFees: feesFromApi(p.pricing?.otherFees),
         availabilityDate: p.availabilityDate ? p.availabilityDate.slice(0, 10) : "",
         leaseDurationMonths: num(p.leaseDurationMonths),
         amenities: (p.amenities ?? []).join(", "),
@@ -83,6 +89,8 @@ function toBody(f) {
             securityDeposit: num(f.securityDeposit),
             advanceRent: num(f.advanceRent),
             monthlyServiceCharge: num(f.monthlyServiceCharge),
+            utilities: utilitiesToApi(f.utilities),
+            otherFees: feesToApi(f.otherFees),
         },
         availabilityDate: f.availabilityDate || null,
         leaseDurationMonths: optional(f.leaseDurationMonths),
@@ -102,6 +110,8 @@ function stepProblems(step, f) {
         if (f.leaseDurationMonths !== "" && (Number(f.leaseDurationMonths) < 1 || Number(f.leaseDurationMonths) > 120)) {
             return "Lease length must be 1 to 120 months.";
         }
+        const costProblem = utilitiesFeesProblem(f.utilities, f.otherFees);
+        if (costProblem) return costProblem;
     }
     return null;
 }
@@ -224,7 +234,8 @@ export default function PropertyForm() {
     const completeness = Math.round((filled / 11) * 100);
     const upfront = [form.monthlyRent, form.advanceRent, form.securityDeposit];
     const upfrontKnown = upfront.every((v) => v !== "");
-    const upfrontTotal = upfrontKnown ? upfront.reduce((s, v) => s + Number(v), 0) : null;
+    const oneTimeFees = form.otherFees.filter((fee) => fee.frequency === "one_time" && fee.amount !== "").reduce((total, fee) => total + Number(fee.amount), 0);
+    const upfrontTotal = upfrontKnown ? upfront.reduce((s, v) => s + Number(v), 0) + oneTimeFees : null;
 
     return (
         <div>
@@ -364,6 +375,12 @@ export default function PropertyForm() {
                             <Field label="Amenities" hint="Comma separated, up to 50">
                                 <input className="field" placeholder="Lift, Generator, Parking" value={form.amenities} onChange={set("amenities")} />
                             </Field>
+                            <UtilitiesFeesEditor
+                                utilities={form.utilities}
+                                fees={form.otherFees}
+                                onUtilitiesChange={(utilities) => setForm((f) => ({ ...f, utilities }))}
+                                onFeesChange={(otherFees) => setForm((f) => ({ ...f, otherFees }))}
+                            />
                             <Field label="House rules" hint="One per line">
                                 <textarea className="field min-h-24" value={form.houseRules} onChange={set("houseRules")} />
                             </Field>
@@ -448,6 +465,7 @@ export default function PropertyForm() {
                         <div className="space-y-1">
                             <div className="flex justify-between"><span>First month's rent</span><span>{money(form.monthlyRent === "" ? null : Number(form.monthlyRent))}</span></div>
                             <div className="flex justify-between"><span>Advance rent</span><span>{money(form.advanceRent === "" ? null : Number(form.advanceRent))}</span></div>
+                            {oneTimeFees > 0 && <div className="flex justify-between"><span>One-time fees</span><span>{money(oneTimeFees)}</span></div>}
                             <div className="flex justify-between"><span>Security deposit</span><span>{money(form.securityDeposit === "" ? null : Number(form.securityDeposit))}</span></div>
                         </div>
                         <div className="mt-3 flex justify-between border-t border-line pt-2 font-semibold">

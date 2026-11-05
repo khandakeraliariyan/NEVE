@@ -23,6 +23,7 @@ const adminAuditLogSchema = new mongoose.Schema(
                 "property_claim",
                 "communication_report",
                 "ai_evaluation",
+                "user",
             ],
         },
         targetId: {

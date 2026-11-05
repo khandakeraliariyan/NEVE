@@ -9,7 +9,7 @@ test("lookup type limits results to the matching active staff roles", () => {
     const reviewer = buildUserLookupFilter({ type: "reviewer", q: "ali", requesterId });
     const manager = buildUserLookupFilter({ type: "manager", q: "ali", requesterId });
 
-    assert.deepEqual(reviewer.filter.role.$in, ["mediator", "legal_reviewer"]);
+    assert.deepEqual(reviewer.filter.role.$in, ["legal_reviewer"]);
     assert.equal(reviewer.filter.isActive, true);
     assert.deepEqual(reviewer.filter._id, { $ne: requesterId });
     assert.ok(manager.error);

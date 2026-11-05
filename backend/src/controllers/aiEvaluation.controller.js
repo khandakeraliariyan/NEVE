@@ -1,16 +1,10 @@
 import mongoose from "mongoose";
 import AIEvaluationRun from "../models/AIEvaluationRun.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
-import { calculateEvaluationMetrics } from "../services/aiEvaluation.service.js";
-
-const tasks = [
-    "ocr",
-    "agreement_extraction",
-    "evidence_link_accuracy",
-    "missing_information",
-    "legal_citation",
-    "suspicious_listing",
-];
+import {
+    AI_EVALUATION_TASKS as tasks,
+    calculateEvaluationMetrics,
+} from "../services/aiEvaluation.service.js";
 const setPrivateResponse = (res) => res.set("Cache-Control", "private, no-store");
 
 export async function createAIEvaluationRun(req, res, next) {

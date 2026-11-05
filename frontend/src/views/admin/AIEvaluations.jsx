@@ -8,7 +8,7 @@ import { dateTime, label } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, PageHeader, Pagination, StatusBadge } from "../../components/ui";
 
-const TASKS = ["ocr", "agreement_extraction", "evidence_link_accuracy", "missing_information", "legal_citation", "suspicious_listing"];
+const TASKS = ["ocr", "agreement_extraction", "evidence_link_accuracy", "missing_information", "legal_citation", "suspicious_listing", "cost_calculation", "distance_calculation", "property_matching", "evidence_conflict"];
 const PAGE_SIZE = 10;
 
 const pct = (v) => (v === null || v === undefined ? "—" : `${(v * 100).toFixed(1)}%`);

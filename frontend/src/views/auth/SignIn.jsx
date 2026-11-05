@@ -11,7 +11,7 @@ import { Button, ErrorBox, Field } from "../../components/ui";
 import { safeNextPath } from "../../components/Redirect";
 
 export default function SignIn() {
-    const { status, role } = useAuth();
+    const { status, role, notice: authNotice, signOut } = useAuth();
     const router = useRouter();
     const next = safeNextPath(useSearchParams().get("next"));
     const [email, setEmail] = useState("");
@@ -20,10 +20,18 @@ export default function SignIn() {
     const [error, setError] = useState(null);
     const [notice, setNotice] = useState(null);
 
+    const [adminRedirect, setAdminRedirect] = useState(false);
+
     useEffect(() => {
+        // Admins have their own portal and can't use this page, even with a password.
+        if (status === "ready" && role === "admin") {
+            setAdminRedirect(true);
+            signOut();
+            return;
+        }
         if (status === "ready") router.replace(next ?? homePathForRole(role));
         if (status === "needs_profile") router.replace("/complete-profile");
-    }, [status, role, router, next]);
+    }, [status, role, router, next, signOut]);
 
     async function handleSubmit(event) {
         event.preventDefault();
@@ -63,7 +71,16 @@ export default function SignIn() {
                 <Field label="Password">
                     <input type="password" required autoComplete="current-password" className="field" value={password} onChange={(e) => setPassword(e.target.value)} />
                 </Field>
-                <ErrorBox error={error} />
+                <ErrorBox error={error ?? authNotice} />
+                {adminRedirect && (
+                    <p className="rounded-lg bg-amber px-3 py-2 text-sm text-amber-ink">
+                        Admin accounts sign in through the{" "}
+                        <Link href="/admin/sign-in" className="font-semibold underline">
+                            admin portal
+                        </Link>
+                        .
+                    </p>
+                )}
                 {notice && <p className="rounded-lg bg-sage px-3 py-2 text-sm text-forest">{notice}</p>}
                 <Button type="submit" className="w-full" disabled={busy || !firebaseConfigured}>
                     {busy ? "Signing in…" : "Sign in"}

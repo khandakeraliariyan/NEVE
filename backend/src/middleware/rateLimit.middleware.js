@@ -28,3 +28,6 @@ export const apiLimiter = createLimiter(100, { skip: isUploadRequest });
 export const authLimiter = createLimiter(20);
 export const userLimiter = createLimiter(20);
 export const uploadLimiter = createLimiter(UPLOAD_RATE_LIMIT);
+
+// Each extraction is a paid model call on a whole document.
+export const extractionLimiter = createLimiter(10);

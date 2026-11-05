@@ -13,14 +13,23 @@ export function AuthProvider({ children }) {
     // "loading" | "signed_out" | "needs_profile" | "ready" | "error"
     const [status, setStatus] = useState(auth ? "loading" : "signed_out");
     const [error, setError] = useState(null);
+    // Why the user was signed out, e.g. an admin who used Google. Shown on sign-in pages.
+    const [notice, setNotice] = useState(null);
 
     const loadProfile = useCallback(async () => {
         try {
             const payload = await api.get("/users/me");
             setProfile(payload.user);
             setStatus("ready");
+            setNotice(null);
             return payload.user;
         } catch (err) {
+            // Admin accounts only accept email and password sessions; end any other kind.
+            if (err instanceof ApiError && err.code === "ADMIN_PASSWORD_SIGN_IN_REQUIRED") {
+                setNotice(err.message);
+                if (auth) await firebaseSignOut(auth);
+                return null;
+            }
             if (err instanceof ApiError && err.status === 404) {
                 setProfile(null);
                 setStatus("needs_profile");
@@ -57,6 +66,8 @@ export function AuthProvider({ children }) {
             role: profile?.role ?? null,
             status,
             error,
+            notice,
+            setNotice,
             reloadProfile: loadProfile,
             setProfile: (user) => {
                 setProfile(user);
@@ -64,7 +75,7 @@ export function AuthProvider({ children }) {
             },
             signOut,
         }),
-        [firebaseUser, profile, status, error, loadProfile, signOut]
+        [firebaseUser, profile, status, error, notice, loadProfile, signOut]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -80,7 +91,6 @@ export function homePathForRole(role) {
             return "/renter";
         case "landlord":
             return "/dashboard";
-        case "mediator":
         case "legal_reviewer":
             return "/cases";
         case "admin":

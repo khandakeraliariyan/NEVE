@@ -93,7 +93,7 @@ export async function exportMyData(req, res, next) {
                 $or: [
                     { renter: actorId },
                     { landlord: actorId },
-                    ...(["mediator", "legal_reviewer"].includes(role)
+                    ...(role === "legal_reviewer"
                         ? [{
                             sharedWith: {
                                 $elemMatch: {
@@ -105,7 +105,7 @@ export async function exportMyData(req, res, next) {
                         : []),
                 ],
             }).lean(),
-            ["mediator", "legal_reviewer"].includes(role)
+            role === "legal_reviewer"
                 ? TenancyCase.find({
                     sharedWith: {
                         $elemMatch: { user: actorId, revokedAt: null },

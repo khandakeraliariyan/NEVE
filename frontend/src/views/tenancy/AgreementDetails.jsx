@@ -394,7 +394,7 @@ function Sharing({ agreement, canEdit, action }) {
         <div className="space-y-6">
             <Card>
                 <h2 className="mb-3 text-xl">Shared with reviewers</h2>
-                {active.length === 0 && <p className="text-sm text-muted">Not shared with any mediator or legal reviewer.</p>}
+                {active.length === 0 && <p className="text-sm text-muted">Not shared with any legal reviewer.</p>}
                 <ul className="divide-y divide-line">
                     {active.map((s) => (
                         <li key={s.user?._id} className="flex items-center justify-between py-2 text-sm">
@@ -412,7 +412,7 @@ function Sharing({ agreement, canEdit, action }) {
             </Card>
             {canEdit && (
                 <Card>
-                    <h2 className="mb-1 text-xl">Share with a mediator or legal reviewer</h2>
+                    <h2 className="mb-1 text-xl">Share with a legal reviewer</h2>
                     <p className="mb-3 text-sm text-muted">This shares the whole agreement: document, clauses, obligations, payments and evidence. Links already opened keep working for up to five minutes after you revoke.</p>
                     <PersonPicker type="reviewer" actionLabel="Share" disabled={action.busy} onPick={(u) => action.run(() => api.post(`/tenancy/agreements/${id}/shares`, { userId: u._id }))} />
                 </Card>

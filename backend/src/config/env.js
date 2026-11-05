@@ -40,6 +40,10 @@ const envSchema = z.object({
         .string()
         .url()
         .default("https://overpass-api.de/api/interpreter"),
+    // The Anthropic SDK reads ANTHROPIC_API_KEY itself; it is listed here so a
+    // missing key can be reported as "extraction not configured".
+    ANTHROPIC_API_KEY: z.string().optional(),
+    AGREEMENT_EXTRACTION_MODEL: z.string().min(1).default("claude-opus-5-5"),
     NEVE_API_BASE_URL: z
         .string()
         .url()

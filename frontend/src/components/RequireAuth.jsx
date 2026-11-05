@@ -6,7 +6,7 @@ import { ErrorBox, Loading } from "./ui";
 import Redirect from "./Redirect";
 
 // Gates its children on sign-in, a Neve profile, and (optionally) a role.
-export default function RequireAuth({ roles, children }) {
+export default function RequireAuth({ roles, signInPath, children }) {
     const { status, role, error, reloadProfile, profile } = useAuth();
     const pathname = usePathname();
 
@@ -18,7 +18,9 @@ export default function RequireAuth({ roles, children }) {
         );
     }
     if (status === "signed_out") {
-        return <Redirect to={`/sign-in?next=${encodeURIComponent(pathname)}`} />;
+        // Admin pages send signed-out visitors to the admin portal, not the public sign-in.
+        const target = signInPath ?? (pathname.startsWith("/admin") ? "/admin/sign-in" : "/sign-in");
+        return <Redirect to={`${target}?next=${encodeURIComponent(pathname)}`} />;
     }
     if (status === "needs_profile") {
         return <Redirect to="/complete-profile" />;
