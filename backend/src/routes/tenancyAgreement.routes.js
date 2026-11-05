@@ -33,6 +33,7 @@ import {
     listMaintenanceRequests,
     reviewConditionEntry,
     updateMaintenanceRequest,
+    assignMaintenanceRequest,
 } from "../controllers/tenancyOperations.controller.js";
 import {
     addCaseEvidence,
@@ -123,6 +124,11 @@ router.post(
 router.patch(
     "/maintenance-requests/:requestId/progress",
     updateMaintenanceRequest
+);
+router.patch(
+    "/maintenance-requests/:requestId/assignee",
+    allowRoles("landlord"),
+    assignMaintenanceRequest
 );
 router.get("/agreements/:agreementId/evidence-graph", getAgreementEvidenceGraph);
 router.get(
