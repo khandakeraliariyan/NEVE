@@ -44,6 +44,9 @@ import aiEvaluationRoutes from "./routes/aiEvaluation.routes.js";
 import verificationRoutes from "./routes/verification.routes.js";
 import adminVerificationRoutes from "./routes/adminVerification.routes.js";
 import adminSystemRoutes from "./routes/adminSystem.routes.js";
+import legalSourceRoutes from "./routes/legalSource.routes.js";
+import adminLegalSourceRoutes from "./routes/adminLegalSource.routes.js";
+import legalReviewRoutes from "./routes/legalReview.routes.js";
 
 const app = express();
 
@@ -110,6 +113,9 @@ app.use("/api/v1/admin/ai-evaluations", aiEvaluationRoutes);
 app.use("/api/v1/verification", verificationRoutes);
 app.use("/api/v1/admin/verifications", adminVerificationRoutes);
 app.use("/api/v1/admin/system", adminSystemRoutes);
+app.use("/api/v1/legal-sources", legalSourceRoutes);
+app.use("/api/v1/admin/legal-sources", adminLegalSourceRoutes);
+app.use("/api/v1/legal-review", legalReviewRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {

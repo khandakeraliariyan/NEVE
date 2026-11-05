@@ -6,9 +6,13 @@ import ConditionReport from "../models/ConditionReport.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
 import TenancyRecordLink, {
+    LEGAL_LINK_RELATIONSHIPS,
     RECORD_LINK_NODE_TYPES,
     RECORD_LINK_RELATIONSHIPS,
 } from "../models/TenancyRecordLink.js";
+import LegalSource from "../models/LegalSource.js";
+import { searchSections } from "../services/legalSource.service.js";
+import { normalizeRewrite, requestClauseRewrite } from "../services/clauseRewrite.service.js";
 import { validateRecordLinkInput } from "../services/evidenceFacts.service.js";
 import { agreementEventFields, verifyHashChain } from "../services/hashChain.service.js";
 import {
@@ -1194,7 +1198,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             })),
             ...recordLinks.map((link) => ({
                 id: String(link._id),
-                kind: "record_link",
+                kind: link.toType === "legal_section" ? "legal_link" : "record_link",
                 from: String(link.fromId),
                 to: String(link.toId),
                 relationship: link.relationship,
@@ -1203,6 +1207,37 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 createdAt: link.createdAt,
             })),
         ];
+
+        const legalSourceIds = [
+            ...new Set(recordLinks.filter((link) => link.legalSource).map((link) => String(link.legalSource))),
+        ];
+        if (legalSourceIds.length) {
+            const legalSources = await LegalSource.find({ _id: { $in: legalSourceIds } })
+                .select("sourceKey version title citation status jurisdiction reviewedAt sections")
+                .lean();
+            const linkedSections = new Set(
+                recordLinks.filter((link) => link.toType === "legal_section").map((link) => String(link.toId))
+            );
+            for (const source of legalSources) {
+                for (const section of source.sections) {
+                    if (!linkedSections.has(String(section._id))) continue;
+                    nodes.push({
+                        id: String(section._id),
+                        type: "legal_section",
+                        legalSourceId: String(source._id),
+                        sourceKey: source.sourceKey,
+                        version: source.version,
+                        title: source.title,
+                        citation: source.citation,
+                        reviewStatus: source.status,
+                        reviewedAt: source.reviewedAt,
+                        sectionNumber: section.sectionNumber,
+                        heading: section.heading,
+                        text: section.text,
+                    });
+                }
+            }
+        }
 
         setPrivateResponse(res);
         return res.json({
@@ -1611,6 +1646,214 @@ export async function getAgreementIntegrity(req, res, next) {
             data: { auditChain, files: fileResults },
             note: "A valid chain shows the recorded history hasn't been edited since it was written. Events from before hashing was added aren't covered.",
         });
+    } catch (error) {
+        next(error);
+    }
+}
+
+function findActiveClause(agreement, clauseId) {
+    if (!validId(clauseId)) return null;
+    const clause = agreement.clauses.id(clauseId);
+    return clause && (clause.reviewStatus ?? "confirmed") !== "rejected" ? clause : null;
+}
+
+// POST /api/v1/tenancy/agreements/:agreementId/legal-links
+// { clauseId, legalSourceId, sectionId, relationship: "cites"|"relates_to"|"contradicts", explanation? }
+// Links a clause to a section of an approved legal source.
+export async function addAgreementLegalLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) return;
+        const { clauseId, legalSourceId, sectionId, relationship, explanation = "" } = req.body ?? {};
+        if (!LEGAL_LINK_RELATIONSHIPS.includes(relationship)) {
+            return res.status(400).json({
+                success: false,
+                message: `relationship must be one of: ${LEGAL_LINK_RELATIONSHIPS.join(", ")}.`,
+            });
+        }
+        if (typeof explanation !== "string" || explanation.length > 1000) {
+            return res.status(400).json({ success: false, message: "explanation must be at most 1000 characters." });
+        }
+        const clause = findActiveClause(agreement, clauseId);
+        if (!clause) return res.status(404).json({ success: false, message: "Clause not found in this agreement." });
+        if (!validId(legalSourceId) || !validId(sectionId)) {
+            return res.status(400).json({ success: false, message: "legalSourceId and sectionId are required." });
+        }
+        const source = await LegalSource.findOne({
+            _id: legalSourceId,
+            status: "approved",
+            jurisdiction: agreement.jurisdiction,
+            "sections._id": sectionId,
+        }).select("_id sourceKey version");
+        if (!source) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved legal-source section not found for this agreement's jurisdiction.",
+            });
+        }
+        let link;
+        try {
+            link = await TenancyRecordLink.create({
+                agreement: agreement._id,
+                fromType: "clause",
+                fromId: clause._id,
+                toType: "legal_section",
+                toId: sectionId,
+                legalSource: source._id,
+                relationship,
+                explanation: explanation.trim(),
+                createdBy: userId(req),
+            });
+        } catch (createError) {
+            if (createError.code === 11000) {
+                return res.status(409).json({ success: false, message: "This clause already has that link to the section." });
+            }
+            throw createError;
+        }
+        await saveAuditedChange(agreement, req, "legal_link_added", "clause", clause._id);
+        setPrivateResponse(res);
+        return res.status(201).json({ success: true, data: link });
+    } catch (error) {
+        next(error);
+    }
+}
+
+const rewritesInProgress = new Set();
+
+// POST /api/v1/tenancy/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions
+// Claude suggests balanced wording, citing only approved legal sources it
+// was given for this clause.
+export async function suggestClauseRewrite(req, res, next) {
+    let key = null;
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) return;
+        if (!isExtractionConfigured()) {
+            return res.status(503).json({ success: false, message: "Clause suggestions are not configured." });
+        }
+        const clause = findActiveClause(agreement, req.params.clauseId);
+        if (!clause) return res.status(404).json({ success: false, message: "Clause not found in this agreement." });
+        if ((clause.rewriteSuggestions ?? []).length >= 10) {
+            return res.status(409).json({ success: false, message: "This clause already has 10 suggestions." });
+        }
+
+        key = `${agreement._id}:${clause._id}`;
+        if (rewritesInProgress.has(key)) {
+            key = null;
+            return res.status(409).json({ success: false, message: "A suggestion is already being written for this clause." });
+        }
+        rewritesInProgress.add(key);
+
+        const sources = await LegalSource.find({ jurisdiction: agreement.jurisdiction, status: "approved" }).lean();
+        const sections = searchSections(sources, {
+            query: `${clause.heading} ${clause.text}`,
+            category: clause.category,
+            limit: 8,
+        });
+        const result = await requestClauseRewrite({ clause, sections, jurisdiction: agreement.jurisdiction });
+        const suggestion = normalizeRewrite(result.result, sections);
+        if (!suggestion.text) {
+            return res.status(502).json({ success: false, message: "Clause suggestion failed. Please try again later." });
+        }
+        clause.rewriteSuggestions.push({ ...suggestion, model: result.model, requestedBy: userId(req) });
+        await saveAuditedChange(agreement, req, "clause_rewrite_suggested", "clause", clause._id);
+
+        setPrivateResponse(res);
+        return res.status(201).json({
+            success: true,
+            data: clause.rewriteSuggestions[clause.rewriteSuggestions.length - 1],
+            consideredSections: sections.map(({ legalSourceId, sectionId, title, sectionNumber, version }) => ({
+                legalSourceId,
+                sectionId,
+                title,
+                sectionNumber,
+                version,
+            })),
+            usage: result.usage,
+            latencyMs: result.latencyMs,
+            disclaimer:
+                "A drafting suggestion for the parties to discuss, based only on legal sources a Neve legal reviewer approved. It isn't legal advice and doesn't change the clause.",
+        });
+    } catch (error) {
+        if (error instanceof ExtractionError) {
+            return res.status(error.status).json({ success: false, message: error.publicMessage });
+        }
+        next(error);
+    } finally {
+        if (key) rewritesInProgress.delete(key);
+    }
+}
+
+function findSuggestion(agreement, req, res) {
+    const clause = findActiveClause(agreement, req.params.clauseId);
+    const suggestion =
+        clause && validId(req.params.suggestionId) ? clause.rewriteSuggestions.id(req.params.suggestionId) : null;
+    if (!suggestion) {
+        res.status(404).json({ success: false, message: "Rewrite suggestion not found." });
+        return null;
+    }
+    return { clause, suggestion };
+}
+
+// PATCH .../clauses/:clauseId/rewrite-suggestions/:suggestionId/response
+// { response: "agree"|"dismiss" }  (renter or landlord)
+export async function respondToClauseRewrite(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) return;
+        const { response } = req.body ?? {};
+        if (!["agree", "dismiss"].includes(response)) {
+            return res.status(400).json({ success: false, message: "response must be agree or dismiss." });
+        }
+        const found = findSuggestion(agreement, req, res);
+        if (!found) return;
+        const { clause, suggestion } = found;
+        suggestion.responses = suggestion.responses.filter((entry) => String(entry.user) !== String(userId(req)));
+        suggestion.responses.push({ user: userId(req), response, respondedAt: new Date() });
+        await saveAuditedChange(agreement, req, `clause_rewrite_${response}`, "clause", clause._id);
+        const agreedBy = new Set(
+            suggestion.responses.filter((entry) => entry.response === "agree").map((entry) => String(entry.user))
+        );
+        setPrivateResponse(res);
+        return res.json({
+            success: true,
+            data: suggestion,
+            bothAgree: agreedBy.has(String(agreement.renter)) && agreedBy.has(String(agreement.landlord)),
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH .../clauses/:clauseId/rewrite-suggestions/:suggestionId/assessment
+// { verdict: "endorsed"|"has_concerns", note? }  (legal reviewer with access)
+export async function assessClauseRewrite(req, res, next) {
+    try {
+        if (req.neveUser.role !== "legal_reviewer") {
+            return res.status(403).json({ success: false, message: "Only a legal reviewer can assess suggestions." });
+        }
+        const agreement = await getAccessibleAgreement(req, res);
+        if (!agreement) return;
+        const { verdict, note = "" } = req.body ?? {};
+        if (!["endorsed", "has_concerns"].includes(verdict)) {
+            return res.status(400).json({ success: false, message: "verdict must be endorsed or has_concerns." });
+        }
+        if (typeof note !== "string" || note.length > 2000) {
+            return res.status(400).json({ success: false, message: "note must be at most 2000 characters." });
+        }
+        if (verdict === "has_concerns" && !note.trim()) {
+            return res.status(400).json({ success: false, message: "Describe the concerns in note." });
+        }
+        const found = findSuggestion(agreement, req, res);
+        if (!found) return;
+        const { clause, suggestion } = found;
+        suggestion.reviewerAssessments = suggestion.reviewerAssessments.filter(
+            (entry) => String(entry.reviewer) !== String(userId(req))
+        );
+        suggestion.reviewerAssessments.push({ reviewer: userId(req), verdict, note: note.trim(), assessedAt: new Date() });
+        await saveAuditedChange(agreement, req, "clause_rewrite_assessed", "clause", clause._id);
+        setPrivateResponse(res);
+        return res.json({ success: true, data: suggestion });
     } catch (error) {
         next(error);
     }

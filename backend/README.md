@@ -29,8 +29,8 @@ important requirements are missing.
 | 4.7 | **Neve Maintenance & Repair** | **Implemented** | Requests with category, priority, description and private photos; statuses (submitted, acknowledged, in progress, awaiting renter, completed, disputed, cancelled); responsibility; assignment to the renter, the landlord or a named outside person; progress history; searchable repair records. | — |
 | 4.8 | **Neve Smart Choice — Explainable Matching** | **Implemented** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Matching is rule-based, not AI. Commute distance is straight-line. |
 | 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app, and by email and push when configured), and suspicious-message reporting. Payment processing is out of scope. | Inquiries have two separate status flows. |
-| 4.10 | **Neve Agreement & Trust** | **Partial** | Private agreement upload (PDF, image, text); Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer. | Balanced clause rewrites; legal-source retrieval with sections, versions and review status; the legal-review workflow. |
-| 4.11 | **Neve Evidence Graph** | **Partial** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`, `requires`), record-to-record links (a clause `requires` an obligation, a payment `supports` an obligation), a per-record fact state (documented, disputed, uncertain, undocumented) where a `supports` link confirmed by both participants is a documented fact, Claude-suggested file links that count only after a participant accepts them, with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses, extracted-vs-recorded value mismatches, conflicting or mismatched payment amounts (rent per month, deposit and advance totals), and missing or decreasing move-in/move-out meter readings; JSON evidence report; SHA-256 hashes of uploaded files and a hash-linked agreement event history, with an integrity check. | Legal-source nodes. |
+| 4.10 | **Neve Agreement & Trust** | **Mostly implemented** | Private agreement upload (PDF, image, text); Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer; versioned legal sources with sections that a legal reviewer approves; section search; Claude-suggested balanced clause rewrites that cite only approved sections, with each party's response and reviewer assessments. | Rewrite suggestions don't edit the clause; the parties change it themselves. Agreements are still Bangladesh-only. |
+| 4.11 | **Neve Evidence Graph** | **Implemented** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`, `requires`), record-to-record links (a clause `requires` an obligation, a payment `supports` an obligation), a per-record fact state (documented, disputed, uncertain, undocumented) where a `supports` link confirmed by both participants is a documented fact, Claude-suggested file links that count only after a participant accepts them, with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses, extracted-vs-recorded value mismatches, conflicting or mismatched payment amounts (rent per month, deposit and advance totals), and missing or decreasing move-in/move-out meter readings; JSON evidence report; SHA-256 hashes of uploaded files and a hash-linked agreement event history, with an integrity check; clause links to approved legal-source sections shown as legal-source nodes with their version and review status. | — |
 | 4.12 | **Neve Property Manager** | **Not implemented** | Landlords manage their own listings (create, edit, pause, delete), inquiries, viewings and listing analytics. | The `property_manager` role, access scoped to assigned properties and tenancies, and lease/obligation tracking for managers. |
 | 4.13 | **Neve Security, Privacy & Dispute Support** | **Implemented** | Role-based access; private-by-default tenancy files with signed URLs; case-specific evidence sharing with legal reviewers (the role that replaced mediators); sensitive-access log; personal-data export; document deletion requests; retention dates and legal holds; tamper-evident (SHA-256 hash-linked, append-only) admin audit and sensitive-access logs with an integrity check; scheduled retention purges; database backups to private object storage with restore; no public trust scores or AI verdicts. | — |
 | 4.14 | **Neve AI Reliability & Evaluation** | **Partial** | Admin API that scores submitted evaluation runs: precision, recall, F1, exact match, false-positive rate, OCR character error rate, failure rate, latency and cost, for model-backed and deterministic tasks. Extraction responses record model, token usage and latency. | A documented test set and runner that produce those results; separate OCR evaluation; regression tracking. |
@@ -43,7 +43,7 @@ important requirements are missing.
 | Landlord | `landlord` | Implemented |
 | Property manager | — | Not implemented |
 | Mediator | `legal_reviewer` | Replaced: invited legal reviewers review shared cases and post notes, questions and opinions |
-| Legal reviewer (legal-source pack) | `legal_reviewer` | Partial: there is no legal-source pack to review yet |
+| Legal reviewer (legal-source pack) | `legal_reviewer` | Implemented: approves legal-source versions or sends them back, and assesses clause rewrite suggestions on shared agreements |
 | Platform administrator | `admin` | Implemented (email/password sign-in only) |
 | AI service | Claude agreement extraction | Partial: proposals only, confirmed or rejected by participants |
 
@@ -60,8 +60,8 @@ important requirements are missing.
 | 1 | Duplicate/contradiction warning demonstration | Implemented (heuristic; known false positives) |
 | 1 | Evidence Graph demo with a sample agreement and conflicting records | Implemented |
 | 1 | Basic evaluation with a documented test set | Partial (scoring API only; no test set) |
-| 2 — Tenancy Trust | Qualified-review workflow and reviewed legal-source pack | Not implemented |
-| 2 | Agreement analysis, receipts, obligation tracking, evidence reports | Partial (no clause rewrites or legal sources) |
+| 2 — Tenancy Trust | Qualified-review workflow and reviewed legal-source pack | Implemented |
+| 2 | Agreement analysis, receipts, obligation tracking, evidence reports | Implemented |
 | 2 | Move-in/move-out reports with two-party confirmation | Implemented |
 | 2 | Maintenance and repair requests | Mostly implemented (no assignment) |
 | 2 | Secure sharing, role permissions, audit history, privacy workflows | Implemented |
@@ -69,7 +69,7 @@ important requirements are missing.
 | 3 — Scale | Property-manager workspace and analytics | Not implemented |
 | 3 | Advanced saved-search alerts and matching | Partial (in-app alerts only) |
 | 3 | Mediator workspace and more integrations | Replaced by the legal-reviewer case workspace; no integrations |
-| 3 | More jurisdictions through legal-source packs | Not implemented (Bangladesh only) |
+| 3 | More jurisdictions through legal-source packs | Partial (legal sources take any jurisdiction; agreements are Bangladesh-only) |
 | 3 | Public APIs and larger-scale reliability evaluation | Not implemented |
 
 **Out of scope for the first release (non-goals):** property sales, payment
@@ -344,6 +344,11 @@ the feature inventory previously proposed.
 | `/api/v1/tenancy` | `GET /agreements/:agreementId/integrity?recheckFiles=true` | Agreement participants and shared reviewers verify the hash-linked event history and, optionally, re-hash up to 50 stored files against their recorded SHA-256 |
 | `/api/v1/admin/audit-logs` | `GET /integrity?log=admin\|access` | Admin verifies the hash chain of the admin audit log or the sensitive-access log |
 | `/api/v1/admin/system` | `GET /jobs?job=&limit=`, `POST /retention-purge`, `POST /backups` | Admin views background job runs, runs the retention purge now (`{ "dryRun": true }` lists what would be deleted), or starts a backup |
+| `/api/v1/legal-sources` | `GET /?jurisdiction=`, `GET /jurisdictions`, `GET /search?jurisdiction=&q=&category=&limit=` | Public approved legal-source pack for a jurisdiction, the jurisdictions that have one, and section search |
+| `/api/v1/admin/legal-sources` | `GET /`, `POST /`, `GET /:sourceId`, `PATCH /:sourceId`, `PATCH /:sourceId/status` | Admin drafts legal-source versions (posting an existing `sourceKey` starts its next version), edits drafts, and submits (`submit`) or retires (`retire`) them |
+| `/api/v1/legal-review` | `GET /sources?status=in_review`, `GET /sources/:sourceId`, `PATCH /sources/:sourceId` | Legal reviewer queue: `approve` (retires the previous approved version) or `request_changes` with a note. A reviewer can't approve a source they drafted |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/legal-links` | Renter or landlord links a clause to an approved legal-source section (`cites`, `relates_to`, `contradicts`) |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses/:clauseId/rewrite-suggestions`, `PATCH .../rewrite-suggestions/:suggestionId/response`, `PATCH .../rewrite-suggestions/:suggestionId/assessment` | Claude suggests balanced wording citing only approved sections (renter or landlord; needs `ANTHROPIC_API_KEY`); each party responds `agree` or `dismiss`; a legal reviewer with access records `endorsed` or `has_concerns` |
 
 For exact role checks and request/response fields, see the corresponding
 router, controller, validator, and model under `src/`.
@@ -533,8 +538,8 @@ capped at 500 entries; the report marks whether it was truncated. File contents
 are not embedded, and report generation is recorded in the agreement audit
 trail and sensitive-access log.
 
-Jurisdiction defaults to Bangladesh as metadata. Bangladesh-specific legal
-source retrieval and suggested clause wording are not implemented.
+Jurisdiction defaults to Bangladesh as metadata. Clause rewrites and legal
+links use the approved legal-source pack for the agreement's jurisdiction.
 `plainLanguageNote` is either written by a participant or generated by
 extraction; generated summaries describe the text only and are not legal
 advice.
@@ -821,6 +826,24 @@ tools instead.
 
 Both jobs are off until enabled, and a database lock stops two server
 instances from running the same job at once.
+
+### Legal sources and clause rewrites
+
+A **legal source** is one version of a law, rule or official guidance, split
+into numbered sections tagged with clause topics (`rent`, `deposit`, `term`,
+`notice`, `maintenance`, `utilities`, `other`). Admins draft it and submit it;
+a legal reviewer approves it or sends it back with notes. Approving a version
+retires the previous approved version of the same `sourceKey`, so each source
+has at most one approved version. The approved versions for a jurisdiction
+are its **legal-source pack**.
+
+**Clause rewrite suggestions** retrieve the best-matching approved sections
+for a clause (by topic and shared words) and ask Claude for balanced wording
+that cites only those sections. Citations to anything else are dropped, and a
+suggestion with no citation is labelled as not backed by a reviewed source.
+Suggestions never change the clause: each party records `agree` or
+`dismiss`, and a legal reviewer the agreement is shared with can record an
+assessment. They are drafting help, not legal advice.
 
 ### Responses and pagination
 

@@ -1,5 +1,57 @@
 import mongoose from "mongoose";
 
+const rewriteSuggestionSchema = new mongoose.Schema(
+    {
+        text: { type: String, required: true, maxlength: 6000 },
+        rationale: { type: String, maxlength: 2000, default: "" },
+        changes: { type: [String], default: [] },
+        concerns: { type: [String], default: [] },
+        citations: {
+            type: [
+                {
+                    _id: false,
+                    legalSource: { type: mongoose.Schema.Types.ObjectId, ref: "LegalSource", required: true },
+                    sectionId: { type: mongoose.Schema.Types.ObjectId, required: true },
+                    sourceKey: { type: String, maxlength: 120 },
+                    version: { type: Number },
+                    sectionNumber: { type: String, maxlength: 40 },
+                    title: { type: String, maxlength: 300 },
+                },
+            ],
+            default: [],
+        },
+        model: { type: String, default: null },
+        requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        // Each participant's view of the suggestion. Agreeing doesn't change
+        // the clause; the parties edit the clause themselves.
+        responses: {
+            type: [
+                {
+                    _id: false,
+                    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                    response: { type: String, enum: ["agree", "dismiss"], required: true },
+                    respondedAt: { type: Date, default: Date.now },
+                },
+            ],
+            default: [],
+        },
+        // A legal reviewer the agreement is shared with can assess it.
+        reviewerAssessments: {
+            type: [
+                {
+                    _id: false,
+                    reviewer: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                    verdict: { type: String, enum: ["endorsed", "has_concerns"], required: true },
+                    note: { type: String, trim: true, maxlength: 2000, default: "" },
+                    assessedAt: { type: Date, default: Date.now },
+                },
+            ],
+            default: [],
+        },
+    },
+    { timestamps: true }
+);
+
 const clauseSchema = new mongoose.Schema(
     {
         heading: { type: String, trim: true, maxlength: 200, default: "" },
@@ -43,6 +95,7 @@ const clauseSchema = new mongoose.Schema(
         // text; null when the file is a PDF or image and was not machine-checked.
         sourceVerified: { type: Boolean, default: null },
         ambiguityNote: { type: String, trim: true, maxlength: 1000, default: "" },
+        rewriteSuggestions: { type: [rewriteSuggestionSchema], default: [] },
         reviewedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",

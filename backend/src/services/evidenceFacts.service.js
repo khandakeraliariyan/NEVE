@@ -69,7 +69,7 @@ export function buildFactStates(agreement, links = [], recordLinks = []) {
 export function findUnmetRequirements(agreement, recordLinks = []) {
     const flags = [];
     for (const link of recordLinks) {
-        if (link.relationship !== "requires") continue;
+        if (link.relationship !== "requires" || link.toType === "legal_section") continue;
         const required = findRecord(agreement, link.toType, link.toId);
         if (!required) {
             flags.push({

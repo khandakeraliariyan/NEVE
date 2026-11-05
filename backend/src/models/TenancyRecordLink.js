@@ -5,6 +5,8 @@ import mongoose from "mongoose";
 // obligation. Links between a record and a file are TenancyEvidenceLinks.
 export const RECORD_LINK_NODE_TYPES = ["agreement", "clause", "obligation", "payment"];
 export const RECORD_LINK_RELATIONSHIPS = ["requires", "supports", "contradicts", "relates_to"];
+// A clause can cite a section of an approved legal source.
+export const LEGAL_LINK_RELATIONSHIPS = ["cites", "relates_to", "contradicts"];
 
 const tenancyRecordLinkSchema = new mongoose.Schema(
     {
@@ -16,9 +18,15 @@ const tenancyRecordLinkSchema = new mongoose.Schema(
         },
         fromType: { type: String, enum: RECORD_LINK_NODE_TYPES, required: true },
         fromId: { type: mongoose.Schema.Types.ObjectId, required: true },
-        toType: { type: String, enum: RECORD_LINK_NODE_TYPES, required: true },
+        toType: { type: String, enum: [...RECORD_LINK_NODE_TYPES, "legal_section"], required: true },
         toId: { type: mongoose.Schema.Types.ObjectId, required: true },
-        relationship: { type: String, enum: RECORD_LINK_RELATIONSHIPS, required: true },
+        // Set when toType is "legal_section": the source version holding it.
+        legalSource: { type: mongoose.Schema.Types.ObjectId, ref: "LegalSource", default: null },
+        relationship: {
+            type: String,
+            enum: [...new Set([...RECORD_LINK_RELATIONSHIPS, ...LEGAL_LINK_RELATIONSHIPS])],
+            required: true,
+        },
         explanation: { type: String, trim: true, maxlength: 1000, default: "" },
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     },

@@ -15,6 +15,10 @@ import {
     updateAgreementObligation,
     updateAgreementEvidenceLink,
     confirmAgreementEvidenceLink,
+    addAgreementLegalLink,
+    suggestClauseRewrite,
+    respondToClauseRewrite,
+    assessClauseRewrite,
     suggestAgreementEvidenceLinks,
     reviewSuggestedEvidenceLink,
     addAgreementRecordLink,
@@ -165,6 +169,26 @@ router.post(
     "/agreements/:agreementId/evidence-links/:linkId/confirm",
     allowRoles("renter", "landlord"),
     confirmAgreementEvidenceLink
+);
+router.post(
+    "/agreements/:agreementId/legal-links",
+    allowRoles("renter", "landlord"),
+    addAgreementLegalLink
+);
+router.post(
+    "/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions",
+    allowRoles("renter", "landlord"),
+    suggestClauseRewrite
+);
+router.patch(
+    "/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions/:suggestionId/response",
+    allowRoles("renter", "landlord"),
+    respondToClauseRewrite
+);
+router.patch(
+    "/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions/:suggestionId/assessment",
+    allowRoles("legal_reviewer"),
+    assessClauseRewrite
 );
 router.post(
     "/agreements/:agreementId/record-links",
