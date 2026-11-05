@@ -1,3 +1,7 @@
+import {
+    isDeliveryConfigured,
+    queueNotificationDelivery,
+} from "./notificationDelivery.service.js";
 import Notification from "../models/Notification.js";
 import RenterPreference from "../models/RenterPreference.js";
 import SavedSearch from "../models/SavedSearch.js";
@@ -98,6 +102,7 @@ export async function notifyRentersOfMatchingProperty(property) {
         const result = await Notification.bulkWrite(notifications, {
             ordered: false,
         });
+        await queueUpsertedDeliveries(result);
         return {
             matchedRenterCount: notifications.length,
             deliveredCount: result.upsertedCount,
@@ -108,11 +113,27 @@ export async function notifyRentersOfMatchingProperty(property) {
             writeErrors.length > 0 &&
             writeErrors.every((writeError) => writeError.code === 11000)
         ) {
+            await queueUpsertedDeliveries(error.result);
             return {
                 matchedRenterCount: notifications.length,
                 deliveredCount: error.result?.upsertedCount ?? 0,
             };
         }
         throw error;
+    }
+}
+
+// bulkWrite skips document hooks, so send email/push for the new alerts here.
+async function queueUpsertedDeliveries(result) {
+    if (!isDeliveryConfigured()) return;
+    const ids = Object.values(result?.upsertedIds ?? {});
+    if (!ids.length) return;
+    try {
+        const created = await Notification.find({ _id: { $in: ids } });
+        for (const notification of created) {
+            queueNotificationDelivery(notification, Notification);
+        }
+    } catch (error) {
+        console.error("Queue matching alert delivery error:", error);
     }
 }

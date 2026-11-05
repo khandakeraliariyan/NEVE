@@ -53,6 +53,15 @@ const envSchema = z.object({
     // missing key can be reported as "extraction not configured".
     ANTHROPIC_API_KEY: z.string().optional(),
     AGREEMENT_EXTRACTION_MODEL: z.string().min(1).default("claude-opus-5-5"),
+    // Email delivery through an HTTP email API. All three are needed.
+    EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).optional(),
+    EMAIL_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().email().optional(),
+    // Push delivery through Firebase Cloud Messaging.
+    PUSH_NOTIFICATIONS_ENABLED: z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((value) => value === "true"),
     NEVE_API_BASE_URL: z
         .string()
         .url()

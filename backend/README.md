@@ -28,7 +28,7 @@ important requirements are missing.
 | 4.6 | **Neve Move-In & Move-Out Records** | **Implemented** | Room-by-room and meter-reading entries with photos, confirm/dispute by each party, append-only corrections, and move-in vs move-out comparison that reports differences without assigning fault. | — |
 | 4.7 | **Neve Maintenance & Repair** | **Implemented** | Requests with category, priority, description and private photos; statuses (submitted, acknowledged, in progress, awaiting renter, completed, disputed, cancelled); responsibility; assignment to the renter, the landlord or a named outside person; progress history; searchable repair records. | — |
 | 4.8 | **Neve Smart Choice — Explainable Matching** | **Implemented** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Matching is rule-based, not AI. Commute distance is straight-line. |
-| 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app), and suspicious-message reporting. Payment processing is out of scope. | Email/push notifications; inquiries have two separate status flows. |
+| 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app, and by email and push when configured), and suspicious-message reporting. Payment processing is out of scope. | Inquiries have two separate status flows. |
 | 4.10 | **Neve Agreement & Trust** | **Partial** | Private agreement upload (PDF, image, text); Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer. | Balanced clause rewrites; legal-source retrieval with sections, versions and review status; the legal-review workflow. |
 | 4.11 | **Neve Evidence Graph** | **Partial** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`) with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses and extracted-vs-recorded value mismatches; JSON evidence report. | `requires` relationship; legal-source nodes; AI-proposed links; an explicit "documented fact" state; automatic detection of conflicting payment amounts and missing meter readings; SHA-256 file hashes and hash-linked events. |
 | 4.12 | **Neve Property Manager** | **Not implemented** | Landlords manage their own listings (create, edit, pause, delete), inquiries, viewings and listing analytics. | The `property_manager` role, access scoped to assigned properties and tenancies, and lease/obligation tracking for managers. |
@@ -184,6 +184,10 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `OVERPASS_API_URL` | No | `https://overpass-api.de/api/interpreter` | Overpass endpoint for nearby-place data |
 | `ROUTING_WALKING_URL` | No | `https://routing.openstreetmap.de/routed-foot` | OSRM-compatible service for walking routes and times |
 | `ROUTING_DRIVING_URL` | No | `https://routing.openstreetmap.de/routed-car` | OSRM-compatible service for driving routes and times |
+| `EMAIL_PROVIDER` | For email | Optional; `resend` or `sendgrid` | HTTP email API used for email notifications |
+| `EMAIL_API_KEY` | For email | Optional | API key for the email provider |
+| `EMAIL_FROM` | For email | Optional; email address | Sender address for notification emails |
+| `PUSH_NOTIFICATIONS_ENABLED` | No | `false`; `true` or `false` | Sends push notifications through Firebase Cloud Messaging with the existing service account |
 | `NEVE_API_BASE_URL` | No | `http://localhost:5000/api/v1` | Configured API base URL |
 
 R2 is treated as configured only when all four R2 account, key, secret, and
@@ -325,6 +329,7 @@ the feature inventory previously proposed.
 | `/api/v1/tenancy` | `PATCH /maintenance-requests/:requestId/assignee` | Landlord assigns a repair to the renter, the landlord, or a named person outside Neve (`{ assignee: { userId } }`, `{ assignee: { name, phone?, organization? } }`, or `{ assignee: null }`); the change is added to the request history |
 | `/api/v1/properties` | `GET /:id/route?toLat=&toLng=&mode=walking\|driving&geometry=true` | Public walking or driving route from a published listing to a point: distance, estimated time, and an optional GeoJSON line |
 | `/api/v1/properties` | `GET /:id/travel-times?mode=&category=&limit=` | Public walking or driving time to the nearest mapped places (up to 25), optionally for one category |
+| `/api/v1/notifications` | `GET /preferences`, `PATCH /preferences`, `POST /push-tokens`, `DELETE /push-tokens` | Email/push settings (`email`, `push`, `mutedTypes`) and Firebase Cloud Messaging device tokens for the signed-in user |
 
 For exact role checks and request/response fields, see the corresponding
 router, controller, validator, and model under `src/`.
@@ -758,6 +763,18 @@ when it is set, so scores for renters who don't use them are unchanged.
 - `household`: `{ adults, children, pets, needsStepFreeAccess }`. Checks about
   two people per bedroom (or available spots for shared listings), whether
   house rules allow or forbid pets, and ground floor or a listed lift.
+
+### Email and push notifications
+
+Every new in-app notification is also sent by email and push when those
+channels are configured (`EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM`;
+`PUSH_NOTIFICATIONS_ENABLED=true`). Delivery runs after the notification is
+saved, never blocks or fails the original action, and its result is stored
+on the notification's `delivery` field. Users turn channels off or mute
+specific notification types at `/api/v1/notifications/preferences`; muted
+types still appear in the app. The app registers each device's FCM token at
+`POST /api/v1/notifications/push-tokens`, and tokens FCM reports as invalid
+are removed automatically.
 
 ### Responses and pagination
 

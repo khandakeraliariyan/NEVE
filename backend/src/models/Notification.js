@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { queueNotificationDelivery } from "../services/notificationDelivery.service.js";
 
 const notificationSchema = new mongoose.Schema(
     {
@@ -73,6 +74,13 @@ const notificationSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+
+        // Email and push results; null until delivery runs (or when no
+        // delivery channel is configured).
+        delivery: {
+            type: mongoose.Schema.Types.Mixed,
+            default: null,
+        },
     },
     { timestamps: true }
 );
@@ -85,6 +93,16 @@ notificationSchema.index(
         partialFilterExpression: { type: "matching_listing_available" },
     }
 );
+
+notificationSchema.pre("save", function markNew() {
+    this.$locals.wasNew = this.isNew;
+});
+
+notificationSchema.post("save", function deliverNew(doc) {
+    if (doc.$locals.wasNew) {
+        queueNotificationDelivery(doc, doc.constructor);
+    }
+});
 
 const Notification = mongoose.model("Notification", notificationSchema);
 

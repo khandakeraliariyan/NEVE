@@ -81,6 +81,28 @@ const userSchema = new mongoose.Schema(
             default: true,
         },
 
+        notificationPreferences: {
+            email: { type: Boolean, default: true },
+            push: { type: Boolean, default: true },
+            // Notification types the user doesn't want sent by email or push.
+            // They still appear in the app.
+            mutedTypes: { type: [String], default: [] },
+        },
+
+        // Firebase Cloud Messaging device tokens. Never returned by default.
+        pushTokens: {
+            type: [
+                {
+                    _id: false,
+                    token: { type: String, required: true, maxlength: 4096 },
+                    platform: { type: String, enum: ["web", "android", "ios"], default: "web" },
+                    lastSeenAt: { type: Date, default: Date.now },
+                },
+            ],
+            default: [],
+            select: false,
+        },
+
         // Email and phone come from Firebase (verified sign-in email, phone
         // number confirmed by Firebase phone auth). Identity is reviewed by an
         // admin from submitted documents.
