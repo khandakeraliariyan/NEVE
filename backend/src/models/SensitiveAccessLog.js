@@ -16,7 +16,7 @@ const sensitiveAccessLogSchema = new mongoose.Schema(
         resourceType: {
             type: String,
             required: true,
-            enum: ["agreement", "case", "file", "privacy_request"],
+            enum: ["agreement", "case", "file", "privacy_request", "verification_request"],
         },
         resourceId: {
             type: mongoose.Schema.Types.ObjectId,

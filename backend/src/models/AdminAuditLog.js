@@ -24,6 +24,7 @@ const adminAuditLogSchema = new mongoose.Schema(
                 "communication_report",
                 "ai_evaluation",
                 "user",
+                "verification_request",
             ],
         },
         targetId: {

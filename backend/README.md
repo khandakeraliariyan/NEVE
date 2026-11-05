@@ -21,10 +21,10 @@ important requirements are missing.
 | § | Main project feature | Backend status | Implemented | Not implemented yet |
 |---|---|---|---|---|
 | 4.1 | **Neve Discover — Rental Marketplace** | **Mostly implemented** | Listing search and filters (location, rent, bedrooms, property type — `apartment`, `house`, `room` or `shared_room`, with occupant gender, bathroom type and available spots for shared listings — furnishing, availability, lease length, amenities), map search, recent listings, favorites, comparison, saved searches, and suspicious/inaccurate listing reports. | List/map switching is frontend behavior. |
-| 4.2 | **Neve Property Intelligence** | **Mostly implemented** | Listing details with photos, videos, floor plans, rooms, floor, furnishing, amenities, house rules, lease length and availability; rent, deposit, advance and service charge; landlord public profile; viewing requests and listing questions. | Phone/email, identity and property-ownership verification, so no precise verification status can be shown. |
+| 4.2 | **Neve Property Intelligence** | **Implemented** | Listing details with photos, videos, floor plans, rooms, floor, furnishing, amenities, house rules, lease length and availability; rent, deposit, advance and service charge; landlord public profile with email, phone, identity and ownership verification status; viewing requests and listing questions. | — |
 | 4.3 | **Neve Neighborhood Intelligence (5 km)** | **Partial** | Property-centered OpenStreetMap places within a 100–5000 m radius, category filters, insights, a 24-hour cache, and source and freshness metadata. | Walking/driving routes and travel times (distances are straight-line only). Cross-property neighborhood comparison exists only inside property comparison. |
 | 4.4 | **Neve True Cost of Renting** | **Implemented** | Separate upfront and monthly totals; rent, service charge, advance, deposit, utilities (included, fixed, estimated, or renter-pays-unknown) and other one-time or monthly fees; every line labelled landlord-provided or landlord estimate and every total labelled calculated; assumptions; missing amounts make totals unknown, never zero. | — |
-| 4.5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate-listing signals (titles, location, rent, shared image fingerprints, coordinates), description-vs-field consistency warnings, unusual-rent checks, renter reports, human review, reviewed public trust summaries, and a deposit-safety notice. | Identity and ownership checks. Heuristics have known false positives (look-alike flats in one building, generic titles, negated amenities such as "no parking", service charges written "per month"). |
+| 4.5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate-listing signals (titles, location, rent, shared image fingerprints, coordinates), description-vs-field consistency warnings, unusual-rent checks, renter reports, human review, reviewed public trust summaries, admin-reviewed identity and ownership verification, and a deposit-safety notice. | Heuristics have known false positives (look-alike flats in one building, generic titles, negated amenities such as "no parking", service charges written "per month"). |
 | 4.6 | **Neve Move-In & Move-Out Records** | **Implemented** | Room-by-room and meter-reading entries with photos, confirm/dispute by each party, append-only corrections, and move-in vs move-out comparison that reports differences without assigning fault. | — |
 | 4.7 | **Neve Maintenance & Repair** | **Mostly implemented** | Requests with category, priority, description and private photos; statuses (submitted, acknowledged, in progress, awaiting renter, completed, disputed, cancelled); responsibility; progress history; searchable repair records. | Assigning a repair to a specific person. |
 | 4.8 | **Neve Smart Choice — Explainable Matching** | **Partial** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Commute destination, walking distance and household-needs preferences. Matching is rule-based, not AI. |
@@ -65,7 +65,7 @@ important requirements are missing.
 | 2 | Move-in/move-out reports with two-party confirmation | Implemented |
 | 2 | Maintenance and repair requests | Mostly implemented (no assignment) |
 | 2 | Secure sharing, role permissions, audit history, privacy workflows | Partial (no hash-linked audit, automatic purge, or backups) |
-| 2 | Fuller listing-risk signals and human review | Partial (no identity/ownership verification) |
+| 2 | Fuller listing-risk signals and human review | Implemented |
 | 3 — Scale | Property-manager workspace and analytics | Not implemented |
 | 3 | Advanced saved-search alerts and matching | Partial (in-app alerts only) |
 | 3 | Mediator workspace and more integrations | Replaced by the legal-reviewer case workspace; no integrations |
@@ -314,6 +314,12 @@ the feature inventory previously proposed.
 | `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId`, `PUT /:reviewId/reply`, `DELETE /:reviewId/reply` | Property reviews; posting requires a `confirmed` or `completed` viewing of that property. Only the property's landlord can reply |
 | `/api/v1/review-moderation` | `POST /:reviewId/reports`, `GET /reports`, `PATCH /reports/:reportId`, `PATCH /:reviewId/moderation` | Review reports and moderation |
 | `/api/v1/landlord/dashboard` | `GET /properties`, `GET /performance` | Landlord listing dashboard and analytics for owned listings |
+| `/api/v1/users` | `PUT /me/photo`, `DELETE /me/photo`, `GET /:userId/photo` | Set or remove your profile photo (a confirmed `profile_photo` upload); the photo route is public and redirects to a short-lived URL |
+| `/api/v1/properties` | `GET /mine/:id` | Landlord lookup of one of their own listings in any status except deleted |
+| `/api/v1/viewings` | `PATCH /:viewingId/complete` | Landlord marks a confirmed viewing whose time has passed as completed |
+| `/api/v1/admin/users` | `PATCH /:userId/status` | Admin deactivates or reactivates a non-admin account |
+| `/api/v1/verification` | `GET /me`, `POST /contact/sync`, `GET /requests`, `POST /requests`, `PATCH /requests/:requestId/cancel` | Renter/landlord email and phone verification (read from Firebase) and identity or ownership verification requests |
+| `/api/v1/admin/verifications` | `GET /`, `GET /:requestId`, `PATCH /:requestId` | Admin review of identity and ownership verification requests; viewing documents is logged |
 
 For exact role checks and request/response fields, see the corresponding
 router, controller, validator, and model under `src/`.
@@ -714,6 +720,22 @@ are available to administrators through
 `PATCH /api/v1/admin/moderation/communication-reports/:reportId/status`.
 Administrative status changes are audit-logged. Reports request human review;
 they do not automatically determine misconduct or restrict an account.
+
+### Verification
+
+- **Email and phone:** after the user verifies their email or signs in with
+  Firebase phone auth in the app, `POST /api/v1/verification/contact/sync`
+  copies the verified email state and phone number from Firebase.
+- **Identity and ownership:** upload documents with purpose
+  `verification_document`, confirm them, then `POST /api/v1/verification/requests`
+  with `type` (`identity` or `ownership`), `documentType`, `documents`, and, for
+  ownership, `propertyId` (landlords only, for their own listing). An admin
+  approves or rejects it at `/api/v1/admin/verifications`; a rejection needs a
+  note for the requester. Opening a request's documents is recorded in the
+  sensitive-access log, and the decision in the admin audit log.
+- **Public view:** property details show the landlord's `verification` summary
+  (`emailVerified`, `phoneVerified`, `identityVerified`, `ownershipVerified`) as
+  booleans only. Documents and numbers are never public.
 
 ### Responses and pagination
 

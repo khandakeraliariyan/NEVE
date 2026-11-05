@@ -80,6 +80,29 @@ const userSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
+
+        // Email and phone come from Firebase (verified sign-in email, phone
+        // number confirmed by Firebase phone auth). Identity is reviewed by an
+        // admin from submitted documents.
+        verification: {
+            email: {
+                verified: { type: Boolean, default: false },
+                verifiedAt: { type: Date, default: null },
+            },
+            phone: {
+                verified: { type: Boolean, default: false },
+                phoneNumber: { type: String, default: null },
+                verifiedAt: { type: Date, default: null },
+            },
+            identity: {
+                status: {
+                    type: String,
+                    enum: ["unverified", "pending", "verified", "rejected"],
+                    default: "unverified",
+                },
+                verifiedAt: { type: Date, default: null },
+            },
+        },
     },
     {
         timestamps: true,

@@ -363,6 +363,16 @@ const propertySchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+
+        // Set only by an admin after reviewing ownership documents.
+        ownershipVerification: {
+            status: {
+                type: String,
+                enum: ["unverified", "pending", "verified", "rejected"],
+                default: "unverified",
+            },
+            verifiedAt: { type: Date, default: null },
+        },
     },
     {
         timestamps: true,
