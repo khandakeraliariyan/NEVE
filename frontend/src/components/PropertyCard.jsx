@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+"use client";
+
+import Link from "next/link";
 import { label, money } from "../lib/format";
 import { useCompare } from "../lib/compare";
 
@@ -49,7 +51,7 @@ export default function PropertyCard({ property, badge, footer, onSaveToggle, sa
             </PropertyImage>
             <div className="flex flex-1 flex-col gap-3 p-4">
                 <div>
-                    <Link to={`/properties/${id}`} className="text-lg leading-snug text-ink hover:text-forest">
+                    <Link href={`/properties/${id}`} className="text-lg leading-snug text-ink hover:text-forest">
                         {property.title}
                     </Link>
                     <p className="text-sm text-muted">
@@ -83,7 +85,7 @@ export default function PropertyCard({ property, badge, footer, onSaveToggle, sa
                     ) : (
                         <span />
                     )}
-                    <Link to={`/properties/${id}`} className="font-semibold text-forest hover:underline">
+                    <Link href={`/properties/${id}`} className="font-semibold text-forest hover:underline">
                         View details →
                     </Link>
                 </div>

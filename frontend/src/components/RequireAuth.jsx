@@ -1,11 +1,14 @@
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+"use client";
+
+import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { ErrorBox, Loading } from "./ui";
+import Redirect from "./Redirect";
 
-// Gates a route tree on sign-in, a Neve profile, and (optionally) a role.
-export default function RequireAuth({ roles }) {
+// Gates its children on sign-in, a Neve profile, and (optionally) a role.
+export default function RequireAuth({ roles, children }) {
     const { status, role, error, reloadProfile, profile } = useAuth();
-    const location = useLocation();
+    const pathname = usePathname();
 
     if (status === "loading") {
         return (
@@ -15,10 +18,10 @@ export default function RequireAuth({ roles }) {
         );
     }
     if (status === "signed_out") {
-        return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />;
+        return <Redirect to={`/sign-in?next=${encodeURIComponent(pathname)}`} />;
     }
     if (status === "needs_profile") {
-        return <Navigate to="/complete-profile" replace />;
+        return <Redirect to="/complete-profile" />;
     }
     if (status === "error") {
         return (
@@ -33,7 +36,7 @@ export default function RequireAuth({ roles }) {
     if (roles && !roles.includes(role)) {
         return <AccessMessage title="Access denied" text="Your role can't open this page." />;
     }
-    return <Outlet />;
+    return children;
 }
 
 function AccessMessage({ title, text }) {

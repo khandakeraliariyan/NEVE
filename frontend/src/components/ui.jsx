@@ -1,7 +1,8 @@
-import { Link } from "react-router-dom";
+"use client";
+
+import Link from "next/link";
 import { label } from "../lib/format";
 
-// eslint-disable-next-line no-unused-vars -- Component is used as a JSX tag
 export function Button({ variant = "primary", className = "", as: Component = "button", ...props }) {
     const styles = {
         primary: "bg-forest text-white hover:bg-forest-hover",
@@ -20,7 +21,7 @@ export function Button({ variant = "primary", className = "", as: Component = "b
 
 export function ButtonLink({ to, variant = "primary", className = "", children }) {
     return (
-        <Button as={Link} to={to} variant={variant} className={className}>
+        <Button as={Link} href={to} variant={variant} className={className}>
             {children}
         </Button>
     );

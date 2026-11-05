@@ -24,10 +24,12 @@ function write(ids) {
 
 // Compare selection lives on the client so it works before sign-in.
 export function useCompare() {
-    const [ids, setIds] = useState(read);
+    // Start empty so the server render and first client render match, then load from storage.
+    const [ids, setIds] = useState([]);
 
     useEffect(() => {
         const sync = () => setIds(read());
+        sync();
         window.addEventListener(EVENT, sync);
         window.addEventListener("storage", sync);
         return () => {

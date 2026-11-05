@@ -1,5 +1,9 @@
+"use client";
+
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import NavLink from "./NavLink";
 import Logo from "./Logo";
 import { useAuth } from "../context/AuthContext";
 import { ROLE_LABELS, workspaceNav } from "../nav";
@@ -40,9 +44,9 @@ function NotificationBell() {
     );
 }
 
-export default function WorkspaceLayout() {
+export default function WorkspaceLayout({ children }) {
     const { profile, role, signOut } = useAuth();
-    const navigate = useNavigate();
+    const router = useRouter();
     const [menuOpen, setMenuOpen] = useState(false);
     const groups = workspaceNav(role);
 
@@ -59,7 +63,7 @@ export default function WorkspaceLayout() {
                             {group.items.map((item) => (
                                 <li key={item.to}>
                                     <NavLink
-                                        to={item.to}
+                                        href={item.to}
                                         end={item.end}
                                         onClick={() => setMenuOpen(false)}
                                         className={({ isActive }) =>
@@ -100,13 +104,13 @@ export default function WorkspaceLayout() {
                         <button type="button" className="rounded-lg border border-line px-3 py-1.5 text-sm lg:hidden" onClick={() => setMenuOpen(true)}>
                             Menu
                         </button>
-                        <Link to="/properties" className="hidden rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white hover:bg-forest-hover sm:inline-flex">
+                        <Link href="/properties" className="hidden rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white hover:bg-forest-hover sm:inline-flex">
                             Find Properties
                         </Link>
                     </div>
                     <div className="flex items-center gap-4">
                         <NotificationBell />
-                        <Link to="/settings" className="rounded-lg px-2 py-1 text-right text-sm leading-tight hover:bg-sage" title="Account settings">
+                        <Link href="/settings" className="rounded-lg px-2 py-1 text-right text-sm leading-tight hover:bg-sage" title="Account settings">
                             <p className="font-semibold">{profile?.displayName}</p>
                             <p className="text-xs text-muted">{ROLE_LABELS[role]}</p>
                         </Link>
@@ -114,7 +118,7 @@ export default function WorkspaceLayout() {
                             type="button"
                             onClick={async () => {
                                 await signOut();
-                                navigate("/");
+                                router.push("/");
                             }}
                             className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:bg-sage"
                         >
@@ -123,7 +127,7 @@ export default function WorkspaceLayout() {
                     </div>
                 </header>
                 <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 md:px-8">
-                    <Outlet />
+                    {children}
                 </main>
             </div>
         </div>

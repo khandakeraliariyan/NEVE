@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+"use client";
+
+import Link from "next/link";
 import { COMPARE_MAX, useCompare } from "../lib/compare";
 
 export default function CompareBar() {
@@ -14,7 +16,7 @@ export default function CompareBar() {
                     Clear
                 </button>
                 <Link
-                    to="/compare"
+                    href="/compare"
                     className={`rounded-full bg-white px-4 py-1.5 font-semibold text-forest ${compare.ids.length < 2 ? "pointer-events-none opacity-60" : ""}`}
                 >
                     Compare →

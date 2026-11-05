@@ -1,10 +1,13 @@
+"use client";
+
 import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import Link from "next/link";
+import NavLink from "./NavLink";
 import Logo from "./Logo";
 import { PUBLIC_NAV } from "../nav";
 import { homePathForRole, useAuth } from "../context/AuthContext";
 
-export default function PublicLayout() {
+export default function PublicLayout({ children }) {
     const { status, role, profile } = useAuth();
     const [open, setOpen] = useState(false);
 
@@ -17,7 +20,7 @@ export default function PublicLayout() {
                         {PUBLIC_NAV.map((item) => (
                             <NavLink
                                 key={item.to}
-                                to={item.to}
+                                href={item.to}
                                 end={item.end}
                                 className={({ isActive }) =>
                                     `border-b-2 pb-1 ${isActive ? "border-forest text-forest" : "border-transparent text-ink hover:text-forest"}`
@@ -30,17 +33,17 @@ export default function PublicLayout() {
                     <div className="hidden items-center gap-3 lg:flex">
                         {status === "ready" ? (
                             <Link
-                                to={homePathForRole(role)}
+                                href={homePathForRole(role)}
                                 className="flex items-center gap-2 rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white"
                             >
                                 {profile?.displayName ?? "My workspace"} →
                             </Link>
                         ) : (
                             <>
-                                <Link to="/sign-up" className="rounded-lg border border-forest/40 px-4 py-2 text-sm text-forest hover:bg-sage">
+                                <Link href="/sign-up" className="rounded-lg border border-forest/40 px-4 py-2 text-sm text-forest hover:bg-sage">
                                     List a Property
                                 </Link>
-                                <Link to="/sign-in" className="rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white hover:bg-forest-hover">
+                                <Link href="/sign-in" className="rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white hover:bg-forest-hover">
                                     Sign In / Register
                                 </Link>
                             </>
@@ -53,11 +56,11 @@ export default function PublicLayout() {
                 {open && (
                     <nav className="flex flex-col gap-1 border-t border-line px-4 py-3 text-sm lg:hidden">
                         {PUBLIC_NAV.map((item) => (
-                            <Link key={item.to} to={item.to} className="py-2" onClick={() => setOpen(false)}>
+                            <Link key={item.to} href={item.to} className="py-2" onClick={() => setOpen(false)}>
                                 {item.label}
                             </Link>
                         ))}
-                        <Link to={status === "ready" ? homePathForRole(role) : "/sign-in"} className="py-2 font-semibold text-forest">
+                        <Link href={status === "ready" ? homePathForRole(role) : "/sign-in"} className="py-2 font-semibold text-forest">
                             {status === "ready" ? "My workspace" : "Sign In / Register"}
                         </Link>
                     </nav>
@@ -65,7 +68,7 @@ export default function PublicLayout() {
             </header>
 
             <main className="flex-1">
-                <Outlet />
+                {children}
             </main>
 
             <footer className="mt-16 border-t border-line bg-panel">
@@ -81,7 +84,7 @@ export default function PublicLayout() {
                         <ul className="space-y-1 text-muted">
                             {PUBLIC_NAV.map((item) => (
                                 <li key={item.to}>
-                                    <Link to={item.to} className="hover:text-forest">
+                                    <Link href={item.to} className="hover:text-forest">
                                         {item.label}
                                     </Link>
                                 </li>
@@ -91,8 +94,8 @@ export default function PublicLayout() {
                     <div>
                         <p className="mb-2 font-semibold">Account</p>
                         <ul className="space-y-1 text-muted">
-                            <li><Link to="/sign-in" className="hover:text-forest">Sign in</Link></li>
-                            <li><Link to="/sign-up" className="hover:text-forest">Create an account</Link></li>
+                            <li><Link href="/sign-in" className="hover:text-forest">Sign in</Link></li>
+                            <li><Link href="/sign-up" className="hover:text-forest">Create an account</Link></li>
                         </ul>
                     </div>
                     <div className="text-xs text-muted">

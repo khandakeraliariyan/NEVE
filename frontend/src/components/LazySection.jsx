@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useRef, useState } from "react";
 
 // Renders children only once the section scrolls near the viewport, to save API requests.
