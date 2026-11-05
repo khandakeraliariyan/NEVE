@@ -18,6 +18,7 @@ const editableFields = [
     "title",
     "description",
     "propertyType",
+    "sharedAccommodation",
     "address",
     "bedrooms",
     "bathrooms",

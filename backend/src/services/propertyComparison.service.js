@@ -33,6 +33,7 @@ export function buildPropertyComparison(properties) {
             title: item.title,
             description: item.description,
             propertyType: item.propertyType,
+            sharedAccommodation: item.sharedAccommodation ?? null,
             address: item.address,
             bedrooms: item.bedrooms,
             bathrooms: item.bathrooms,

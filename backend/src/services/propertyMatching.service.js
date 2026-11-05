@@ -1,5 +1,6 @@
 import Property from "../models/Property.js";
 import RenterPreference from "../models/RenterPreference.js";
+import { PROPERTY_TYPES } from "../constants/propertyTypes.js";
 
 const WEIGHTS = {
     budget: 35,
@@ -47,10 +48,7 @@ export function validatePreferences(preferences) {
 
     if (
         preferences.propertyType !== undefined &&
-        ![
-            "apartment",
-            "house",
-        ].includes(preferences.propertyType)
+        !PROPERTY_TYPES.includes(preferences.propertyType)
     ) {
         errors.push("Invalid propertyType");
     }

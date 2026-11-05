@@ -1,4 +1,5 @@
 import RenterPreference from "../models/RenterPreference.js";
+import { PROPERTY_TYPES as ALL_PROPERTY_TYPES } from "../constants/propertyTypes.js";
 
 const getUserId = (req) => req.neveUser._id;
 
@@ -14,10 +15,7 @@ const allowedFields = [
     "alertsEnabled",
 ];
 
-const PROPERTY_TYPES = [
-    "apartment",
-    "house",
-];
+const PROPERTY_TYPES = ALL_PROPERTY_TYPES;
 const FURNISHING_TYPES = [
     "furnished",
     "unfurnished",

@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+    BATHROOM_TYPES,
+    OCCUPANT_GENDERS,
+    PROPERTY_TYPES,
+} from "../constants/propertyTypes.js";
 
 const amenitiesSchema = z.preprocess(
     (value) => {
@@ -18,8 +23,11 @@ const propertySearchFields = {
     city: z.string().trim().max(100).optional(),
     area: z.string().trim().max(100).optional(),
     propertyType: z
-        .enum(["apartment", "house"])
+        .enum(PROPERTY_TYPES)
         .optional(),
+    occupantGender: z.enum(OCCUPANT_GENDERS).optional(),
+    bathroomType: z.enum(BATHROOM_TYPES).optional(),
+    minAvailableSpots: z.coerce.number().int().min(1).max(50).optional(),
     furnishing: z
         .enum(["furnished", "unfurnished"])
         .optional(),
