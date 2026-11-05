@@ -28,7 +28,7 @@ important requirements are missing.
 | 4.6 | **Neve Move-In & Move-Out Records** | **Implemented** | Room-by-room and meter-reading entries with photos, confirm/dispute by each party, append-only corrections, and move-in vs move-out comparison that reports differences without assigning fault. | — |
 | 4.7 | **Neve Maintenance & Repair** | **Mostly implemented** | Requests with category, priority, description and private photos; statuses (submitted, acknowledged, in progress, awaiting renter, completed, disputed, cancelled); responsibility; progress history; searchable repair records. | Assigning a repair to a specific person. |
 | 4.8 | **Neve Smart Choice — Explainable Matching** | **Partial** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Commute destination, walking distance and household-needs preferences. Matching is rule-based, not AI. |
-| 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app), and suspicious-message reporting. Payment processing is out of scope. | Email/push notifications; viewings can't be marked completed; inquiries have two separate status flows. |
+| 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app), and suspicious-message reporting. Payment processing is out of scope. | Email/push notifications; inquiries have two separate status flows. |
 | 4.10 | **Neve Agreement & Trust** | **Partial** | Private agreement upload (PDF, image, text); Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer. | Balanced clause rewrites; legal-source retrieval with sections, versions and review status; the legal-review workflow. |
 | 4.11 | **Neve Evidence Graph** | **Partial** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`) with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses and extracted-vs-recorded value mismatches; JSON evidence report. | `requires` relationship; legal-source nodes; AI-proposed links; an explicit "documented fact" state; automatic detection of conflicting payment amounts and missing meter readings; SHA-256 file hashes and hash-linked events. |
 | 4.12 | **Neve Property Manager** | **Not implemented** | Landlords manage their own listings (create, edit, pause, delete), inquiries, viewings and listing analytics. | The `property_manager` role, access scoped to assigned properties and tenancies, and lease/obligation tracking for managers. |
@@ -747,8 +747,9 @@ missing product features, see [Project feature coverage](#project-feature-covera
    `accepted` or `declined`, and only from `pending`.
    `PATCH /api/v1/inquiries/:id` separately accepts `acknowledged`, `responded`,
    or `closed`. The supported workflow needs consolidation.
-4. **Viewing completion:** handlers use `requested`, `confirmed`, `declined`, and
-   `cancelled`, but none sets the schema's `completed` status.
+4. **Viewing completion:** landlords mark a confirmed viewing whose time has
+   passed as `completed` with `PATCH /api/v1/viewings/:viewingId/complete`,
+   which also records `completedAt`.
 5. **Unpublished listing lookup:** `GET /api/v1/properties/:id` returns published
    listings only, so owners must find drafts and paused listings through the
    paginated `GET /api/v1/properties/mine` or

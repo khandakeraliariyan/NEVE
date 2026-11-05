@@ -48,6 +48,11 @@ const viewingRequestSchema = new mongoose.Schema(
             index: true,
         },
 
+        completedAt: {
+            type: Date,
+            default: null,
+        },
+
         landlordNote: {
             type: String,
             trim: true,
