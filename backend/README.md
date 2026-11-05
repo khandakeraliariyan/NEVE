@@ -751,9 +751,8 @@ missing product features, see [Project feature coverage](#project-feature-covera
    passed as `completed` with `PATCH /api/v1/viewings/:viewingId/complete`,
    which also records `completedAt`.
 5. **Unpublished listing lookup:** `GET /api/v1/properties/:id` returns published
-   listings only, so owners must find drafts and paused listings through the
-   paginated `GET /api/v1/properties/mine` or
-   `GET /api/v1/landlord/dashboard/properties`.
+   listings only. Owners open their own drafts and paused listings by ID with
+   `GET /api/v1/properties/mine/:id`.
 6. **Response and pagination consistency:** the shared helpers are not
    consistently used by all endpoints; clients should check each endpoint's
    controller for its exact response shape.

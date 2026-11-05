@@ -6,6 +6,7 @@ import {
     getProperties,
     getRecentProperties,
     getMyProperties,
+    getMyPropertyById,
     getPropertyById,
     getPropertyDetail,
     updateProperty,
@@ -43,6 +44,13 @@ router.get(
     authenticateUser,
     allowRoles("landlord"),
     getMyProperties
+);
+
+router.get(
+    "/mine/:id",
+    authenticateUser,
+    allowRoles("landlord"),
+    getMyPropertyById
 );
 
 router.post("/compare", compareProperties);

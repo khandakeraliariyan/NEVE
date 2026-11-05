@@ -377,3 +377,40 @@ export async function deleteProperty(req, res, next) {
         next(error);
     }
 }
+
+// GET /api/v1/properties/mine/:id
+// Lets the owner open one of their own listings in any status except deleted,
+// including drafts and paused listings that the public route hides.
+export async function getMyPropertyById(req, res, next) {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID",
+            });
+        }
+
+        const property = await Property.findOne({
+            ...manageablePropertyFilter(req.neveUser._id),
+            _id: id,
+            status: { $ne: "deleted" },
+        }).populate("landlord", "displayName photoURL");
+
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Property not found",
+            });
+        }
+
+        res.set("Cache-Control", "private, no-store");
+        return res.status(200).json({
+            success: true,
+            property,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
