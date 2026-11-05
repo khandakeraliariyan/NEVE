@@ -1,3 +1,4 @@
+import { validateSmartChoicePreferences } from "../services/smartChoice.service.js";
 import RenterPreference from "../models/RenterPreference.js";
 import { PROPERTY_TYPES as ALL_PROPERTY_TYPES } from "../constants/propertyTypes.js";
 
@@ -13,6 +14,9 @@ const allowedFields = [
     "furnishing",
     "amenities",
     "alertsEnabled",
+    "commute",
+    "walkingDistance",
+    "household",
 ];
 
 const PROPERTY_TYPES = ALL_PROPERTY_TYPES;
@@ -38,6 +42,9 @@ export const getRenterPreferences = async (req, res) => {
                 furnishing: null,
                 amenities: [],
                 alertsEnabled: true,
+                commute: null,
+                walkingDistance: null,
+                household: null,
             },
         });
     } catch (error) {
@@ -70,6 +77,12 @@ export const updateRenterPreferences = async (req, res) => {
         }
 
         const updates = {};
+
+        const smartChoice = validateSmartChoicePreferences(body);
+        if (smartChoice.error) {
+            return res.status(400).json({ message: smartChoice.error });
+        }
+        Object.assign(updates, smartChoice.updates);
 
         if (body.alertsEnabled !== undefined) {
             if (typeof body.alertsEnabled !== "boolean") {

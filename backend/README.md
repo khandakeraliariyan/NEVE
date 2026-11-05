@@ -27,7 +27,7 @@ important requirements are missing.
 | 4.5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate-listing signals (titles, location, rent, shared image fingerprints, coordinates), description-vs-field consistency warnings, unusual-rent checks, renter reports, human review, reviewed public trust summaries, admin-reviewed identity and ownership verification, and a deposit-safety notice. | Heuristics have known false positives (look-alike flats in one building, generic titles, negated amenities such as "no parking", service charges written "per month"). |
 | 4.6 | **Neve Move-In & Move-Out Records** | **Implemented** | Room-by-room and meter-reading entries with photos, confirm/dispute by each party, append-only corrections, and move-in vs move-out comparison that reports differences without assigning fault. | — |
 | 4.7 | **Neve Maintenance & Repair** | **Implemented** | Requests with category, priority, description and private photos; statuses (submitted, acknowledged, in progress, awaiting renter, completed, disputed, cancelled); responsibility; assignment to the renter, the landlord or a named outside person; progress history; searchable repair records. | — |
-| 4.8 | **Neve Smart Choice — Explainable Matching** | **Partial** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Commute destination, walking distance and household-needs preferences. Matching is rule-based, not AI. |
+| 4.8 | **Neve Smart Choice — Explainable Matching** | **Implemented** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Matching is rule-based, not AI. Commute distance is straight-line. |
 | 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app), and suspicious-message reporting. Payment processing is out of scope. | Email/push notifications; inquiries have two separate status flows. |
 | 4.10 | **Neve Agreement & Trust** | **Partial** | Private agreement upload (PDF, image, text); Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer. | Balanced clause rewrites; legal-source retrieval with sections, versions and review status; the legal-review workflow. |
 | 4.11 | **Neve Evidence Graph** | **Partial** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`) with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses and extracted-vs-recorded value mismatches; JSON evidence report. | `requires` relationship; legal-source nodes; AI-proposed links; an explicit "documented fact" state; automatic detection of conflicting payment amounts and missing meter readings; SHA-256 file hashes and hash-linked events. |
@@ -737,6 +737,23 @@ they do not automatically determine misconduct or restrict an account.
 - **Public view:** property details show the landlord's `verification` summary
   (`emailVerified`, `phoneVerified`, `identityVerified`, `ownershipVerified`) as
   booleans only. Documents and numbers are never public.
+
+### Smart Choice preferences
+
+`PATCH /api/v1/renter-preferences` also accepts three optional blocks; send
+`null` to clear one. Each adds an explained criterion to recommendations only
+when it is set, so scores for renters who don't use them are unchanged.
+
+- `commute`: `{ label, latitude, longitude, maxDistanceKm, mode }`. Scores 100
+  within `maxDistanceKm` (straight line from the listing's map point), falling
+  to 0 at twice that distance.
+- `walkingDistance`: `{ categories, maxDistanceMeters }` with categories from
+  `healthcare`, `education`, `groceries`, `transport`, `banking`,
+  `recreation`, `food`. Uses cached nearby places only; a listing whose nearby
+  places haven't been loaded is `unknown`, not a shortfall.
+- `household`: `{ adults, children, pets, needsStepFreeAccess }`. Checks about
+  two people per bedroom (or available spots for shared listings), whether
+  house rules allow or forbid pets, and ground floor or a listed lift.
 
 ### Responses and pagination
 

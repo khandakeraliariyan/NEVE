@@ -1,6 +1,12 @@
 import Property from "../models/Property.js";
 import RenterPreference from "../models/RenterPreference.js";
 import { PROPERTY_TYPES } from "../constants/propertyTypes.js";
+import NearbyPlaceCache from "../models/NearbyPlaceCache.js";
+import {
+    scoreCommute,
+    scoreHousehold,
+    scoreWalkingDistance,
+} from "./smartChoice.service.js";
 
 const WEIGHTS = {
     budget: 35,
@@ -296,6 +302,11 @@ const RECOMMENDATION_WEIGHTS = {
     propertyType: 12,
     furnishing: 8,
     amenities: 10,
+    // Applied only when the renter sets these preferences, so existing
+    // scores don't change for renters who haven't.
+    commute: 15,
+    walkingDistance: 10,
+    household: 12,
 };
 
 const normalize = (value) => String(value ?? "").trim().toLowerCase();
@@ -388,7 +399,16 @@ function scoreAmenities(property, preferences) {
     return (matched / preferred.length) * 100;
 }
 
-export function calculateMatch(property, preferences) {
+export function calculateMatch(property, preferences, context = {}) {
+    const extended = {
+        commute: scoreCommute(property, preferences.commute),
+        walkingDistance: scoreWalkingDistance(
+            property,
+            preferences.walkingDistance,
+            context.nearbyCache
+        ),
+        household: scoreHousehold(property, preferences.household),
+    };
     const componentScores = {
         budget: scoreBudget(property, preferences),
         location: scoreLocation(property, preferences),
@@ -397,6 +417,9 @@ export function calculateMatch(property, preferences) {
         furnishing: scoreFurnishing(property, preferences),
         amenities: scoreAmenities(property, preferences),
     };
+    for (const [key, result] of Object.entries(extended)) {
+        if (result.requested) componentScores[key] = result.score;
+    }
 
     let weightedTotal = 0;
     let applicableWeight = 0;
@@ -418,6 +441,9 @@ export function calculateMatch(property, preferences) {
         propertyType: "Property type",
         furnishing: "Furnishing",
         amenities: "Amenities",
+        commute: "Commute",
+        walkingDistance: "Walking distance",
+        household: "Household needs",
     };
     const rent = property.pricing?.monthlyRent;
     const budgetRequested =
@@ -430,8 +456,9 @@ export function calculateMatch(property, preferences) {
     }
 
     const criteria = Object.entries(componentScores).map(([key, value]) => {
-        const requested =
-            key === "budget"
+        const requested = extended[key]
+            ? extended[key].requested
+            : key === "budget"
                 ? preferences.minRent != null || preferences.maxRent != null
                 : key === "location"
                   ? Boolean(preferences.cities?.length || preferences.areas?.length)
@@ -447,6 +474,8 @@ export function calculateMatch(property, preferences) {
 
         if (!requested) {
             explanation = "This preference was not provided.";
+        } else if (extended[key]) {
+            explanation = extended[key].explanation;
         } else if (value === null) {
             explanation =
                 "Cannot assess because the required property or renter preference data is missing.";
@@ -614,9 +643,24 @@ export async function getMatchedProperties(
         .limit(MAX_CANDIDATES)
         .lean();
 
+    // Walking distance uses already-cached nearby places only.
+    const nearbyByProperty = new Map();
+    if (preferences.walkingDistance) {
+        const caches = await NearbyPlaceCache.find({
+            property: { $in: properties.map((property) => property._id) },
+        })
+            .select("property places.category places.distanceMeters radiusMeters")
+            .lean();
+        for (const cache of caches) {
+            nearbyByProperty.set(String(cache.property), cache);
+        }
+    }
+
     const ranked = properties
         .map((property) => {
-            const match = calculateMatch(property, preferences);
+            const match = calculateMatch(property, preferences, {
+                nearbyCache: nearbyByProperty.get(String(property._id)),
+            });
 
             return {
                 property,
