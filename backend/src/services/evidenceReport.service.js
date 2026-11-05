@@ -8,6 +8,7 @@ export function buildAgreementEvidenceReport({
     files,
     messages,
     recordLinks = [],
+    conditionReports = [],
     generatedAt = new Date(),
     messageCount = messages.length,
     messageLimit = 500,
@@ -167,7 +168,7 @@ export function buildAgreementEvidenceReport({
                 createdAt: event.createdAt,
             })),
         },
-        analysis: analyzeAgreementEvidence(agreement, links, recordLinks),
+        analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports),
         disclaimer:
             "This report compiles user-entered records and participant assessments. It does not independently verify evidence, provide legal advice, or determine liability. File contents are not embedded; sources are identified by their record IDs and metadata.",
     };

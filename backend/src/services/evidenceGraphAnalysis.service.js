@@ -1,3 +1,4 @@
+import { findMeterReadingIssues, findPaymentConflicts } from "./evidenceChecks.service.js";
 import { buildFactStates, findUnmetRequirements } from "./evidenceFacts.service.js";
 
 // Compares values extracted from the agreement file with the values a
@@ -40,7 +41,7 @@ export function findExtractionMismatches(agreement) {
     return mismatches;
 }
 
-export function analyzeAgreementEvidence(agreement, links, recordLinks = []) {
+export function analyzeAgreementEvidence(agreement, links, recordLinks = [], conditionReports = []) {
     const missingInformation = [];
     const potentialConflicts = [];
     const uncertainInterpretations = [];
@@ -181,6 +182,10 @@ export function analyzeAgreementEvidence(agreement, links, recordLinks = []) {
     }
 
     missingInformation.push(...findUnmetRequirements(agreement, recordLinks));
+    potentialConflicts.push(...findPaymentConflicts(agreement));
+    const meterIssues = findMeterReadingIssues(conditionReports);
+    missingInformation.push(...meterIssues.missing);
+    potentialConflicts.push(...meterIssues.conflicts);
     for (const link of recordLinks) {
         if (link.relationship === "contradicts") {
             potentialConflicts.push({

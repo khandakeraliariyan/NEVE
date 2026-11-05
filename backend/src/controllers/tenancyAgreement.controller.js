@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Inquiry from "../models/Inquiry.js";
 import InquiryMessage from "../models/InquiryMessage.js";
 import Property from "../models/Property.js";
+import ConditionReport from "../models/ConditionReport.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
 import TenancyRecordLink, {
@@ -1017,9 +1018,12 @@ export async function getAgreementEvidenceGraph(req, res, next) {
         }
 
         await saveAuditedChange(agreement, req, "evidence_graph_viewed");
-        const recordLinks = await TenancyRecordLink.find({ agreement: agreement._id })
-            .sort({ createdAt: 1 })
-            .lean();
+        const [recordLinks, conditionReports] = await Promise.all([
+            TenancyRecordLink.find({ agreement: agreement._id }).sort({ createdAt: 1 }).lean(),
+            ConditionReport.find({ agreement: agreement._id })
+                .select("stage entries._id entries.kind entries.meterType entries.reading entries.recordedAt entries.supersedes")
+                .lean(),
+        ]);
         const [messages, links] = await Promise.all([
             InquiryMessage.find({ inquiry: agreement.inquiry })
                 .populate("sender", "displayName role")
@@ -1185,7 +1189,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             agreementId: agreement._id,
             nodes,
             edges,
-            analysis: analyzeAgreementEvidence(agreement, links, recordLinks),
+            analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports),
             disclaimer:
                 "User-entered records and links are not independently verified and do not determine legal liability.",
         });
@@ -1202,9 +1206,12 @@ export async function getAgreementEvidenceReport(req, res, next) {
         }
 
         await saveAuditedChange(agreement, req, "evidence_report_generated");
-        const recordLinks = await TenancyRecordLink.find({ agreement: agreement._id })
-            .sort({ createdAt: 1 })
-            .lean();
+        const [recordLinks, conditionReports] = await Promise.all([
+            TenancyRecordLink.find({ agreement: agreement._id }).sort({ createdAt: 1 }).lean(),
+            ConditionReport.find({ agreement: agreement._id })
+                .select("stage entries._id entries.kind entries.meterType entries.reading entries.recordedAt entries.supersedes")
+                .lean(),
+        ]);
         const [messages, messageCount, links] = await Promise.all([
             InquiryMessage.find({ inquiry: agreement.inquiry })
                 .populate("sender", "displayName role")
@@ -1243,6 +1250,7 @@ export async function getAgreementEvidenceReport(req, res, next) {
             files,
             messages: includedMessages,
             recordLinks,
+            conditionReports,
             generatedAt: new Date(),
             messageCount,
             messageLimit: 500,
