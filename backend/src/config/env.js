@@ -40,6 +40,15 @@ const envSchema = z.object({
         .string()
         .url()
         .default("https://overpass-api.de/api/interpreter"),
+    // OSRM-compatible routing services for walking and driving times.
+    ROUTING_WALKING_URL: z
+        .string()
+        .url()
+        .default("https://routing.openstreetmap.de/routed-foot"),
+    ROUTING_DRIVING_URL: z
+        .string()
+        .url()
+        .default("https://routing.openstreetmap.de/routed-car"),
     // The Anthropic SDK reads ANTHROPIC_API_KEY itself; it is listed here so a
     // missing key can be reported as "extraction not configured".
     ANTHROPIC_API_KEY: z.string().optional(),

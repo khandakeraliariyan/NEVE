@@ -22,7 +22,7 @@ important requirements are missing.
 |---|---|---|---|---|
 | 4.1 | **Neve Discover — Rental Marketplace** | **Mostly implemented** | Listing search and filters (location, rent, bedrooms, property type — `apartment`, `house`, `room` or `shared_room`, with occupant gender, bathroom type and available spots for shared listings — furnishing, availability, lease length, amenities), map search, recent listings, favorites, comparison, saved searches, and suspicious/inaccurate listing reports. | List/map switching is frontend behavior. |
 | 4.2 | **Neve Property Intelligence** | **Implemented** | Listing details with photos, videos, floor plans, rooms, floor, furnishing, amenities, house rules, lease length and availability; rent, deposit, advance and service charge; landlord public profile with email, phone, identity and ownership verification status; viewing requests and listing questions. | — |
-| 4.3 | **Neve Neighborhood Intelligence (5 km)** | **Partial** | Property-centered OpenStreetMap places within a 100–5000 m radius, category filters, insights, a 24-hour cache, and source and freshness metadata. | Walking/driving routes and travel times (distances are straight-line only). Cross-property neighborhood comparison exists only inside property comparison. |
+| 4.3 | **Neve Neighborhood Intelligence (5 km)** | **Mostly implemented** | Property-centered OpenStreetMap places within a 100–5000 m radius, category filters, insights, a 24-hour cache, source and freshness metadata, and walking/driving routes and travel times from OpenStreetMap routing. | Cross-property neighborhood comparison exists only inside property comparison. Travel times don't include live traffic. |
 | 4.4 | **Neve True Cost of Renting** | **Implemented** | Separate upfront and monthly totals; rent, service charge, advance, deposit, utilities (included, fixed, estimated, or renter-pays-unknown) and other one-time or monthly fees; every line labelled landlord-provided or landlord estimate and every total labelled calculated; assumptions; missing amounts make totals unknown, never zero. | — |
 | 4.5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate-listing signals (titles, location, rent, shared image fingerprints, coordinates), description-vs-field consistency warnings, unusual-rent checks, renter reports, human review, reviewed public trust summaries, admin-reviewed identity and ownership verification, and a deposit-safety notice. | Heuristics have known false positives (look-alike flats in one building, generic titles, negated amenities such as "no parking", service charges written "per month"). |
 | 4.6 | **Neve Move-In & Move-Out Records** | **Implemented** | Room-by-room and meter-reading entries with photos, confirm/dispute by each party, append-only corrections, and move-in vs move-out comparison that reports differences without assigning fault. | — |
@@ -53,7 +53,7 @@ important requirements are missing.
 |---|---|---|
 | 1 — Hackathon MVP | Listing cards and detailed property pages | Implemented |
 | 1 | Search and filters for core rental attributes | Implemented (no room/shared types) |
-| 1 | Property-centered 5 km nearby-places map | Partial (no routes or travel times) |
+| 1 | Property-centered 5 km nearby-places map | Implemented |
 | 1 | True Cost with provided, calculated and estimated labels | Implemented |
 | 1 | Landlord profile, inquiry and viewing-request flow | Implemented |
 | 1 | Property comparison and explainable matching | Implemented (no commute/walking preferences) |
@@ -182,6 +182,8 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `ANTHROPIC_API_KEY` | For extraction | Optional | Enables agreement extraction; without it the extract endpoint returns 503 |
 | `AGREEMENT_EXTRACTION_MODEL` | No | `claude-opus-5-5` | Claude model used for agreement extraction |
 | `OVERPASS_API_URL` | No | `https://overpass-api.de/api/interpreter` | Overpass endpoint for nearby-place data |
+| `ROUTING_WALKING_URL` | No | `https://routing.openstreetmap.de/routed-foot` | OSRM-compatible service for walking routes and times |
+| `ROUTING_DRIVING_URL` | No | `https://routing.openstreetmap.de/routed-car` | OSRM-compatible service for driving routes and times |
 | `NEVE_API_BASE_URL` | No | `http://localhost:5000/api/v1` | Configured API base URL |
 
 R2 is treated as configured only when all four R2 account, key, secret, and
@@ -321,6 +323,8 @@ the feature inventory previously proposed.
 | `/api/v1/verification` | `GET /me`, `POST /contact/sync`, `GET /requests`, `POST /requests`, `PATCH /requests/:requestId/cancel` | Renter/landlord email and phone verification (read from Firebase) and identity or ownership verification requests |
 | `/api/v1/admin/verifications` | `GET /`, `GET /:requestId`, `PATCH /:requestId` | Admin review of identity and ownership verification requests; viewing documents is logged |
 | `/api/v1/tenancy` | `PATCH /maintenance-requests/:requestId/assignee` | Landlord assigns a repair to the renter, the landlord, or a named person outside Neve (`{ assignee: { userId } }`, `{ assignee: { name, phone?, organization? } }`, or `{ assignee: null }`); the change is added to the request history |
+| `/api/v1/properties` | `GET /:id/route?toLat=&toLng=&mode=walking\|driving&geometry=true` | Public walking or driving route from a published listing to a point: distance, estimated time, and an optional GeoJSON line |
+| `/api/v1/properties` | `GET /:id/travel-times?mode=&category=&limit=` | Public walking or driving time to the nearest mapped places (up to 25), optionally for one category |
 
 For exact role checks and request/response fields, see the corresponding
 router, controller, validator, and model under `src/`.
