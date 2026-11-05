@@ -10,6 +10,7 @@ import TenancyRecordLink, {
     RECORD_LINK_RELATIONSHIPS,
 } from "../models/TenancyRecordLink.js";
 import { validateRecordLinkInput } from "../services/evidenceFacts.service.js";
+import { agreementEventFields, verifyHashChain } from "../services/hashChain.service.js";
 import {
     EXTRACTABLE_MIME_TYPES,
     ExtractionError,
@@ -19,7 +20,7 @@ import {
     normalizeSuggestions,
     requestEvidenceLinkSuggestions,
 } from "../services/evidenceLinkSuggestion.service.js";
-import { readStoredObject } from "../services/fileUpload.service.js";
+import { hashStoredObject, readStoredObject } from "../services/fileUpload.service.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import { analyzeAgreementEvidence } from "../services/evidenceGraphAnalysis.service.js";
@@ -1062,13 +1063,17 @@ export async function getAgreementEvidenceGraph(req, res, next) {
         const files = await UploadedFile.find({
             _id: { $in: [...new Set(fileIds.map(String))] },
         })
-            .select("originalName mimeType sizeBytes status")
+            .select("originalName mimeType sizeBytes status sha256")
             .lean();
 
         const nodes = [
             {
                 id: String(agreement._id),
                 type: "agreement",
+                auditChain: verifyHashChain(
+                    agreement.auditTrail,
+                    (event) => agreementEventFields(agreement._id, event)
+                ),
                 title: agreement.title,
                 status: agreement.status,
                 jurisdiction: agreement.jurisdiction,
@@ -1086,6 +1091,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 mimeType: file.mimeType,
                 sizeBytes: file.sizeBytes,
                 status: file.status,
+                sha256: file.sha256 ?? null,
             })),
             ...agreement.clauses.map((clause) => ({
                 id: String(clause._id),
@@ -1136,6 +1142,8 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 targetType: event.targetType,
                 targetId: event.targetId,
                 createdAt: event.createdAt,
+                hash: event.hash ?? null,
+                prevHash: event.prevHash ?? null,
             })),
         ];
         const edges = [
@@ -1255,7 +1263,7 @@ export async function getAgreementEvidenceReport(req, res, next) {
         const files = await UploadedFile.find({
             _id: { $in: [...new Set(fileIds.map(String))] },
         })
-            .select("originalName mimeType sizeBytes status")
+            .select("originalName mimeType sizeBytes status sha256")
             .lean();
         const report = buildAgreementEvidenceReport({
             agreement,
@@ -1544,6 +1552,65 @@ export async function reviewSuggestedEvidenceLink(req, res, next) {
         );
         setPrivateResponse(res);
         return res.json({ success: true, data: link });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/tenancy/agreements/:agreementId/integrity?recheckFiles=true
+// Verifies the agreement's hash-linked event history and, optionally,
+// re-hashes up to 50 stored files and compares them with their recorded hash.
+export async function getAgreementIntegrity(req, res, next) {
+    try {
+        const agreement = await getAccessibleAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const auditChain = verifyHashChain(
+            agreement.auditTrail,
+            (event) => agreementEventFields(agreement._id, event)
+        );
+
+        const links = await TenancyEvidenceLink.find({ agreement: agreement._id }).select("uploadedFile").lean();
+        const fileIds = [
+            agreement.documentFile,
+            ...agreement.obligations.map((obligation) => obligation.evidenceFile),
+            ...agreement.payments.map((payment) => payment.receiptFile),
+            ...links.map((link) => link.uploadedFile),
+        ].filter(Boolean);
+        const files = await UploadedFile.find({ _id: { $in: [...new Set(fileIds.map(String))] } })
+            .select("originalName sha256 hashedAt storageKey status")
+            .limit(50)
+            .lean();
+
+        const recheck = req.query.recheckFiles === "true";
+        const fileResults = [];
+        for (const file of files) {
+            const result = {
+                id: String(file._id),
+                name: file.originalName,
+                sha256: file.sha256 ?? null,
+                hashedAt: file.hashedAt ?? null,
+                status: file.sha256 ? "recorded" : "not_hashed",
+            };
+            if (recheck && file.sha256 && file.status === "uploaded") {
+                try {
+                    const current = await hashStoredObject(file.storageKey);
+                    result.status = current === file.sha256 ? "matches" : "changed";
+                } catch (hashError) {
+                    result.status = "unavailable";
+                }
+            }
+            fileResults.push(result);
+        }
+
+        await saveAuditedChange(agreement, req, "integrity_checked");
+        setPrivateResponse(res);
+        return res.json({
+            success: true,
+            data: { auditChain, files: fileResults },
+            note: "A valid chain shows the recorded history hasn't been edited since it was written. Events from before hashing was added aren't covered.",
+        });
     } catch (error) {
         next(error);
     }

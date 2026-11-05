@@ -1,3 +1,4 @@
+import { appendChainedAgreementEvent } from "../services/hashChain.service.js";
 import mongoose from "mongoose";
 import ConditionReport from "../models/ConditionReport.js";
 import MaintenanceRequest from "../models/MaintenanceRequest.js";
@@ -79,7 +80,7 @@ function privateResponse(res) {
 }
 
 function appendAgreementAudit(agreement, actor, action, targetType, targetId) {
-    agreement.auditTrail.push({
+    appendChainedAgreementEvent(agreement, {
         actor,
         action,
         targetType,

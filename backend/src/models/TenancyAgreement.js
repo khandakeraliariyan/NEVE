@@ -248,6 +248,10 @@ const auditEventSchema = new mongoose.Schema(
         targetType: { type: String, default: "agreement", maxlength: 30 },
         targetId: { type: mongoose.Schema.Types.ObjectId, default: null },
         createdAt: { type: Date, default: Date.now },
+        // SHA-256 chain: hash covers this event and prevHash, the previous
+        // event's hash. Events from before hashing have neither.
+        prevHash: { type: String, default: null },
+        hash: { type: String, default: null },
     },
     { _id: false }
 );

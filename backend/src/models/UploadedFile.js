@@ -60,6 +60,18 @@ const uploadedFileSchema = new mongoose.Schema(
             min: 1,
         },
 
+        // SHA-256 of the stored bytes, computed when the upload is confirmed.
+        // null if hashing failed; the upload still completes.
+        sha256: {
+            type: String,
+            default: null,
+            match: /^[a-f0-9]{64}$/,
+        },
+        hashedAt: {
+            type: Date,
+            default: null,
+        },
+
         imageFingerprint: {
             type: String,
             match: /^[a-f0-9]{32}$/,

@@ -55,6 +55,7 @@ export function buildAgreementEvidenceReport({
                 mimeType: file.mimeType,
                 sizeBytes: file.sizeBytes,
                 status: file.status,
+                sha256: file.sha256 ?? null,
             })),
             clauses: agreement.clauses.map((clause) => ({
                 id: idOf(clause._id),
@@ -166,6 +167,8 @@ export function buildAgreementEvidenceReport({
                 targetType: event.targetType,
                 targetId: idOf(event.targetId),
                 createdAt: event.createdAt,
+                prevHash: event.prevHash ?? null,
+                hash: event.hash ?? null,
             })),
         },
         analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports),

@@ -6,6 +6,7 @@ import {
     addAgreementPayment,
     createTenancyAgreement,
     getAgreementEvidenceGraph,
+    getAgreementIntegrity,
     getAgreementEvidenceReport,
     getTenancyAgreement,
     listTenancyAgreements,
@@ -136,6 +137,7 @@ router.patch(
     assignMaintenanceRequest
 );
 router.get("/agreements/:agreementId/evidence-graph", getAgreementEvidenceGraph);
+router.get("/agreements/:agreementId/integrity", getAgreementIntegrity);
 router.get(
     "/agreements/:agreementId/evidence-report",
     getAgreementEvidenceReport
