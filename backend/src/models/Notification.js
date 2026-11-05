@@ -22,6 +22,7 @@ const notificationSchema = new mongoose.Schema(
                 "tenancy_case_shared",
                 "tenancy_case_review_activity",
                 "staff_role_changed",
+                "account_status_changed",
             ],
             required: true,
         },

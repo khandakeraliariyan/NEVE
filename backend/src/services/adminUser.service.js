@@ -60,3 +60,30 @@ export function buildAdminUserFilter({ q, role }) {
     }
     return { filter };
 }
+
+// Admins can deactivate and reactivate renter, landlord and legal reviewer
+// accounts. Admin accounts and the admin's own account are never changed here.
+export function validateAccountStatusChange({ isActive, reason, target, actorId }) {
+    if (typeof isActive !== "boolean") {
+        return { error: "isActive must be true or false.", status: 400 };
+    }
+    if (reason !== undefined && reason !== null && (typeof reason !== "string" || reason.length > 500)) {
+        return { error: "reason must be text of at most 500 characters.", status: 400 };
+    }
+    if (!target) {
+        return { error: "User not found.", status: 404 };
+    }
+    if (String(target._id) === String(actorId)) {
+        return { error: "You can't change your own account status.", status: 403 };
+    }
+    if (target.role === "admin") {
+        return { error: "Admin accounts can't be deactivated here.", status: 403 };
+    }
+    if (target.isActive === isActive) {
+        return {
+            error: isActive ? "This account is already active." : "This account is already inactive.",
+            status: 409,
+        };
+    }
+    return { value: { isActive, reason: typeof reason === "string" ? reason.trim() : "" } };
+}

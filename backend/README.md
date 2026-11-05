@@ -730,8 +730,10 @@ missing product features, see [Project feature coverage](#project-feature-covera
    appoint legal reviewers through `/api/v1/admin/users`. Admin accounts are
    created with `npm run create-admin -- --email <email> --name "<name>"`
    (password from `NEVE_ADMIN_PASSWORD` or a prompt; add `--promote` to convert
-   an existing profile). An account's active state still requires a direct
-   database edit.
+   an existing profile). Admins deactivate or reactivate renter, landlord and
+   legal reviewer accounts with `PATCH /api/v1/admin/users/:userId/status`
+   (`{ "isActive": false, "reason": "..." }`); admin accounts and the admin's
+   own account can't be changed there.
    Admins sign in only at the frontend's `/admin/sign-in` portal with email and
    password. The API refuses any admin session whose Firebase sign-in provider
    isn't `password` (error code `ADMIN_PASSWORD_SIGN_IN_REQUIRED`), so Google
