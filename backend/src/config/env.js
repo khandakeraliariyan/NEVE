@@ -62,6 +62,21 @@ const envSchema = z.object({
         .enum(["true", "false"])
         .default("false")
         .transform((value) => value === "true"),
+    // Background jobs. Both are off unless enabled.
+    RETENTION_PURGE_ENABLED: z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((value) => value === "true"),
+    RETENTION_PURGE_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(10080).default(60),
+    ABANDONED_UPLOAD_HOURS: z.coerce.number().int().min(1).max(720).default(24),
+    VERIFICATION_DOCUMENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+    BACKUP_ENABLED: z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((value) => value === "true"),
+    BACKUP_INTERVAL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
+    BACKUP_RETENTION_COUNT: z.coerce.number().int().min(1).max(365).default(14),
+    BACKUP_BUCKET_NAME: z.string().optional(),
     NEVE_API_BASE_URL: z
         .string()
         .url()

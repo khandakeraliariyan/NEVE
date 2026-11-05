@@ -43,6 +43,7 @@ import adminPrivacyRoutes from "./routes/adminPrivacy.routes.js";
 import aiEvaluationRoutes from "./routes/aiEvaluation.routes.js";
 import verificationRoutes from "./routes/verification.routes.js";
 import adminVerificationRoutes from "./routes/adminVerification.routes.js";
+import adminSystemRoutes from "./routes/adminSystem.routes.js";
 
 const app = express();
 
@@ -108,6 +109,7 @@ app.use("/api/v1/admin/privacy", adminPrivacyRoutes);
 app.use("/api/v1/admin/ai-evaluations", aiEvaluationRoutes);
 app.use("/api/v1/verification", verificationRoutes);
 app.use("/api/v1/admin/verifications", adminVerificationRoutes);
+app.use("/api/v1/admin/system", adminSystemRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {

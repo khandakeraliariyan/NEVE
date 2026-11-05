@@ -32,7 +32,7 @@ important requirements are missing.
 | 4.10 | **Neve Agreement & Trust** | **Partial** | Private agreement upload (PDF, image, text); Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer. | Balanced clause rewrites; legal-source retrieval with sections, versions and review status; the legal-review workflow. |
 | 4.11 | **Neve Evidence Graph** | **Partial** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`, `requires`), record-to-record links (a clause `requires` an obligation, a payment `supports` an obligation), a per-record fact state (documented, disputed, uncertain, undocumented) where a `supports` link confirmed by both participants is a documented fact, Claude-suggested file links that count only after a participant accepts them, with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses, extracted-vs-recorded value mismatches, conflicting or mismatched payment amounts (rent per month, deposit and advance totals), and missing or decreasing move-in/move-out meter readings; JSON evidence report; SHA-256 hashes of uploaded files and a hash-linked agreement event history, with an integrity check. | Legal-source nodes. |
 | 4.12 | **Neve Property Manager** | **Not implemented** | Landlords manage their own listings (create, edit, pause, delete), inquiries, viewings and listing analytics. | The `property_manager` role, access scoped to assigned properties and tenancies, and lease/obligation tracking for managers. |
-| 4.13 | **Neve Security, Privacy & Dispute Support** | **Partial** | Role-based access; private-by-default tenancy files with signed URLs; case-specific evidence sharing with legal reviewers (the role that replaced mediators); sensitive-access log; personal-data export; document deletion requests; retention dates and legal holds; tamper-evident (SHA-256 hash-linked, append-only) admin audit and sensitive-access logs with an integrity check; no public trust scores or AI verdicts. | Automatic retention purges and backup workflows. |
+| 4.13 | **Neve Security, Privacy & Dispute Support** | **Implemented** | Role-based access; private-by-default tenancy files with signed URLs; case-specific evidence sharing with legal reviewers (the role that replaced mediators); sensitive-access log; personal-data export; document deletion requests; retention dates and legal holds; tamper-evident (SHA-256 hash-linked, append-only) admin audit and sensitive-access logs with an integrity check; scheduled retention purges; database backups to private object storage with restore; no public trust scores or AI verdicts. | — |
 | 4.14 | **Neve AI Reliability & Evaluation** | **Partial** | Admin API that scores submitted evaluation runs: precision, recall, F1, exact match, false-positive rate, OCR character error rate, failure rate, latency and cost, for model-backed and deterministic tasks. Extraction responses record model, token usage and latency. | A documented test set and runner that produce those results; separate OCR evaluation; regression tracking. |
 
 ### Users and roles (§3)
@@ -64,7 +64,7 @@ important requirements are missing.
 | 2 | Agreement analysis, receipts, obligation tracking, evidence reports | Partial (no clause rewrites or legal sources) |
 | 2 | Move-in/move-out reports with two-party confirmation | Implemented |
 | 2 | Maintenance and repair requests | Mostly implemented (no assignment) |
-| 2 | Secure sharing, role permissions, audit history, privacy workflows | Partial (no hash-linked audit, automatic purge, or backups) |
+| 2 | Secure sharing, role permissions, audit history, privacy workflows | Implemented |
 | 2 | Fuller listing-risk signals and human review | Implemented |
 | 3 — Scale | Property-manager workspace and analytics | Not implemented |
 | 3 | Advanced saved-search alerts and matching | Partial (in-app alerts only) |
@@ -188,6 +188,14 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `EMAIL_API_KEY` | For email | Optional | API key for the email provider |
 | `EMAIL_FROM` | For email | Optional; email address | Sender address for notification emails |
 | `PUSH_NOTIFICATIONS_ENABLED` | No | `false`; `true` or `false` | Sends push notifications through Firebase Cloud Messaging with the existing service account |
+| `RETENTION_PURGE_ENABLED` | No | `false`; `true` or `false` | Runs the retention purge on a schedule |
+| `RETENTION_PURGE_INTERVAL_MINUTES` | No | `60`; 5 to 10080 | How often the retention purge runs |
+| `ABANDONED_UPLOAD_HOURS` | No | `24`; 1 to 720 | Age after which an unconfirmed upload is purged |
+| `VERIFICATION_DOCUMENT_RETENTION_DAYS` | No | `90`; 1 to 3650 | Days after a verification request closes before its documents are purged |
+| `BACKUP_ENABLED` | No | `false`; `true` or `false` | Runs database backups on a schedule |
+| `BACKUP_INTERVAL_HOURS` | No | `24`; 1 to 720 | How often backups run |
+| `BACKUP_RETENTION_COUNT` | No | `14`; 1 to 365 | Number of most recent backups to keep |
+| `BACKUP_BUCKET_NAME` | No | Optional; defaults to `R2_BUCKET_NAME` | Private bucket for database backups |
 | `NEVE_API_BASE_URL` | No | `http://localhost:5000/api/v1` | Configured API base URL |
 
 R2 is treated as configured only when all four R2 account, key, secret, and
@@ -335,6 +343,7 @@ the feature inventory previously proposed.
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links/suggest`, `PATCH /agreements/:agreementId/evidence-links/:linkId/review` | Claude reads one evidence file and proposes links to clauses, obligations and payments (`{ fileId }`); proposals are `proposed` until a participant sends `{ decision: "accept" \| "reject" }`. Needs `ANTHROPIC_API_KEY` |
 | `/api/v1/tenancy` | `GET /agreements/:agreementId/integrity?recheckFiles=true` | Agreement participants and shared reviewers verify the hash-linked event history and, optionally, re-hash up to 50 stored files against their recorded SHA-256 |
 | `/api/v1/admin/audit-logs` | `GET /integrity?log=admin\|access` | Admin verifies the hash chain of the admin audit log or the sensitive-access log |
+| `/api/v1/admin/system` | `GET /jobs?job=&limit=`, `POST /retention-purge`, `POST /backups` | Admin views background job runs, runs the retention purge now (`{ "dryRun": true }` lists what would be deleted), or starts a backup |
 
 For exact role checks and request/response fields, see the corresponding
 router, controller, validator, and model under `src/`.
@@ -780,6 +789,38 @@ specific notification types at `/api/v1/notifications/preferences`; muted
 types still appear in the app. The app registers each device's FCM token at
 `POST /api/v1/notifications/push-tokens`, and tokens FCM reports as invalid
 are removed automatically.
+
+### Retention purge and backups
+
+**Retention purge** deletes files Neve no longer needs: uploads never
+confirmed within `ABANDONED_UPLOAD_HOURS`; tenancy evidence whose retention
+date has passed; and identity or ownership documents from verification
+requests closed more than `VERIFICATION_DOCUMENT_RETENTION_DAYS` ago. A file
+under legal hold, or used by any agreement, link, condition record, repair,
+case, listing, profile or open verification request, is never deleted. Each
+file is locked before deletion, so a new legal hold or retention date set
+meanwhile stops it. Runs are recorded and listed at
+`GET /api/v1/admin/system/jobs`.
+
+**Backups** write every collection as gzipped Extended JSON plus a
+`manifest.json` with document counts and SHA-256 hashes to
+`backups/<id>/` in the private backup bucket, then keep the newest
+`BACKUP_RETENTION_COUNT` backups. Uploaded files already live in object
+storage and aren't copied. Run one with `npm run backup` or
+`POST /api/v1/admin/system/backups`. List and restore with:
+
+```bash
+npm run restore-backup -- --list
+npm run restore-backup -- --id <backupId> --confirm
+```
+
+Restore checks every file's hash first and skips collections that already
+have documents unless `--drop` is given. Each collection is held in memory
+during a backup, so very large databases should use MongoDB's own backup
+tools instead.
+
+Both jobs are off until enabled, and a database lock stops two server
+instances from running the same job at once.
 
 ### Responses and pagination
 

@@ -7,7 +7,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "node --test",
-    "create-admin": "node scripts/createAdmin.js"
+    "create-admin": "node scripts/createAdmin.js",
+    "backup": "node scripts/backup.js",
+    "restore-backup": "node scripts/restoreBackup.js"
   },
   "keywords": [],
   "type": "module",

@@ -30,6 +30,7 @@ const adminAuditLogSchema = new mongoose.Schema(
                 "ai_evaluation",
                 "user",
                 "verification_request",
+                "system_job",
             ],
         },
         targetId: {
