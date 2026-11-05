@@ -1,3 +1,5 @@
+import { buildFactStates, findUnmetRequirements } from "./evidenceFacts.service.js";
+
 // Compares values extracted from the agreement file with the values a
 // participant recorded. A mismatch is a conflict to review, not a finding of
 // which value is right.
@@ -38,7 +40,7 @@ export function findExtractionMismatches(agreement) {
     return mismatches;
 }
 
-export function analyzeAgreementEvidence(agreement, links) {
+export function analyzeAgreementEvidence(agreement, links, recordLinks = []) {
     const missingInformation = [];
     const potentialConflicts = [];
     const uncertainInterpretations = [];
@@ -178,11 +180,28 @@ export function analyzeAgreementEvidence(agreement, links) {
         }
     }
 
+    missingInformation.push(...findUnmetRequirements(agreement, recordLinks));
+    for (const link of recordLinks) {
+        if (link.relationship === "contradicts") {
+            potentialConflicts.push({
+                type: "record_contradiction",
+                linkId: String(link._id),
+                targetId: String(link.fromId),
+                relatedId: String(link.toId),
+                message: `A participant marked this ${link.fromType} as contradicting a ${link.toType}.`,
+            });
+        }
+    }
+
+    const factStates = buildFactStates(agreement, links, recordLinks);
+
     return {
         method: "deterministic_record_completeness_and_user_assessments",
         missingInformation,
         potentialConflicts,
         uncertainInterpretations,
+        factStates,
+        documentedFacts: factStates.filter((fact) => fact.state === "documented"),
         disclaimer:
             "These flags reflect recorded fields, participant assessments, and any automated extraction of the agreement file. Extracted clauses are proposals until a participant confirms them. Flags do not verify facts or determine legal liability.",
     };

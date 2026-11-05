@@ -16,6 +16,7 @@ const relationshipEventSchema = new mongoose.Schema(
                 "cites",
                 "context_only",
                 "unassessed",
+                "requires",
             ],
             required: true,
         },
@@ -57,6 +58,7 @@ const tenancyEvidenceLinkSchema = new mongoose.Schema(
                 "cites",
                 "context_only",
                 "unassessed",
+                "requires",
             ],
             default: "unassessed",
         },
@@ -68,6 +70,19 @@ const tenancyEvidenceLinkSchema = new mongoose.Schema(
             required: true,
         },
         history: { type: [relationshipEventSchema], default: [] },
+        // Participants who confirmed this relationship. A "supports" link
+        // confirmed by both the renter and the landlord is a documented fact.
+        // Changing the relationship clears confirmations.
+        confirmations: {
+            type: [
+                {
+                    _id: false,
+                    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                    confirmedAt: { type: Date, default: Date.now },
+                },
+            ],
+            default: [],
+        },
     },
     { timestamps: true }
 );

@@ -4,6 +4,11 @@ import InquiryMessage from "../models/InquiryMessage.js";
 import Property from "../models/Property.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
+import TenancyRecordLink, {
+    RECORD_LINK_NODE_TYPES,
+    RECORD_LINK_RELATIONSHIPS,
+} from "../models/TenancyRecordLink.js";
+import { validateRecordLinkInput } from "../services/evidenceFacts.service.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import { analyzeAgreementEvidence } from "../services/evidenceGraphAnalysis.service.js";
@@ -26,6 +31,7 @@ const relationships = [
     "cites",
     "context_only",
     "unassessed",
+    "requires",
 ];
 
 const setPrivateResponse = (res) =>
@@ -850,6 +856,9 @@ export async function updateAgreementEvidenceLink(req, res, next) {
             });
         }
 
+        if (link.relationship !== relationship) {
+            link.confirmations = [];
+        }
         link.relationship = relationship;
         link.explanation = explanation.trim();
         if (requestedConfidence !== undefined) {
@@ -1008,6 +1017,9 @@ export async function getAgreementEvidenceGraph(req, res, next) {
         }
 
         await saveAuditedChange(agreement, req, "evidence_graph_viewed");
+        const recordLinks = await TenancyRecordLink.find({ agreement: agreement._id })
+            .sort({ createdAt: 1 })
+            .lean();
         const [messages, links] = await Promise.all([
             InquiryMessage.find({ inquiry: agreement.inquiry })
                 .populate("sender", "displayName role")
@@ -1142,6 +1154,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 relationship: link.relationship,
                 explanation: link.explanation,
                 confidence: link.confidence ?? null,
+                confirmedBy: (link.confirmations ?? []).map((entry) => String(entry.user)),
                 linkedBy: link.linkedBy,
                 createdAt: link.createdAt,
                 file: link.uploadedFile
@@ -1154,6 +1167,16 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                     }
                     : null,
             })),
+            ...recordLinks.map((link) => ({
+                id: String(link._id),
+                kind: "record_link",
+                from: String(link.fromId),
+                to: String(link.toId),
+                relationship: link.relationship,
+                explanation: link.explanation,
+                createdBy: String(link.createdBy),
+                createdAt: link.createdAt,
+            })),
         ];
 
         setPrivateResponse(res);
@@ -1162,7 +1185,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             agreementId: agreement._id,
             nodes,
             edges,
-            analysis: analyzeAgreementEvidence(agreement, links),
+            analysis: analyzeAgreementEvidence(agreement, links, recordLinks),
             disclaimer:
                 "User-entered records and links are not independently verified and do not determine legal liability.",
         });
@@ -1179,6 +1202,9 @@ export async function getAgreementEvidenceReport(req, res, next) {
         }
 
         await saveAuditedChange(agreement, req, "evidence_report_generated");
+        const recordLinks = await TenancyRecordLink.find({ agreement: agreement._id })
+            .sort({ createdAt: 1 })
+            .lean();
         const [messages, messageCount, links] = await Promise.all([
             InquiryMessage.find({ inquiry: agreement.inquiry })
                 .populate("sender", "displayName role")
@@ -1216,6 +1242,7 @@ export async function getAgreementEvidenceReport(req, res, next) {
             links,
             files,
             messages: includedMessages,
+            recordLinks,
             generatedAt: new Date(),
             messageCount,
             messageLimit: 500,
@@ -1227,6 +1254,124 @@ export async function getAgreementEvidenceReport(req, res, next) {
             `attachment; filename="neve-evidence-report-${agreement._id}.json"`
         );
         return res.json({ success: true, data: report });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// POST /api/v1/tenancy/agreements/:agreementId/evidence-links/:linkId/confirm
+// A participant confirms the link's current relationship. A "supports" link
+// confirmed by both participants is a documented fact.
+export async function confirmAgreementEvidenceLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const { linkId } = req.params;
+        if (!validId(linkId)) {
+            return res.status(400).json({ success: false, message: "Invalid evidence link ID." });
+        }
+        const link = await TenancyEvidenceLink.findOne({ _id: linkId, agreement: agreement._id });
+        if (!link) {
+            return res.status(404).json({ success: false, message: "Evidence link not found." });
+        }
+        if (link.relationship === "unassessed") {
+            return res.status(409).json({
+                success: false,
+                message: "Assess the relationship before confirming it.",
+            });
+        }
+        if ((link.confirmations ?? []).some((entry) => String(entry.user) === String(userId(req)))) {
+            return res.status(409).json({ success: false, message: "You already confirmed this link." });
+        }
+        link.confirmations.push({ user: userId(req), confirmedAt: new Date() });
+        await link.save();
+        await saveAuditedChange(
+            agreement,
+            req,
+            "evidence_link_confirmed",
+            link.targetType,
+            link.targetId
+        );
+
+        const confirmers = new Set(link.confirmations.map((entry) => String(entry.user)));
+        const documentedFact =
+            link.relationship === "supports" &&
+            confirmers.has(String(agreement.renter)) &&
+            confirmers.has(String(agreement.landlord));
+
+        setPrivateResponse(res);
+        return res.json({ success: true, data: link, documentedFact });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// POST /api/v1/tenancy/agreements/:agreementId/record-links
+// { fromType, fromId, toType, toId, relationship, explanation? }
+export async function addAgreementRecordLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const { value, error, status } = validateRecordLinkInput(req.body, agreement, {
+            nodeTypes: RECORD_LINK_NODE_TYPES,
+            relationships: RECORD_LINK_RELATIONSHIPS,
+        });
+        if (error) {
+            return res.status(status).json({ success: false, message: error });
+        }
+        let link;
+        try {
+            link = await TenancyRecordLink.create({
+                ...value,
+                agreement: agreement._id,
+                createdBy: userId(req),
+            });
+        } catch (createError) {
+            if (createError.code === 11000) {
+                return res.status(409).json({
+                    success: false,
+                    message: "These records already have that relationship.",
+                });
+            }
+            throw createError;
+        }
+        await saveAuditedChange(agreement, req, "record_link_added", value.fromType, value.fromId);
+        setPrivateResponse(res);
+        return res.status(201).json({ success: true, data: link });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// DELETE /api/v1/tenancy/agreements/:agreementId/record-links/:linkId
+export async function removeAgreementRecordLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const { linkId } = req.params;
+        if (!validId(linkId)) {
+            return res.status(400).json({ success: false, message: "Invalid record link ID." });
+        }
+        const link = await TenancyRecordLink.findOneAndDelete({
+            _id: linkId,
+            agreement: agreement._id,
+            createdBy: userId(req),
+        });
+        if (!link) {
+            return res.status(404).json({
+                success: false,
+                message: "Record link not found, or it was created by the other participant.",
+            });
+        }
+        await saveAuditedChange(agreement, req, "record_link_removed", link.fromType, link.fromId);
+        setPrivateResponse(res);
+        return res.json({ success: true, message: "Record link removed." });
     } catch (error) {
         next(error);
     }

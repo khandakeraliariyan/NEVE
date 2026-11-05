@@ -13,6 +13,9 @@ import {
     shareAgreement,
     updateAgreementObligation,
     updateAgreementEvidenceLink,
+    confirmAgreementEvidenceLink,
+    addAgreementRecordLink,
+    removeAgreementRecordLink,
     updateAgreementPayment,
     updateTenancyAgreementStatus,
 } from "../controllers/tenancyAgreement.controller.js";
@@ -143,6 +146,21 @@ router.post(
 router.patch(
     "/agreements/:agreementId/evidence-links/:linkId",
     updateAgreementEvidenceLink
+);
+router.post(
+    "/agreements/:agreementId/evidence-links/:linkId/confirm",
+    allowRoles("renter", "landlord"),
+    confirmAgreementEvidenceLink
+);
+router.post(
+    "/agreements/:agreementId/record-links",
+    allowRoles("renter", "landlord"),
+    addAgreementRecordLink
+);
+router.delete(
+    "/agreements/:agreementId/record-links/:linkId",
+    allowRoles("renter", "landlord"),
+    removeAgreementRecordLink
 );
 router.post(
     "/agreements/:agreementId/clauses",
