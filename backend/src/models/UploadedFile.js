@@ -23,6 +23,7 @@ const uploadedFileSchema = new mongoose.Schema(
                 "property_video",
                 "floor_plan",
                 "tenancy_evidence",
+                "profile_photo",
             ],
             required: true,
         },

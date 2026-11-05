@@ -739,7 +739,10 @@ missing product features, see [Project feature coverage](#project-feature-covera
    isn't `password` (error code `ADMIN_PASSWORD_SIGN_IN_REQUIRED`), so Google
    sign-in never grants admin access.
 2. **Profile photos:** `PATCH /api/v1/users/me` updates the display name, phone
-   number, and renter/landlord role, but not the profile photo.
+   number, and renter/landlord role. Photos use their own flow: upload with
+   purpose `profile_photo`, confirm it, then `PUT /api/v1/users/me/photo`
+   (`{ "fileId": "..." }`). `DELETE /api/v1/users/me/photo` removes it, and the
+   public `GET /api/v1/users/:userId/photo` redirects to a short-lived URL.
 3. **Inquiry status flows:** `PATCH /api/v1/inquiries/:inquiryId/respond` accepts
    `accepted` or `declined`, and only from `pending`.
    `PATCH /api/v1/inquiries/:id` separately accepts `acknowledged`, `responded`,

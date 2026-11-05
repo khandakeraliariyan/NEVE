@@ -7,6 +7,12 @@ import {
     lookupUsers,
 } from "../controllers/user.controller.js";
 
+import {
+    getProfilePhoto,
+    removeMyProfilePhoto,
+    setMyProfilePhoto,
+} from "../controllers/profilePhoto.controller.js";
+
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
@@ -28,6 +34,8 @@ const router = Router();
 router.post("/profile", authenticateUser, createProfile);
 router.get("/me", authenticateUser, getMyProfile);
 router.patch("/me", authenticateUser, updateMyProfile);
+router.put("/me/photo", authenticateUser, setMyProfilePhoto);
+router.delete("/me/photo", authenticateUser, removeMyProfilePhoto);
 
 router.get(
     "/lookup",
@@ -84,5 +92,9 @@ router.delete(
     allowRoles("renter"),
     clearRecentlyViewed
 );
+
+// Public, so other users' photos can be shown; registered last so it never
+// shadows a /me route.
+router.get("/:userId/photo", getProfilePhoto);
 
 export default router;

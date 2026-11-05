@@ -29,6 +29,14 @@ const userSchema = new mongoose.Schema(
             default: null,
         },
 
+        // A photo uploaded to Neve. photoURL then points at the stable
+        // GET /users/:userId/photo address, which redirects to a signed URL.
+        profilePhoto: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "UploadedFile",
+            default: null,
+        },
+
         phoneNumber: {
             type: String,
             default: null,
