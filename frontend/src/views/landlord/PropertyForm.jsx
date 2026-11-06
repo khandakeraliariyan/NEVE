@@ -250,7 +250,7 @@ export default function PropertyForm() {
                 {property && (
                     <div className="flex items-center gap-2 text-sm">
                         <StatusBadge status={property.status} />
-                        <Link href="/listings" className="rounded-lg border border-line bg-panel px-3 py-2">
+                        <Link href="/listings" className="rounded-full border border-line bg-panel px-5 py-2.5 hover:bg-sage">
                             Exit
                         </Link>
                     </div>

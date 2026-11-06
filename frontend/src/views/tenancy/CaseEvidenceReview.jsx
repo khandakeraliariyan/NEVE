@@ -47,7 +47,7 @@ function Viewer({ entry }) {
                     </p>
                 </div>
                 {url && (
-                    <a href={url} target="_blank" rel="noreferrer" className="rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white">
+                    <a href={url} target="_blank" rel="noreferrer" className="rounded-full bg-forest px-5 py-2.5 text-sm font-medium text-white">
                         Open in new tab
                     </a>
                 )}

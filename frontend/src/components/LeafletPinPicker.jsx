@@ -22,7 +22,7 @@ export default function PinPicker({ value, onChange, className = "h-72" }) {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <ClickHandler onPick={onChange} />
-                {position && <CircleMarker center={position} radius={10} pathOptions={{ color: "#fff", weight: 2, fillColor: "#173f2f", fillOpacity: 1 }} />}
+                {position && <CircleMarker center={position} radius={10} pathOptions={{ color: "#fff", weight: 2, fillColor: "#222222", fillOpacity: 1 }} />}
             </MapContainer>
         </div>
     );

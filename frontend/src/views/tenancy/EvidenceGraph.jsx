@@ -11,13 +11,13 @@ import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, PageHeader }
 import NotFound from "../NotFound";
 
 const TYPES = {
-    agreement: { title: "Agreement", color: "#173f2f" },
-    clause: { title: "Clauses", color: "#2f6b4f" },
-    obligation: { title: "Obligations", color: "#b7791f" },
-    payment_record: { title: "Payments", color: "#2b6cb0" },
-    file: { title: "Files", color: "#7c8f84" },
-    inquiry_message: { title: "Messages", color: "#9b5de5" },
-    event: { title: "Events", color: "#a0aec0" },
+    agreement: { title: "Agreement", color: "#222222" },
+    clause: { title: "Clauses", color: "#a39587" },
+    obligation: { title: "Obligations", color: "#c08a3e" },
+    payment_record: { title: "Payments", color: "#4f6d8a" },
+    file: { title: "Files", color: "#8c847d" },
+    inquiry_message: { title: "Messages", color: "#8a6a8c" },
+    event: { title: "Events", color: "#c9bdb1" },
 };
 const RELATIONSHIPS = ["supports", "contradicts", "relates_to", "cites", "context_only", "unassessed"];
 const TARGET_TYPES = { agreement: "agreement", clause: "clause", obligation: "obligation", payment: "payment_record", message: "inquiry_message" };
@@ -294,7 +294,7 @@ export default function EvidenceGraph() {
                                             y1={positions[e.from].y}
                                             x2={positions[e.to].x}
                                             y2={positions[e.to].y}
-                                            stroke={e.relationship === "contradicts" ? "#8a2323" : e.relationship === "supports" ? "#2f6b4f" : "#b9cbbf"}
+                                            stroke={e.relationship === "contradicts" ? "#9b2b2b" : e.relationship === "supports" ? "#4c7a57" : "#d4ccc2"}
                                             strokeWidth={selected && (e.from === selected.id || e.to === selected.id) ? 3 : 1.5}
                                             strokeDasharray={e.relationship === "unassessed" ? "5 4" : undefined}
                                         />
@@ -304,15 +304,15 @@ export default function EvidenceGraph() {
                                     .map((n) => {
                                         const agreementNode = visibleNodes.find((x) => x.type === "agreement");
                                         if (!agreementNode || n.type === "file") return null;
-                                        return <line key={`spoke-${n.id}`} x1={positions[agreementNode.id].x} y1={positions[agreementNode.id].y} x2={positions[n.id].x} y2={positions[n.id].y} stroke="#e3ece6" />;
+                                        return <line key={`spoke-${n.id}`} x1={positions[agreementNode.id].x} y1={positions[agreementNode.id].y} x2={positions[n.id].x} y2={positions[n.id].y} stroke="#ebe5de" />;
                                     })}
                                 {visibleNodes.map((n) => {
                                     const p = positions[n.id];
                                     const r = n.type === "agreement" ? 34 : 18;
                                     return (
                                         <g key={n.id} onClick={() => setSelectedId(n.id)} className="cursor-pointer">
-                                            <circle cx={p.x} cy={p.y} r={r} fill={TYPES[n.type]?.color} stroke={selectedId === n.id ? "#f6dfb8" : "#fff"} strokeWidth={selectedId === n.id ? 5 : 3} />
-                                            <text x={p.x} y={p.y + r + 13} textAnchor="middle" fontSize="13" fontFamily="Arial" fill="#13231b">
+                                            <circle cx={p.x} cy={p.y} r={r} fill={TYPES[n.type]?.color} stroke={selectedId === n.id ? "#b8aea4" : "#fff"} strokeWidth={selectedId === n.id ? 5 : 3} />
+                                            <text x={p.x} y={p.y + r + 13} textAnchor="middle" fontSize="13" fontFamily="Inter, sans-serif" fill="#222222">
                                                 {nodeLabel(n).slice(0, 22)}
                                             </text>
                                         </g>

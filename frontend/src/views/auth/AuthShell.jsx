@@ -8,14 +8,28 @@ import { Button } from "../../components/ui";
 
 export default function AuthShell({ title, subtitle, eyebrow, children }) {
     return (
-        <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="grid min-h-screen gap-3 p-3 lg:grid-cols-[1.1fr_1fr]">
+            <aside className="hero-surface relative hidden flex-col justify-between overflow-hidden rounded-3xl p-10 text-white lg:flex">
+                <Logo tone="light" />
+                <div>
+                    <p className="text-xs uppercase tracking-widest text-white/60">Rental discovery & tenancy records</p>
+                    <h2 className="mt-4 max-w-md text-5xl text-white">
+                        Find your place. <span className="text-taupe-soft">Know your rights.</span>
+                    </h2>
+                    <div className="glass-dark mt-10 inline-flex items-center gap-4 rounded-2xl border border-white/15 px-5 py-4 text-sm text-white/80">
+                        <span className="font-display text-3xl font-medium text-white">01</span>
+                        Itemized costs, trust signals and private tenancy records in one place.
+                    </div>
+                </div>
+            </aside>
+            <div className="flex items-center justify-center px-4 py-12">
             <div className="w-full max-w-md">
-                <div className="mb-8 flex justify-center">
+                <div className="mb-8 flex justify-center lg:hidden">
                     <Logo />
                 </div>
-                <div className="rounded-2xl border border-line bg-panel p-8 shadow-sm">
+                <div className="rounded-3xl border border-line/70 bg-panel p-8 shadow-soft md:p-10">
                     {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
-                    <h1 className="text-2xl">{title}</h1>
+                    <h1 className="text-3xl">{title}</h1>
                     {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
                     {!firebaseConfigured && (
                         <p className="mt-4 rounded-lg bg-amber px-3 py-2 text-xs text-amber-ink">
@@ -24,6 +38,7 @@ export default function AuthShell({ title, subtitle, eyebrow, children }) {
                     )}
                     <div className="mt-6">{children}</div>
                 </div>
+            </div>
             </div>
         </div>
     );

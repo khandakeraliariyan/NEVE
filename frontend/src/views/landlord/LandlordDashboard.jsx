@@ -93,7 +93,7 @@ export default function LandlordDashboard() {
                 </label>
                 <button
                     type="button"
-                    className="rounded-lg bg-forest px-4 py-2 font-semibold text-white disabled:opacity-50"
+                    className="rounded-full bg-forest px-5 py-2.5 font-medium text-white disabled:opacity-50"
                     disabled={range.from && range.to && range.from > range.to}
                     onClick={() => setAppliedRange(range)}
                 >

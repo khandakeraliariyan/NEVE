@@ -46,7 +46,7 @@ export default function MapView({ markers = [], center, zoom = 13, className = "
                         pathOptions={{
                             color: "#ffffff",
                             weight: 2,
-                            fillColor: marker.tone === "secondary" ? "#2f6b4f" : "#173f2f",
+                            fillColor: marker.tone === "secondary" ? "#a39587" : "#222222",
                             fillOpacity: 0.95,
                         }}
                     >

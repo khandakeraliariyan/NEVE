@@ -98,7 +98,7 @@ export default function MyFavorites() {
                         badge={`Saved ${relativeTime(savedAt)}`}
                         footer={
                             <div className="flex gap-2 text-sm">
-                                <Link href={`/properties/${property._id}`} className="flex-1 rounded-lg bg-forest px-3 py-2 text-center font-semibold text-white">
+                                <Link href={`/properties/${property._id}`} className="flex-1 rounded-full bg-forest px-4 py-2 text-center font-medium text-white">
                                     Request viewing
                                 </Link>
                                 <Link href={`/properties/${property._id}/true-cost`} className="flex-1 rounded-lg bg-mist px-3 py-2 text-center text-forest">

@@ -10,7 +10,7 @@ import { COST_DISCLAIMER, CostLine, MissingList, TotalRow } from "../../../compo
 import { Card, Disclaimer, ErrorBox, Loading } from "../../../components/ui";
 import NotFound from "../../NotFound";
 
-const BAR_COLORS = ["#173f2f", "#2f6b4f", "#5f9b7c", "#9cc5ad", "#c6dfcd", "#e4dccb"];
+const BAR_COLORS = ["#222222", "#454140", "#7a6f66", "#a39587", "#c9bdb1", "#e4dccf"];
 
 function sum(values) {
     return values.reduce((total, v) => total + (Number(v) || 0), 0);
