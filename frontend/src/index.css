@@ -12,7 +12,7 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Surfaces */
-  --color-canvas: #faf8f6;        /* page background */
+  --color-canvas: #fdfcfa;        /* page background (white) */
   --color-panel: #ffffff;         /* cards */
   --color-mist: #f5f2ee;          /* subtle inset surface */
   --color-sage: #efebe6;          /* beige surface / secondary button */
@@ -25,9 +25,13 @@
   --color-moss: #a39587;          /* taupe accent */
   --color-taupe: #a39587;
   --color-taupe-soft: #b8aea4;
+  --color-taupe-deep: #8a7b6e;     /* taupe that reads on white */
   --color-night: #120a0b;         /* dark sections / footer */
   --color-ink: #222222;
-  --color-muted: #6b645f;
+  --color-muted: #332d29;        /* darker so small text stays readable on the taupe page */
+  --color-page-top: #a39587;      /* page gradient, from the Homevia backdrop */
+  --color-page-bottom: #b4a99e;
+  --color-page-glow: #e2ddd6;
 
   /* Status */
   --color-amber: #f4e6cf;
@@ -55,6 +59,7 @@ body {
 }
 
 body {
+  position: relative;
   margin: 0;
   font-family: var(--font-sans);
   background: var(--color-canvas);
@@ -62,6 +67,45 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* White page that opens with the taupe gradient: taupe at the top of every page,
+   melting into white as you scroll, with the soft light glow on the right. */
+body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 760px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(26rem 26rem at 100% 62%, rgb(226 221 214 / 0.9), transparent 65%),
+    linear-gradient(180deg, var(--color-page-top) 0%, var(--color-page-bottom) 45%, rgb(253 252 250 / 0) 100%);
+}
+
+/* Taupe section band — the screenshot look: vertical taupe gradient plus a light circle glow
+   in the bottom-right corner. Alternate it with white sections. */
+.taupe-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--color-page-top) 0%, var(--color-page-bottom) 100%);
+}
+.taupe-band::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -8rem;
+  bottom: -10rem;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 999px;
+  background: var(--color-page-glow);
+  opacity: 0.9;
+  filter: blur(40px);
+  pointer-events: none;
 }
 
 h1,
@@ -80,7 +124,7 @@ h1 {
 }
 
 ::selection {
-  background: var(--color-taupe);
+  background: var(--color-ink);
   color: #fff;
 }
 
@@ -114,7 +158,7 @@ button {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--color-taupe);
+  background: currentColor;
 }
 
 .field {
@@ -307,5 +351,105 @@ html.reveal-ready [data-reveal="word"]:not(.is-in) {
 @media (prefers-reduced-motion: reduce) {
   .nav-drop {
     animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Homevia navbar — values taken from the live site                    */
+/* Transparent bar over the top of the page (not sticky), 1180px max,  */
+/* 20px padding. Links 24px / 1.416, white at 70%; on hover the text   */
+/* rolls up out of a clipped box and a full-white copy rises in.       */
+/* ------------------------------------------------------------------ */
+.hv-nav-link {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.416;
+  letter-spacing: 0;
+  color: #fff;
+}
+@media (min-width: 1200px) {
+  .hv-nav-link {
+    font-size: 24px;
+  }
+}
+
+.nav-roll {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+}
+.nav-roll > span {
+  grid-area: 1 / 1;
+  transition:
+    transform 0.5s cubic-bezier(0.44, 0, 0.56, 1),
+    opacity 0.5s cubic-bezier(0.44, 0, 0.56, 1);
+}
+.nav-roll > span:first-child {
+  opacity: 0.7;
+}
+.nav-roll > span:last-child {
+  transform: translateY(32px);
+}
+a:hover > .nav-roll > span:first-child,
+a:focus-visible > .nav-roll > span:first-child {
+  transform: translateY(-32px);
+}
+a:hover > .nav-roll > span:last-child,
+a:focus-visible > .nav-roll > span:last-child {
+  transform: none;
+}
+a[aria-current="page"] > .nav-roll > span:first-child {
+  opacity: 1;
+}
+
+/* "Book a Visit"-style button: outline, 6px radius, 16px text, 24px arrow */
+.hv-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.hv-nav-cta:hover {
+  border-color: rgb(255 255 255 / 0.45);
+}
+
+/* Arrow swap: the arrow leaves 20px up-right while its twin arrives from 20px down-left */
+.arrow-swap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.arrow-swap > svg {
+  transition: transform 0.5s cubic-bezier(0.44, 0, 0.56, 1);
+}
+.arrow-swap > svg:last-child {
+  position: absolute;
+  transform: translate(-20px, 20px);
+}
+a:hover .arrow-swap > svg:first-child,
+button:hover .arrow-swap > svg:first-child {
+  transform: translate(20px, -20px);
+}
+a:hover .arrow-swap > svg:last-child,
+button:hover .arrow-swap > svg:last-child {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-roll > span,
+  .arrow-swap > svg {
+    transition: none;
   }
 }

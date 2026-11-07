@@ -12,13 +12,12 @@ const REVEAL_BOOT = `if(!matchMedia("(prefers-reduced-motion: reduce)").matches&
 export const metadata = {
     title: { default: "Neve", template: "%s · Neve" },
     description: "Rental discovery and tenancy records for renters and landlords in Bangladesh.",
-    icons: { icon: "/favicon.svg" },
 };
 
 export const viewport = {
     width: "device-width",
     initialScale: 1,
-    themeColor: "#faf8f6",
+    themeColor: "#a39587",
 };
 
 export default function RootLayout({ children }) {

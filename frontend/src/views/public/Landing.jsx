@@ -105,7 +105,7 @@ export default function Landing() {
         <div>
             {/* Hero — pulled up beneath the floating glass navbar */}
             <section className="px-3 pt-3 md:px-6">
-                <div className="relative mx-auto -mt-[72px] flex min-h-[680px] max-w-[1600px] flex-col justify-end overflow-hidden rounded-3xl px-5 pb-6 pt-32 text-white md:min-h-[760px] md:px-12 md:pb-10">
+                <div className="relative mx-auto lg:-mt-[84px] flex min-h-[680px] max-w-[1600px] flex-col justify-end overflow-hidden rounded-3xl px-5 pb-6 pt-32 text-white md:min-h-[760px] md:px-12 md:pb-10">
                     <div className="hero-zoom absolute inset-0">
                         <Photo n={8} priority alt="Modern house beside an infinity pool at sunset" />
                     </div>
@@ -194,7 +194,7 @@ export default function Landing() {
                 </p>
                 <h2 data-reveal="up" style={delay(100)} className="mt-5 max-w-5xl text-3xl leading-tight md:text-5xl">
                     Clearer information before you sign. Every figure and signal on Neve is labelled with{" "}
-                    <span className="text-taupe">where it came from and what it can&apos;t tell you.</span>
+                    <span className="text-taupe-deep">where it came from and what it can&apos;t tell you.</span>
                 </h2>
                 <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-3">
                     {[
@@ -213,7 +213,7 @@ export default function Landing() {
             </section>
 
             {/* Listings */}
-            <section data-reveal="scale" className="mx-3 rounded-3xl bg-sage/60 py-20 md:mx-6">
+            <section data-reveal="scale" className="taupe-band mx-3 rounded-3xl py-20 md:mx-6">
                 <div className="mx-auto max-w-7xl px-4 md:px-8">
                     <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
                         <div>
@@ -262,7 +262,7 @@ export default function Landing() {
                 <ol className="divide-y divide-line border-y border-line">
                     {PILLARS.map((pillar, i) => (
                         <li key={pillar.n} data-reveal="up" style={delay(i * 120)} className="group grid gap-4 py-8 sm:grid-cols-[5rem_1fr]">
-                            <span className="font-display text-4xl font-medium tracking-tight text-taupe transition duration-500 group-hover:-translate-y-1 group-hover:text-ink">
+                            <span className="font-display text-4xl font-medium tracking-tight text-taupe-deep transition duration-500 group-hover:-translate-y-1 group-hover:text-ink">
                                 {pillar.n}
                             </span>
                             <div className="transition-transform duration-500 group-hover:translate-x-2">
@@ -344,7 +344,8 @@ export default function Landing() {
             </section>
 
             {/* FAQ */}
-            <section className="mx-auto grid max-w-7xl gap-10 px-4 pb-24 md:px-8 lg:grid-cols-[1fr_1.6fr]">
+            <section className="taupe-band mx-3 mb-24 rounded-3xl px-4 py-20 md:mx-6 md:px-8">
+                <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_1.6fr]">
                 <div>
                     <p data-reveal="up" className="eyebrow">
                         FAQ
@@ -359,6 +360,7 @@ export default function Landing() {
                             {answer}
                         </AccordionItem>
                     ))}
+                </div>
                 </div>
             </section>
 

@@ -6,6 +6,9 @@ import NavLink from "./NavLink";
 import Logo from "./Logo";
 import { PUBLIC_NAV } from "../nav";
 import { homePathForRole, useAuth } from "../context/AuthContext";
+import { ArrowSwap, NavRoll } from "./motion";
+
+const NAV_LINKS = [{ to: "/", label: "Home", end: true }, ...PUBLIC_NAV];
 
 export default function PublicLayout({ children }) {
     const { status, role, profile } = useAuth();
@@ -13,69 +16,70 @@ export default function PublicLayout({ children }) {
 
     return (
         <div className="flex min-h-screen flex-col">
-            <header className="sticky top-0 z-30 px-3 pt-3 md:px-6">
-                <div className="nav-drop glass mx-auto flex max-w-7xl items-center justify-between gap-6 rounded-full border border-white/60 px-4 py-2.5 shadow-soft md:px-6">
-                    <Logo />
-                    <nav className="hidden items-center gap-1 text-sm lg:flex">
-                        {PUBLIC_NAV.map((item) => (
-                            <NavLink
-                                key={item.to}
-                                href={item.to}
-                                end={item.end}
-                                className={({ isActive }) =>
-                                    `rounded-full px-4 py-2 ${isActive ? "bg-forest text-white" : "text-ink/80 hover:bg-sage hover:text-ink"}`
-                                }
-                            >
-                                {item.label}
+            {/* Homevia-style navbar: transparent, laid over the top of the page, scrolls away with it. */}
+            <header className="absolute inset-x-0 top-0 z-30">
+                <div className="nav-drop mx-auto hidden w-full max-w-[1180px] items-center justify-between p-5 lg:flex">
+                    <Logo tone="light" size={34} />
+                    <nav className="flex items-center gap-7">
+                        {NAV_LINKS.map((item) => (
+                            <NavLink key={item.to} href={item.to} end={item.end} className="hv-nav-link">
+                                <NavRoll>{item.label}</NavRoll>
                             </NavLink>
                         ))}
-                    </nav>
-                    <div className="hidden items-center gap-2 lg:flex">
-                        {status === "ready" ? (
-                            <Link
-                                href={homePathForRole(role)}
-                                className="flex items-center gap-2 rounded-full bg-forest px-5 py-2.5 text-sm font-medium text-white hover:bg-forest-hover"
-                            >
-                                {profile?.displayName ?? "My workspace"} →
-                            </Link>
-                        ) : (
-                            <>
-                                <Link href="/sign-up" className="rounded-full px-4 py-2.5 text-sm text-ink hover:bg-sage">
-                                    List a Property
-                                </Link>
-                                <Link href="/sign-in" className="rounded-full bg-forest px-5 py-2.5 text-sm font-medium text-white hover:bg-forest-hover">
-                                    Sign In / Register
-                                </Link>
-                            </>
+                        {status !== "ready" && (
+                            <NavLink href="/sign-up" end className="hv-nav-link">
+                                <NavRoll>List a Property</NavRoll>
+                            </NavLink>
                         )}
-                    </div>
-                    <button
-                        type="button"
-                        className="rounded-full border border-line bg-white px-4 py-2 text-sm lg:hidden"
-                        onClick={() => setOpen(!open)}
-                        aria-expanded={open}
-                    >
-                        {open ? "Close" : "Menu"}
-                    </button>
-                </div>
-                {open && (
-                    <nav className="glass mx-auto mt-2 flex max-w-7xl flex-col gap-1 rounded-3xl border border-white/60 p-3 text-sm shadow-soft lg:hidden">
-                        {PUBLIC_NAV.map((item) => (
-                            <Link key={item.to} href={item.to} className="rounded-full px-4 py-2.5 hover:bg-sage" onClick={() => setOpen(false)}>
-                                {item.label}
-                            </Link>
-                        ))}
-                        <Link
-                            href={status === "ready" ? homePathForRole(role) : "/sign-in"}
-                            className="mt-1 rounded-full bg-forest px-4 py-2.5 text-center font-medium text-white"
-                        >
-                            {status === "ready" ? "My workspace" : "Sign In / Register"}
-                        </Link>
                     </nav>
-                )}
+                    <Link href={status === "ready" ? homePathForRole(role) : "/sign-in"} className="hv-nav-cta">
+                        {status === "ready" ? profile?.displayName ?? "My workspace" : "Sign In"}
+                        <ArrowSwap />
+                    </Link>
+                </div>
+
+                {/* Phone/tablet: black bar with logo and a two-line menu button, as on Homevia */}
+                <div className="bg-black lg:hidden">
+                    <div className="flex items-center justify-between p-5">
+                        <Logo tone="light" size={34} />
+                        <button
+                            type="button"
+                            onClick={() => setOpen(!open)}
+                            aria-expanded={open}
+                            aria-label={open ? "Close menu" : "Open menu"}
+                            className="relative flex h-10 w-10 items-center justify-center rounded-xl"
+                        >
+                            <span className={`absolute h-[2px] w-6 rounded-sm bg-white transition duration-300 ${open ? "rotate-45" : "-translate-y-[4px]"}`} />
+                            <span className={`absolute h-[2px] w-6 rounded-sm bg-white transition duration-300 ${open ? "-rotate-45" : "translate-y-[4px]"}`} />
+                        </button>
+                    </div>
+                    {open && (
+                        <nav className="flex flex-col gap-1 px-5 pb-6">
+                            {NAV_LINKS.map((item) => (
+                                <NavLink key={item.to} href={item.to} end={item.end} className="hv-nav-link py-1" onClick={() => setOpen(false)}>
+                                    <NavRoll>{item.label}</NavRoll>
+                                </NavLink>
+                            ))}
+                            {status !== "ready" && (
+                                <NavLink href="/sign-up" end className="hv-nav-link py-1" onClick={() => setOpen(false)}>
+                                    <NavRoll>List a Property</NavRoll>
+                                </NavLink>
+                            )}
+                            <Link
+                                href={status === "ready" ? homePathForRole(role) : "/sign-in"}
+                                className="hv-nav-cta mt-4 self-start"
+                                onClick={() => setOpen(false)}
+                            >
+                                {status === "ready" ? "My workspace" : "Sign In"}
+                                <ArrowSwap />
+                            </Link>
+                        </nav>
+                    )}
+                </div>
             </header>
 
-            <main className="flex-1">{children}</main>
+            {/* Leaves room for the overlaid navbar (20px padding + 44px row + 20px). */}
+            <main className="flex-1 pt-[84px]">{children}</main>
 
             <footer className="relative mx-3 mb-3 mt-20 overflow-hidden rounded-3xl bg-night text-white md:mx-6 md:mb-6">
                 <div className="glow glow-drift -right-24 -top-32 h-80 w-[28rem] bg-taupe/40" aria-hidden="true" />

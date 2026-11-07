@@ -116,3 +116,40 @@ export function AccordionItem({ question, children, defaultOpen = false }) {
         </div>
     );
 }
+
+// Homevia navbar label: dimmed text that rolls up to a full-strength copy on hover.
+export function NavRoll({ children }) {
+    return (
+        <span className="nav-roll">
+            <span>{children}</span>
+            <span aria-hidden="true">{children}</span>
+        </span>
+    );
+}
+
+// Homevia's arrow (24px, 1.5 stroke).
+const ArrowIcon = ({ size = 24 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 18 18 6m0 9V6H9" />
+    </svg>
+);
+
+// Arrow that swaps diagonally when its parent link/button is hovered.
+export function ArrowSwap({ size = 24, className = "" }) {
+    return (
+        <span className={`arrow-swap shrink-0 ${className}`} style={{ width: size, height: size }}>
+            <ArrowIcon size={size} />
+            <ArrowIcon size={size} />
+        </span>
+    );
+}
+
+// Round arrow badge variant for filled buttons.
+export function ArrowBadge({ className = "h-7 w-7 bg-white text-forest" }) {
+    return (
+        <span className={`arrow-swap shrink-0 rounded-full ${className}`}>
+            <ArrowIcon size={14} />
+            <ArrowIcon size={14} />
+        </span>
+    );
+}

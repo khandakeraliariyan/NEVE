@@ -89,12 +89,12 @@ export default function WorkspaceLayout({ children }) {
 
     return (
         <div className="flex min-h-screen">
-            <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-line bg-sage/60 lg:block">{sidebar}</aside>
+            <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-hidden bg-gradient-to-b from-taupe to-[#b4a99e] lg:block">{sidebar}</aside>
 
             {menuOpen && (
                 <div className="fixed inset-0 z-40 lg:hidden">
                     <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/30" onClick={() => setMenuOpen(false)} />
-                    <aside className="relative h-full w-72 bg-sage shadow-xl">{sidebar}</aside>
+                    <aside className="relative h-full w-72 bg-gradient-to-b from-taupe to-[#b4a99e] shadow-xl">{sidebar}</aside>
                 </div>
             )}
 
