@@ -81,6 +81,22 @@ const userSchema = new mongoose.Schema(
             default: true,
         },
 
+        // Admins only: salted scrypt hash of the admin portal password
+        // ("scrypt$N$r$p$salt$hash"). Never returned by default.
+        passwordHash: {
+            type: String,
+            default: null,
+            select: false,
+        },
+
+        // Admin JWTs issued before this moment are refused, so changing the
+        // password signs out every existing admin session.
+        passwordChangedAt: {
+            type: Date,
+            default: null,
+            select: false,
+        },
+
         notificationPreferences: {
             email: { type: Boolean, default: true },
             push: { type: Boolean, default: true },

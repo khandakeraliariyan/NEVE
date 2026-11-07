@@ -1,77 +1,61 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
-import AuthShell, { firebaseMessage } from "./AuthShell";
-import { auth, firebaseConfigured } from "../../lib/firebase";
+import AuthShell from "./AuthShell";
+import { api } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { label } from "../../lib/format";
 import { Button, ErrorBox, Field } from "../../components/ui";
 import { safeNextPath } from "../../components/Redirect";
 
-// Admin portal: email and password only. No Google, no sign-up. The backend
-// also refuses admin sessions from any other sign-in method.
+// Admin portal: email and password checked by the Neve API, which returns a
+// signed JWT. No Firebase, no Google, no sign-up.
 export default function AdminSignIn() {
-    const { status, role, profile, notice, setNotice, signOut } = useAuth();
+    const { status, role, profile, notice, setNotice, signOut, startAdminSession } = useAuth();
     const router = useRouter();
     const next = safeNextPath(useSearchParams().get("next"));
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
-    const [info, setInfo] = useState(null);
-    const submitted = useRef(false);
 
     useEffect(() => {
-        if (status !== "ready" && status !== "needs_profile") return;
-        if (role === "admin") {
+        if (status === "ready" && role === "admin") {
             router.replace(next?.startsWith("/admin") ? next : "/admin");
-            return;
         }
-        // Someone without an admin account signed in here: end that session.
-        if (submitted.current) {
-            submitted.current = false;
-            setError("This portal is only for admin accounts.");
-            signOut();
-        }
-    }, [status, role, router, next, signOut]);
+    }, [status, role, router, next]);
 
     async function handleSubmit(event) {
         event.preventDefault();
         setBusy(true);
         setError(null);
         setNotice(null);
-        submitted.current = true;
         try {
-            await signInWithEmailAndPassword(auth, email.trim(), password);
+            const payload = await api.post(
+                "/auth/admin/login",
+                { email: email.trim(), password },
+                { auth: false }
+            );
+            setPassword("");
+            await startAdminSession(payload.token, payload.user);
         } catch (err) {
-            submitted.current = false;
-            setError(firebaseMessage(err));
+            setError(err.message);
         } finally {
             setBusy(false);
         }
     }
 
-    async function handleReset() {
-        if (!email.trim()) {
-            setError("Enter your email first, then choose “Forgot password”.");
-            return;
-        }
-        try {
-            await sendPasswordResetEmail(auth, email.trim());
-            setInfo("If an admin account exists for that email, a reset link is on its way.");
-            setError(null);
-        } catch (err) {
-            setError(firebaseMessage(err));
-        }
-    }
-
-    const signedInElsewhere = status === "ready" && role !== "admin" && !submitted.current;
+    const signedInElsewhere = status === "ready" && role !== "admin";
 
     return (
-        <AuthShell eyebrow="Neve admin portal" title="Admin sign in" subtitle="Restricted to Neve staff. Sign in with your admin email and password.">
+        <AuthShell
+            eyebrow="Neve admin portal"
+            title="Admin sign in"
+            subtitle="Restricted to Neve staff. Sign in with your admin email and password."
+            usesFirebase={false}
+        >
             {signedInElsewhere ? (
                 <div className="space-y-4 text-sm">
                     <p className="rounded-lg bg-amber px-3 py-2 text-amber-ink">
@@ -90,17 +74,14 @@ export default function AdminSignIn() {
                         <input type="password" required autoComplete="current-password" className="field" value={password} onChange={(e) => setPassword(e.target.value)} />
                     </Field>
                     <ErrorBox error={error ?? notice} />
-                    {info && <p className="rounded-lg bg-sage px-3 py-2 text-sm text-forest">{info}</p>}
-                    <Button type="submit" className="w-full" disabled={busy || !firebaseConfigured}>
+                    <Button type="submit" className="w-full" disabled={busy}>
                         {busy ? "Signing in…" : "Sign in to admin portal"}
                     </Button>
                 </form>
             )}
-            <div className="mt-5 flex justify-between text-sm">
-                <button type="button" onClick={handleReset} className="text-forest underline" disabled={!firebaseConfigured || signedInElsewhere}>
-                    Forgot password
-                </button>
-                <Link href="/"className="text-muted underline">
+            <div className="mt-5 flex justify-between gap-4 text-sm">
+                <p className="text-muted">Forgot your password? Ask a Neve system administrator to reset it.</p>
+                <Link href="/" className="shrink-0 text-muted underline">
                     Back to Neve
                 </Link>
             </div>

@@ -44,7 +44,7 @@ important requirements are missing.
 | Property manager | — | Not implemented |
 | Mediator | `legal_reviewer` | Replaced: invited legal reviewers review shared cases and post notes, questions and opinions |
 | Legal reviewer (legal-source pack) | `legal_reviewer` | Implemented: approves legal-source versions or sends them back, and assesses clause rewrite suggestions on shared agreements |
-| Platform administrator | `admin` | Implemented (email/password sign-in only) |
+| Platform administrator | `admin` | Implemented (admin portal email/password: salted scrypt hash in MongoDB, Neve-signed JWT session; no Firebase) |
 | AI service | Claude agreement extraction | Partial: proposals only, confirmed or rejected by participants |
 
 ### Release roadmap (§7)
@@ -169,6 +169,8 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `CLIENT_URL` | Yes | Must be a URL | Allowed CORS origin |
 | `MONGODB_URI` | Yes | Non-empty | MongoDB connection string |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Yes | Non-empty path, resolved from the backend directory | Firebase Admin credentials |
+| `ADMIN_JWT_SECRET` | Yes | At least 32 characters | Signs admin portal session JWTs. Changing it signs every admin out |
+| `ADMIN_JWT_EXPIRES_IN` | No | Default `8h` | How long an admin sign-in lasts |
 | `R2_ACCOUNT_ID` | For R2 | Optional | Cloudflare account ID |
 | `R2_ACCESS_KEY_ID` | For R2 | Optional | R2 access key |
 | `R2_SECRET_ACCESS_KEY` | For R2 | Optional | R2 secret key |

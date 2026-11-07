@@ -1,9 +1,10 @@
 import User from "../models/User.js";
+import { ADMIN_SIGN_IN_PROVIDER } from "../services/adminAuth.service.js";
 
-// Admins may only use a session from email and password sign-in, never Google
-// or any other provider, even when the email matches.
+// Admins may only use a session from the admin portal's email and password
+// sign-in (a Neve-signed JWT), never Firebase, even when the email matches.
 export function isAdminSessionAllowed(role, signInProvider) {
-    return role !== "admin" || signInProvider === "password";
+    return role !== "admin" || signInProvider === ADMIN_SIGN_IN_PROVIDER;
 }
 
 export function allowRoles(...allowedRoles) {

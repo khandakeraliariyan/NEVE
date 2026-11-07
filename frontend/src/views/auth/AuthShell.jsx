@@ -1,17 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import Logo from "../../components/Logo";
 import { auth, firebaseConfigured } from "../../lib/firebase";
 import { Button } from "../../components/ui";
 
-export default function AuthShell({ title, subtitle, eyebrow, children }) {
+// usesFirebase: false for the admin portal, which signs in against the Neve API.
+export default function AuthShell({ title, subtitle, eyebrow, usesFirebase = true, children }) {
     return (
         <div className="grid min-h-screen gap-3 p-3 lg:grid-cols-[1.1fr_1fr]">
-            <aside className="hero-surface relative hidden flex-col justify-between overflow-hidden rounded-3xl p-10 text-white lg:flex">
-                <Logo tone="light" />
-                <div>
+            <aside className="relative hidden flex-col justify-between overflow-hidden rounded-3xl bg-night p-10 text-white lg:flex">
+                <div className="hero-zoom absolute inset-0">
+                    <Image
+                        src="/images/auth/sign-in.png"
+                        alt="Modern house with an infinity pool at sunset"
+                        fill
+                        priority
+                        sizes="55vw"
+                        className="object-cover"
+                    />
+                </div>
+                {/* Light at the top for the logo, darker at the bottom so the headline stays readable */}
+                <div className="absolute inset-0 bg-gradient-to-b from-night/40 via-night/10 to-night/85" aria-hidden="true" />
+                <div className="relative">
+                    <Logo tone="light" />
+                </div>
+                <div className="relative">
                     <p className="text-xs uppercase tracking-widest text-white/60">Rental discovery & tenancy records</p>
                     <h2 className="mt-4 max-w-md text-5xl text-white">
                         Find your place. <span className="text-taupe-soft">Know your rights.</span>
@@ -31,7 +47,7 @@ export default function AuthShell({ title, subtitle, eyebrow, children }) {
                     {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
                     <h1 className="text-3xl">{title}</h1>
                     {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
-                    {!firebaseConfigured && (
+                    {usesFirebase && !firebaseConfigured && (
                         <p className="mt-4 rounded-lg bg-amber px-3 py-2 text-xs text-amber-ink">
                             Sign-in isn't configured. Add the NEXT_PUBLIC_FIREBASE_* values to frontend/.env.
                         </p>
