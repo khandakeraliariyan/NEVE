@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // Runs an async loader when its deps change; exposes data, loading, error and reload.

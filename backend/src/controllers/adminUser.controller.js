@@ -4,6 +4,7 @@ import User from "../models/User.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
 import {
     buildAdminUserFilter,
+    validateAccountStatusChange,
     validateReviewerRoleChange,
 } from "../services/adminUser.service.js";
 import { createNotification } from "../services/notification.service.js";
@@ -115,6 +116,67 @@ export async function changeReviewerRole(req, res, next) {
         } catch (notifyError) {
             console.error("Create role change notification error:", notifyError);
             notificationStatus = "failed";
+        }
+
+        return res.json({ success: true, data: updated, notificationStatus });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH /api/v1/admin/users/:userId/status  { isActive: boolean, reason?: string }
+export async function changeAccountStatus(req, res, next) {
+    try {
+        const { userId } = req.params;
+        if (!mongoose.isValidObjectId(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid user ID." });
+        }
+        const target = await User.findById(userId);
+        const { value, error, status } = validateAccountStatusChange({
+            isActive: req.body?.isActive,
+            reason: req.body?.reason,
+            target,
+            actorId: req.neveUser._id,
+        });
+        if (error) {
+            return res.status(status).json({ success: false, message: error });
+        }
+
+        // Only switch if the state is still what we checked, so two admins can't race.
+        const updated = await User.findOneAndUpdate(
+            { _id: target._id, isActive: !value.isActive, role: { $ne: "admin" } },
+            { $set: { isActive: value.isActive } },
+            { new: true, runValidators: true }
+        ).select("displayName email photoURL role isActive createdAt");
+        if (!updated) {
+            return res.status(409).json({
+                success: false,
+                message: "The account changed in the meantime. Reload and try again.",
+            });
+        }
+
+        await recordAdminAction({
+            req,
+            action: value.isActive ? "user_reactivate" : "user_deactivate",
+            targetType: "user",
+            targetId: updated._id,
+            details: { isActive: value.isActive, reason: value.reason },
+        });
+
+        let notificationStatus = "skipped";
+        if (value.isActive) {
+            try {
+                await createNotification({
+                    recipient: updated._id,
+                    type: "account_status_changed",
+                    title: "Your account is active again",
+                    message: "You can use Neve again.",
+                });
+                notificationStatus = "created";
+            } catch (notifyError) {
+                console.error("Create account status notification error:", notifyError);
+                notificationStatus = "failed";
+            }
         }
 
         return res.json({ success: true, data: updated, notificationStatus });

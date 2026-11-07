@@ -1,7 +1,6 @@
-const propertyTypes = [
-    "apartment",
-    "house",
-];
+import { PROPERTY_TYPES } from "../constants/propertyTypes.js";
+
+const propertyTypes = PROPERTY_TYPES;
 const furnishingTypes = ["furnished", "unfurnished"];
 const allowedFields = new Set([
     "name",

@@ -20,19 +20,19 @@ important requirements are missing.
 
 | § | Main project feature | Backend status | Implemented | Not implemented yet |
 |---|---|---|---|---|
-| 4.1 | **Neve Discover — Rental Marketplace** | **Mostly implemented** | Listing search and filters (location, rent, bedrooms, property type, furnishing, availability, lease length, amenities), map search, recent listings, favorites, comparison, saved searches, and suspicious/inaccurate listing reports. | Rooms and shared accommodation (property types are only `apartment` and `house`). List/map switching is frontend behavior. |
-| 4.2 | **Neve Property Intelligence** | **Mostly implemented** | Listing details with photos, videos, floor plans, rooms, floor, furnishing, amenities, house rules, lease length and availability; rent, deposit, advance and service charge; landlord public profile; viewing requests and listing questions. | Phone/email, identity and property-ownership verification, so no precise verification status can be shown. |
-| 4.3 | **Neve Neighborhood Intelligence (5 km)** | **Partial** | Property-centered OpenStreetMap places within a 100–5000 m radius, category filters, insights, a 24-hour cache, and source and freshness metadata. | Walking/driving routes and travel times (distances are straight-line only). Cross-property neighborhood comparison exists only inside property comparison. |
+| 4.1 | **Neve Discover — Rental Marketplace** | **Mostly implemented** | Listing search and filters (location, rent, bedrooms, property type — `apartment`, `house`, `room` or `shared_room`, with occupant gender, bathroom type and available spots for shared listings — furnishing, availability, lease length, amenities), map search, recent listings, favorites, comparison, saved searches, and suspicious/inaccurate listing reports. | List/map switching is frontend behavior. |
+| 4.2 | **Neve Property Intelligence** | **Implemented** | Listing details with photos, videos, floor plans, rooms, floor, furnishing, amenities, house rules, lease length and availability; rent, deposit, advance and service charge; landlord public profile with email, phone, identity and ownership verification status; viewing requests and listing questions. | — |
+| 4.3 | **Neve Neighborhood Intelligence (5 km)** | **Mostly implemented** | Property-centered OpenStreetMap places within a 100–5000 m radius, category filters, insights, a 24-hour cache, source and freshness metadata, and walking/driving routes and travel times from OpenStreetMap routing. | Cross-property neighborhood comparison exists only inside property comparison. Travel times don't include live traffic. |
 | 4.4 | **Neve True Cost of Renting** | **Implemented** | Separate upfront and monthly totals; rent, service charge, advance, deposit, utilities (included, fixed, estimated, or renter-pays-unknown) and other one-time or monthly fees; every line labelled landlord-provided or landlord estimate and every total labelled calculated; assumptions; missing amounts make totals unknown, never zero. | — |
-| 4.5 | **Neve Listing Trust & Fraud Prevention** | **Partial** | Duplicate-listing signals (titles, location, rent, shared image fingerprints, coordinates), description-vs-field consistency warnings, unusual-rent checks, renter reports, human review, reviewed public trust summaries, and a deposit-safety notice. | Identity and ownership checks. Heuristics have known false positives (look-alike flats in one building, generic titles, negated amenities such as "no parking", service charges written "per month"). |
+| 4.5 | **Neve Listing Trust & Fraud Prevention** | **Mostly implemented** | Duplicate-listing signals (titles, location, rent, shared image fingerprints, coordinates), description-vs-field consistency warnings, unusual-rent checks, renter reports, human review, reviewed public trust summaries, admin-reviewed identity and ownership verification, and a deposit-safety notice. | Heuristics have known false positives (look-alike flats in one building, generic titles, negated amenities such as "no parking", service charges written "per month"). |
 | 4.6 | **Neve Move-In & Move-Out Records** | **Implemented** | Room-by-room and meter-reading entries with photos, confirm/dispute by each party, append-only corrections, and move-in vs move-out comparison that reports differences without assigning fault. | — |
-| 4.7 | **Neve Maintenance & Repair** | **Mostly implemented** | Requests with category, priority, description and private photos; statuses (submitted, acknowledged, in progress, awaiting renter, completed, disputed, cancelled); responsibility; progress history; searchable repair records. | Assigning a repair to a specific person. |
-| 4.8 | **Neve Smart Choice — Explainable Matching** | **Partial** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Commute destination, walking distance and household-needs preferences. Matching is rule-based, not AI. |
-| 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app), and suspicious-message reporting. Payment processing is out of scope. | Email/push notifications; viewings can't be marked completed; inquiries have two separate status flows. |
-| 4.10 | **Neve Agreement & Trust** | **Partial** | Private agreement upload (PDF, image, text); Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer. | Balanced clause rewrites; legal-source retrieval with sections, versions and review status; the legal-review workflow. |
-| 4.11 | **Neve Evidence Graph** | **Partial** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`) with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses and extracted-vs-recorded value mismatches; JSON evidence report. | `requires` relationship; legal-source nodes; AI-proposed links; an explicit "documented fact" state; automatic detection of conflicting payment amounts and missing meter readings; SHA-256 file hashes and hash-linked events. |
+| 4.7 | **Neve Maintenance & Repair** | **Implemented** | Requests with category, priority, description and private photos; statuses (submitted, acknowledged, in progress, awaiting renter, completed, disputed, cancelled); responsibility; assignment to the renter, the landlord or a named outside person; progress history; searchable repair records. | — |
+| 4.8 | **Neve Smart Choice — Explainable Matching** | **Implemented** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Matching is rule-based, not AI. Commute distance is straight-line. |
+| 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app, and by email and push when configured), and suspicious-message reporting. Payment processing is out of scope. | Inquiries have two separate status flows. |
+| 4.10 | **Neve Agreement & Trust** | **Mostly implemented** | Private agreement upload (PDF, image, text); Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer; versioned legal sources with sections that a legal reviewer approves; section search; Claude-suggested balanced clause rewrites that cite only approved sections, with each party's response and reviewer assessments. | Rewrite suggestions don't edit the clause; the parties change it themselves. Agreements are still Bangladesh-only. |
+| 4.11 | **Neve Evidence Graph** | **Implemented** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`, `requires`), record-to-record links (a clause `requires` an obligation, a payment `supports` an obligation), a per-record fact state (documented, disputed, uncertain, undocumented) where a `supports` link confirmed by both participants is a documented fact, Claude-suggested file links that count only after a participant accepts them, with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses, extracted-vs-recorded value mismatches, conflicting or mismatched payment amounts (rent per month, deposit and advance totals), and missing or decreasing move-in/move-out meter readings; JSON evidence report; SHA-256 hashes of uploaded files and a hash-linked agreement event history, with an integrity check; clause links to approved legal-source sections shown as legal-source nodes with their version and review status. | — |
 | 4.12 | **Neve Property Manager** | **Not implemented** | Landlords manage their own listings (create, edit, pause, delete), inquiries, viewings and listing analytics. | The `property_manager` role, access scoped to assigned properties and tenancies, and lease/obligation tracking for managers. |
-| 4.13 | **Neve Security, Privacy & Dispute Support** | **Partial** | Role-based access; private-by-default tenancy files with signed URLs; case-specific evidence sharing with legal reviewers (the role that replaced mediators); sensitive-access log; personal-data export; document deletion requests; retention dates and legal holds; no public trust scores or AI verdicts. | Automatic retention purges, backup workflows, and tamper-evident (hash-linked) audit history. |
+| 4.13 | **Neve Security, Privacy & Dispute Support** | **Implemented** | Role-based access; private-by-default tenancy files with signed URLs; case-specific evidence sharing with legal reviewers (the role that replaced mediators); sensitive-access log; personal-data export; document deletion requests; retention dates and legal holds; tamper-evident (SHA-256 hash-linked, append-only) admin audit and sensitive-access logs with an integrity check; scheduled retention purges; database backups to private object storage with restore; no public trust scores or AI verdicts. | — |
 | 4.14 | **Neve AI Reliability & Evaluation** | **Partial** | Admin API that scores submitted evaluation runs: precision, recall, F1, exact match, false-positive rate, OCR character error rate, failure rate, latency and cost, for model-backed and deterministic tasks. Extraction responses record model, token usage and latency. | A documented test set and runner that produce those results; separate OCR evaluation; regression tracking. |
 
 ### Users and roles (§3)
@@ -43,8 +43,8 @@ important requirements are missing.
 | Landlord | `landlord` | Implemented |
 | Property manager | — | Not implemented |
 | Mediator | `legal_reviewer` | Replaced: invited legal reviewers review shared cases and post notes, questions and opinions |
-| Legal reviewer (legal-source pack) | `legal_reviewer` | Partial: there is no legal-source pack to review yet |
-| Platform administrator | `admin` | Implemented (email/password sign-in only) |
+| Legal reviewer (legal-source pack) | `legal_reviewer` | Implemented: approves legal-source versions or sends them back, and assesses clause rewrite suggestions on shared agreements |
+| Platform administrator | `admin` | Implemented (admin portal email/password: salted scrypt hash in MongoDB, Neve-signed JWT session; no Firebase) |
 | AI service | Claude agreement extraction | Partial: proposals only, confirmed or rejected by participants |
 
 ### Release roadmap (§7)
@@ -53,23 +53,23 @@ important requirements are missing.
 |---|---|---|
 | 1 — Hackathon MVP | Listing cards and detailed property pages | Implemented |
 | 1 | Search and filters for core rental attributes | Implemented (no room/shared types) |
-| 1 | Property-centered 5 km nearby-places map | Partial (no routes or travel times) |
+| 1 | Property-centered 5 km nearby-places map | Implemented |
 | 1 | True Cost with provided, calculated and estimated labels | Implemented |
 | 1 | Landlord profile, inquiry and viewing-request flow | Implemented |
 | 1 | Property comparison and explainable matching | Implemented (no commute/walking preferences) |
 | 1 | Duplicate/contradiction warning demonstration | Implemented (heuristic; known false positives) |
-| 1 | Evidence Graph demo with a sample agreement and conflicting records | Partial (amount conflicts need a participant to mark them disputed) |
+| 1 | Evidence Graph demo with a sample agreement and conflicting records | Implemented |
 | 1 | Basic evaluation with a documented test set | Partial (scoring API only; no test set) |
-| 2 — Tenancy Trust | Qualified-review workflow and reviewed legal-source pack | Not implemented |
-| 2 | Agreement analysis, receipts, obligation tracking, evidence reports | Partial (no clause rewrites or legal sources) |
+| 2 — Tenancy Trust | Qualified-review workflow and reviewed legal-source pack | Implemented |
+| 2 | Agreement analysis, receipts, obligation tracking, evidence reports | Implemented |
 | 2 | Move-in/move-out reports with two-party confirmation | Implemented |
 | 2 | Maintenance and repair requests | Mostly implemented (no assignment) |
-| 2 | Secure sharing, role permissions, audit history, privacy workflows | Partial (no hash-linked audit, automatic purge, or backups) |
-| 2 | Fuller listing-risk signals and human review | Partial (no identity/ownership verification) |
+| 2 | Secure sharing, role permissions, audit history, privacy workflows | Implemented |
+| 2 | Fuller listing-risk signals and human review | Implemented |
 | 3 — Scale | Property-manager workspace and analytics | Not implemented |
 | 3 | Advanced saved-search alerts and matching | Partial (in-app alerts only) |
 | 3 | Mediator workspace and more integrations | Replaced by the legal-reviewer case workspace; no integrations |
-| 3 | More jurisdictions through legal-source packs | Not implemented (Bangladesh only) |
+| 3 | More jurisdictions through legal-source packs | Partial (legal sources take any jurisdiction; agreements are Bangladesh-only) |
 | 3 | Public APIs and larger-scale reliability evaluation | Not implemented |
 
 **Out of scope for the first release (non-goals):** property sales, payment
@@ -169,6 +169,8 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `CLIENT_URL` | Yes | Must be a URL | Allowed CORS origin |
 | `MONGODB_URI` | Yes | Non-empty | MongoDB connection string |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Yes | Non-empty path, resolved from the backend directory | Firebase Admin credentials |
+| `ADMIN_JWT_SECRET` | Yes | At least 32 characters | Signs admin portal session JWTs. Changing it signs every admin out |
+| `ADMIN_JWT_EXPIRES_IN` | No | Default `8h` | How long an admin sign-in lasts |
 | `R2_ACCOUNT_ID` | For R2 | Optional | Cloudflare account ID |
 | `R2_ACCESS_KEY_ID` | For R2 | Optional | R2 access key |
 | `R2_SECRET_ACCESS_KEY` | For R2 | Optional | R2 secret key |
@@ -182,6 +184,20 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `ANTHROPIC_API_KEY` | For extraction | Optional | Enables agreement extraction; without it the extract endpoint returns 503 |
 | `AGREEMENT_EXTRACTION_MODEL` | No | `claude-opus-5-5` | Claude model used for agreement extraction |
 | `OVERPASS_API_URL` | No | `https://overpass-api.de/api/interpreter` | Overpass endpoint for nearby-place data |
+| `ROUTING_WALKING_URL` | No | `https://routing.openstreetmap.de/routed-foot` | OSRM-compatible service for walking routes and times |
+| `ROUTING_DRIVING_URL` | No | `https://routing.openstreetmap.de/routed-car` | OSRM-compatible service for driving routes and times |
+| `EMAIL_PROVIDER` | For email | Optional; `resend` or `sendgrid` | HTTP email API used for email notifications |
+| `EMAIL_API_KEY` | For email | Optional | API key for the email provider |
+| `EMAIL_FROM` | For email | Optional; email address | Sender address for notification emails |
+| `PUSH_NOTIFICATIONS_ENABLED` | No | `false`; `true` or `false` | Sends push notifications through Firebase Cloud Messaging with the existing service account |
+| `RETENTION_PURGE_ENABLED` | No | `false`; `true` or `false` | Runs the retention purge on a schedule |
+| `RETENTION_PURGE_INTERVAL_MINUTES` | No | `60`; 5 to 10080 | How often the retention purge runs |
+| `ABANDONED_UPLOAD_HOURS` | No | `24`; 1 to 720 | Age after which an unconfirmed upload is purged |
+| `VERIFICATION_DOCUMENT_RETENTION_DAYS` | No | `90`; 1 to 3650 | Days after a verification request closes before its documents are purged |
+| `BACKUP_ENABLED` | No | `false`; `true` or `false` | Runs database backups on a schedule |
+| `BACKUP_INTERVAL_HOURS` | No | `24`; 1 to 720 | How often backups run |
+| `BACKUP_RETENTION_COUNT` | No | `14`; 1 to 365 | Number of most recent backups to keep |
+| `BACKUP_BUCKET_NAME` | No | Optional; defaults to `R2_BUCKET_NAME` | Private bucket for database backups |
 | `NEVE_API_BASE_URL` | No | `http://localhost:5000/api/v1` | Configured API base URL |
 
 R2 is treated as configured only when all four R2 account, key, secret, and
@@ -314,6 +330,27 @@ the feature inventory previously proposed.
 | `/api/v1/reviews` | `GET /properties/:propertyId`, `POST /properties/:propertyId`, `PATCH /:reviewId`, `DELETE /:reviewId`, `PUT /:reviewId/reply`, `DELETE /:reviewId/reply` | Property reviews; posting requires a `confirmed` or `completed` viewing of that property. Only the property's landlord can reply |
 | `/api/v1/review-moderation` | `POST /:reviewId/reports`, `GET /reports`, `PATCH /reports/:reportId`, `PATCH /:reviewId/moderation` | Review reports and moderation |
 | `/api/v1/landlord/dashboard` | `GET /properties`, `GET /performance` | Landlord listing dashboard and analytics for owned listings |
+| `/api/v1/users` | `PUT /me/photo`, `DELETE /me/photo`, `GET /:userId/photo` | Set or remove your profile photo (a confirmed `profile_photo` upload); the photo route is public and redirects to a short-lived URL |
+| `/api/v1/properties` | `GET /mine/:id` | Landlord lookup of one of their own listings in any status except deleted |
+| `/api/v1/viewings` | `PATCH /:viewingId/complete` | Landlord marks a confirmed viewing whose time has passed as completed |
+| `/api/v1/admin/users` | `PATCH /:userId/status` | Admin deactivates or reactivates a non-admin account |
+| `/api/v1/verification` | `GET /me`, `POST /contact/sync`, `GET /requests`, `POST /requests`, `PATCH /requests/:requestId/cancel` | Renter/landlord email and phone verification (read from Firebase) and identity or ownership verification requests |
+| `/api/v1/admin/verifications` | `GET /`, `GET /:requestId`, `PATCH /:requestId` | Admin review of identity and ownership verification requests; viewing documents is logged |
+| `/api/v1/tenancy` | `PATCH /maintenance-requests/:requestId/assignee` | Landlord assigns a repair to the renter, the landlord, or a named person outside Neve (`{ assignee: { userId } }`, `{ assignee: { name, phone?, organization? } }`, or `{ assignee: null }`); the change is added to the request history |
+| `/api/v1/properties` | `GET /:id/route?toLat=&toLng=&mode=walking\|driving&geometry=true` | Public walking or driving route from a published listing to a point: distance, estimated time, and an optional GeoJSON line |
+| `/api/v1/properties` | `GET /:id/travel-times?mode=&category=&limit=` | Public walking or driving time to the nearest mapped places (up to 25), optionally for one category |
+| `/api/v1/notifications` | `GET /preferences`, `PATCH /preferences`, `POST /push-tokens`, `DELETE /push-tokens` | Email/push settings (`email`, `push`, `mutedTypes`) and Firebase Cloud Messaging device tokens for the signed-in user |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links/:linkId/confirm` | Renter or landlord confirms an evidence link's relationship; a `supports` link confirmed by both is a documented fact. Changing the relationship clears confirmations |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/record-links`, `DELETE /agreements/:agreementId/record-links/:linkId` | Renter or landlord links two records in an agreement (`requires`, `supports`, `contradicts`, `relates_to`); an unmet `requires` link is flagged as missing information |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links/suggest`, `PATCH /agreements/:agreementId/evidence-links/:linkId/review` | Claude reads one evidence file and proposes links to clauses, obligations and payments (`{ fileId }`); proposals are `proposed` until a participant sends `{ decision: "accept" \| "reject" }`. Needs `ANTHROPIC_API_KEY` |
+| `/api/v1/tenancy` | `GET /agreements/:agreementId/integrity?recheckFiles=true` | Agreement participants and shared reviewers verify the hash-linked event history and, optionally, re-hash up to 50 stored files against their recorded SHA-256 |
+| `/api/v1/admin/audit-logs` | `GET /integrity?log=admin\|access` | Admin verifies the hash chain of the admin audit log or the sensitive-access log |
+| `/api/v1/admin/system` | `GET /jobs?job=&limit=`, `POST /retention-purge`, `POST /backups` | Admin views background job runs, runs the retention purge now (`{ "dryRun": true }` lists what would be deleted), or starts a backup |
+| `/api/v1/legal-sources` | `GET /?jurisdiction=`, `GET /jurisdictions`, `GET /search?jurisdiction=&q=&category=&limit=` | Public approved legal-source pack for a jurisdiction, the jurisdictions that have one, and section search |
+| `/api/v1/admin/legal-sources` | `GET /`, `POST /`, `GET /:sourceId`, `PATCH /:sourceId`, `PATCH /:sourceId/status` | Admin drafts legal-source versions (posting an existing `sourceKey` starts its next version), edits drafts, and submits (`submit`) or retires (`retire`) them |
+| `/api/v1/legal-review` | `GET /sources?status=in_review`, `GET /sources/:sourceId`, `PATCH /sources/:sourceId` | Legal reviewer queue: `approve` (retires the previous approved version) or `request_changes` with a note. A reviewer can't approve a source they drafted |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/legal-links` | Renter or landlord links a clause to an approved legal-source section (`cites`, `relates_to`, `contradicts`) |
+| `/api/v1/tenancy` | `POST /agreements/:agreementId/clauses/:clauseId/rewrite-suggestions`, `PATCH .../rewrite-suggestions/:suggestionId/response`, `PATCH .../rewrite-suggestions/:suggestionId/assessment` | Claude suggests balanced wording citing only approved sections (renter or landlord; needs `ANTHROPIC_API_KEY`); each party responds `agree` or `dismiss`; a legal reviewer with access records `endorsed` or `has_concerns` |
 
 For exact role checks and request/response fields, see the corresponding
 router, controller, validator, and model under `src/`.
@@ -503,8 +540,8 @@ capped at 500 entries; the report marks whether it was truncated. File contents
 are not embedded, and report generation is recorded in the agreement audit
 trail and sensitive-access log.
 
-Jurisdiction defaults to Bangladesh as metadata. Bangladesh-specific legal
-source retrieval and suggested clause wording are not implemented.
+Jurisdiction defaults to Bangladesh as metadata. Clause rewrites and legal
+links use the approved legal-source pack for the agreement's jurisdiction.
 `plainLanguageNote` is either written by a participant or generated by
 extraction; generated summaries describe the text only and are not legal
 advice.
@@ -715,6 +752,101 @@ are available to administrators through
 Administrative status changes are audit-logged. Reports request human review;
 they do not automatically determine misconduct or restrict an account.
 
+### Verification
+
+- **Email and phone:** after the user verifies their email or signs in with
+  Firebase phone auth in the app, `POST /api/v1/verification/contact/sync`
+  copies the verified email state and phone number from Firebase.
+- **Identity and ownership:** upload documents with purpose
+  `verification_document`, confirm them, then `POST /api/v1/verification/requests`
+  with `type` (`identity` or `ownership`), `documentType`, `documents`, and, for
+  ownership, `propertyId` (landlords only, for their own listing). An admin
+  approves or rejects it at `/api/v1/admin/verifications`; a rejection needs a
+  note for the requester. Opening a request's documents is recorded in the
+  sensitive-access log, and the decision in the admin audit log.
+- **Public view:** property details show the landlord's `verification` summary
+  (`emailVerified`, `phoneVerified`, `identityVerified`, `ownershipVerified`) as
+  booleans only. Documents and numbers are never public.
+
+### Smart Choice preferences
+
+`PATCH /api/v1/renter-preferences` also accepts three optional blocks; send
+`null` to clear one. Each adds an explained criterion to recommendations only
+when it is set, so scores for renters who don't use them are unchanged.
+
+- `commute`: `{ label, latitude, longitude, maxDistanceKm, mode }`. Scores 100
+  within `maxDistanceKm` (straight line from the listing's map point), falling
+  to 0 at twice that distance.
+- `walkingDistance`: `{ categories, maxDistanceMeters }` with categories from
+  `healthcare`, `education`, `groceries`, `transport`, `banking`,
+  `recreation`, `food`. Uses cached nearby places only; a listing whose nearby
+  places haven't been loaded is `unknown`, not a shortfall.
+- `household`: `{ adults, children, pets, needsStepFreeAccess }`. Checks about
+  two people per bedroom (or available spots for shared listings), whether
+  house rules allow or forbid pets, and ground floor or a listed lift.
+
+### Email and push notifications
+
+Every new in-app notification is also sent by email and push when those
+channels are configured (`EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM`;
+`PUSH_NOTIFICATIONS_ENABLED=true`). Delivery runs after the notification is
+saved, never blocks or fails the original action, and its result is stored
+on the notification's `delivery` field. Users turn channels off or mute
+specific notification types at `/api/v1/notifications/preferences`; muted
+types still appear in the app. The app registers each device's FCM token at
+`POST /api/v1/notifications/push-tokens`, and tokens FCM reports as invalid
+are removed automatically.
+
+### Retention purge and backups
+
+**Retention purge** deletes files Neve no longer needs: uploads never
+confirmed within `ABANDONED_UPLOAD_HOURS`; tenancy evidence whose retention
+date has passed; and identity or ownership documents from verification
+requests closed more than `VERIFICATION_DOCUMENT_RETENTION_DAYS` ago. A file
+under legal hold, or used by any agreement, link, condition record, repair,
+case, listing, profile or open verification request, is never deleted. Each
+file is locked before deletion, so a new legal hold or retention date set
+meanwhile stops it. Runs are recorded and listed at
+`GET /api/v1/admin/system/jobs`.
+
+**Backups** write every collection as gzipped Extended JSON plus a
+`manifest.json` with document counts and SHA-256 hashes to
+`backups/<id>/` in the private backup bucket, then keep the newest
+`BACKUP_RETENTION_COUNT` backups. Uploaded files already live in object
+storage and aren't copied. Run one with `npm run backup` or
+`POST /api/v1/admin/system/backups`. List and restore with:
+
+```bash
+npm run restore-backup -- --list
+npm run restore-backup -- --id <backupId> --confirm
+```
+
+Restore checks every file's hash first and skips collections that already
+have documents unless `--drop` is given. Each collection is held in memory
+during a backup, so very large databases should use MongoDB's own backup
+tools instead.
+
+Both jobs are off until enabled, and a database lock stops two server
+instances from running the same job at once.
+
+### Legal sources and clause rewrites
+
+A **legal source** is one version of a law, rule or official guidance, split
+into numbered sections tagged with clause topics (`rent`, `deposit`, `term`,
+`notice`, `maintenance`, `utilities`, `other`). Admins draft it and submit it;
+a legal reviewer approves it or sends it back with notes. Approving a version
+retires the previous approved version of the same `sourceKey`, so each source
+has at most one approved version. The approved versions for a jurisdiction
+are its **legal-source pack**.
+
+**Clause rewrite suggestions** retrieve the best-matching approved sections
+for a clause (by topic and shared words) and ask Claude for balanced wording
+that cites only those sections. Citations to anything else are dropped, and a
+suggestion with no citation is labelled as not backed by a reviewed source.
+Suggestions never change the clause: each party records `agree` or
+`dismiss`, and a legal reviewer the agreement is shared with can record an
+assessment. They are drafting help, not legal advice.
+
 ### Responses and pagination
 
 Shared response and pagination helpers are available in `src/utils/`.
@@ -730,24 +862,29 @@ missing product features, see [Project feature coverage](#project-feature-covera
    appoint legal reviewers through `/api/v1/admin/users`. Admin accounts are
    created with `npm run create-admin -- --email <email> --name "<name>"`
    (password from `NEVE_ADMIN_PASSWORD` or a prompt; add `--promote` to convert
-   an existing profile). An account's active state still requires a direct
-   database edit.
+   an existing profile). Admins deactivate or reactivate renter, landlord and
+   legal reviewer accounts with `PATCH /api/v1/admin/users/:userId/status`
+   (`{ "isActive": false, "reason": "..." }`); admin accounts and the admin's
+   own account can't be changed there.
    Admins sign in only at the frontend's `/admin/sign-in` portal with email and
    password. The API refuses any admin session whose Firebase sign-in provider
    isn't `password` (error code `ADMIN_PASSWORD_SIGN_IN_REQUIRED`), so Google
    sign-in never grants admin access.
 2. **Profile photos:** `PATCH /api/v1/users/me` updates the display name, phone
-   number, and renter/landlord role, but not the profile photo.
+   number, and renter/landlord role. Photos use their own flow: upload with
+   purpose `profile_photo`, confirm it, then `PUT /api/v1/users/me/photo`
+   (`{ "fileId": "..." }`). `DELETE /api/v1/users/me/photo` removes it, and the
+   public `GET /api/v1/users/:userId/photo` redirects to a short-lived URL.
 3. **Inquiry status flows:** `PATCH /api/v1/inquiries/:inquiryId/respond` accepts
    `accepted` or `declined`, and only from `pending`.
    `PATCH /api/v1/inquiries/:id` separately accepts `acknowledged`, `responded`,
    or `closed`. The supported workflow needs consolidation.
-4. **Viewing completion:** handlers use `requested`, `confirmed`, `declined`, and
-   `cancelled`, but none sets the schema's `completed` status.
+4. **Viewing completion:** landlords mark a confirmed viewing whose time has
+   passed as `completed` with `PATCH /api/v1/viewings/:viewingId/complete`,
+   which also records `completedAt`.
 5. **Unpublished listing lookup:** `GET /api/v1/properties/:id` returns published
-   listings only, so owners must find drafts and paused listings through the
-   paginated `GET /api/v1/properties/mine` or
-   `GET /api/v1/landlord/dashboard/properties`.
+   listings only. Owners open their own drafts and paused listings by ID with
+   `GET /api/v1/properties/mine/:id`.
 6. **Response and pagination consistency:** the shared helpers are not
    consistently used by all endpoints; clients should check each endpoint's
    controller for its exact response shape.

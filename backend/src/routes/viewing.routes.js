@@ -5,6 +5,7 @@ import {
     getMyViewingRequests,
     getLandlordViewingRequests,
     updateViewingRequest,
+    completeViewingRequest,
     cancelMyViewingRequest,
 } from "../controllers/viewing.controller.js";
 
@@ -72,6 +73,13 @@ router.patch(
     authenticateUser,
     allowRoles("landlord"),
     respondToViewingRequest
+);
+
+router.patch(
+    "/:viewingId/complete",
+    authenticateUser,
+    allowRoles("landlord"),
+    completeViewingRequest
 );
 
 router.get(

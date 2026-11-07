@@ -6,6 +6,7 @@ import {
     getProperties,
     getRecentProperties,
     getMyProperties,
+    getMyPropertyById,
     getPropertyById,
     getPropertyDetail,
     updateProperty,
@@ -13,7 +14,11 @@ import {
 } from "../controllers/property.controller.js";
 
 import { getPropertyCosts } from "../controllers/propertyDetail.controller.js";
-import { getNearbyPlaces } from "../controllers/neighborhood.controller.js";
+import {
+    getNearbyPlaces,
+    getPropertyRoute,
+    getPropertyTravelTimes,
+} from "../controllers/neighborhood.controller.js";
 import { getNeighborhoodInsights } from "../controllers/neighborhoodInsights.controller.js";
 import { compareProperties } from "../controllers/propertyComparison.controller.js";
 import { searchProperties } from "../controllers/propertySearch.controller.js";
@@ -45,6 +50,13 @@ router.get(
     getMyProperties
 );
 
+router.get(
+    "/mine/:id",
+    authenticateUser,
+    allowRoles("landlord"),
+    getMyPropertyById
+);
+
 router.post("/compare", compareProperties);
 
 router.get(
@@ -61,6 +73,8 @@ router.get(
 
 router.get("/:id/costs", getPropertyCosts);
 router.get("/:id/nearby", getNearbyPlaces);
+router.get("/:id/route", getPropertyRoute);
+router.get("/:id/travel-times", getPropertyTravelTimes);
 router.get("/:id/neighborhood-insights", getNeighborhoodInsights);
 router.get("/:id/detail", getPropertyDetail);
 

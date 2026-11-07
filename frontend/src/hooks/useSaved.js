@@ -1,12 +1,14 @@
+"use client";
+
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
 // Saved-listing state for renters. Other visitors are sent to sign in.
 export function useSaved() {
     const { role, status } = useAuth();
-    const navigate = useNavigate();
+    const router = useRouter();
     const [savedIds, setSavedIds] = useState(() => new Set());
     const [error, setError] = useState(null);
     const isRenter = status === "ready" && role === "renter";
@@ -21,7 +23,7 @@ export function useSaved() {
     const toggle = useCallback(
         async (property) => {
             if (status !== "ready") {
-                navigate("/sign-in");
+                router.push("/sign-in");
                 return;
             }
             if (!isRenter) {
@@ -49,7 +51,7 @@ export function useSaved() {
                 });
             }
         },
-        [isRenter, navigate, savedIds, status]
+        [isRenter, router, savedIds, status]
     );
 
     return { isSaved: (id) => savedIds.has(id), toggle, error, clearError: () => setError(null), isRenter };

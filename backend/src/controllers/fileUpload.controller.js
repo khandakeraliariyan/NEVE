@@ -16,6 +16,7 @@ import {
     getStoredObjectMetadata,
     createDownloadUrl,
     deleteStoredObject,
+    hashStoredObject,
 } from "../services/fileUpload.service.js";
 import { canManageProperty } from "../services/propertyAccess.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
@@ -199,6 +200,13 @@ export const completeUpload = async (req, res) => {
                 : null;
         }
 
+        try {
+            file.sha256 = await hashStoredObject(file.storageKey);
+            file.hashedAt = new Date();
+        } catch (hashError) {
+            console.error("Hash upload error:", hashError);
+        }
+
         file.status = "uploaded";
         await file.save();
 
@@ -212,6 +220,7 @@ export const completeUpload = async (req, res) => {
                 mimeType: file.mimeType,
                 sizeBytes: file.sizeBytes,
                 status: file.status,
+                sha256: file.sha256,
             },
         });
     } catch (error) {

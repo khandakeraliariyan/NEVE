@@ -29,3 +29,4 @@ const firebaseApp = getApps().length
       });
 
 export const firebaseAuth = getAuth(firebaseApp);
+export { firebaseApp };

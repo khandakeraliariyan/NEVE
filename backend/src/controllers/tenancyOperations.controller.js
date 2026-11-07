@@ -1,3 +1,4 @@
+import { appendChainedAgreementEvent } from "../services/hashChain.service.js";
 import mongoose from "mongoose";
 import ConditionReport from "../models/ConditionReport.js";
 import MaintenanceRequest from "../models/MaintenanceRequest.js";
@@ -7,6 +8,7 @@ import { compareConditionReports } from "../services/conditionReport.service.js"
 import {
     buildMaintenanceSearchFilter,
     canTransitionMaintenanceStatus,
+    validateMaintenanceAssignee,
 } from "../services/maintenanceRequest.service.js";
 import {
     appendAuditEvent,
@@ -78,7 +80,7 @@ function privateResponse(res) {
 }
 
 function appendAgreementAudit(agreement, actor, action, targetType, targetId) {
-    agreement.auditTrail.push({
+    appendChainedAgreementEvent(agreement, {
         actor,
         action,
         targetType,
@@ -752,6 +754,7 @@ export async function listMaintenanceRequests(req, res, next) {
         const [requests, total] = await Promise.all([
             MaintenanceRequest.find(filter)
                 .populate("submittedBy", "displayName photoURL role")
+                .populate("assignee.user", "displayName photoURL role")
                 .populate("history.actor", "displayName photoURL role")
                 .populate("evidenceFiles history.evidenceFiles", "originalName mimeType sizeBytes status")
                 .populate("property", "title address")
@@ -915,6 +918,76 @@ export async function updateMaintenanceRequest(req, res, next) {
             req,
             agreement,
             "maintenance_request_updated",
+            "maintenance_request",
+            request._id
+        );
+        privateResponse(res);
+        return res.json({ success: true, data: request });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH /api/v1/tenancy/maintenance-requests/:requestId/assignee
+// { assignee: { userId } | { name, phone?, organization? } | null }
+// Only the agreement's landlord assigns who carries out a repair.
+export async function assignMaintenanceRequest(req, res, next) {
+    try {
+        const result = await getAccessibleRequest(req, res);
+        if (!result) return;
+        const { request, agreement } = result;
+
+        if (String(agreement.landlord) !== String(actorId(req))) {
+            return res.status(403).json({
+                success: false,
+                message: "Only the landlord can assign a repair.",
+            });
+        }
+        if (["completed", "cancelled"].includes(request.status)) {
+            return res.status(409).json({
+                success: false,
+                message: `A ${request.status} request can't be reassigned.`,
+            });
+        }
+        const { value, error } = validateMaintenanceAssignee(req.body, agreement);
+        if (error) {
+            return res.status(400).json({ success: false, message: error });
+        }
+        if (value === null && !request.assignee) {
+            return res.status(409).json({
+                success: false,
+                message: "This request has no assignee.",
+            });
+        }
+
+        request.assignee = value
+            ? { ...value, assignedBy: actorId(req), assignedAt: new Date() }
+            : null;
+        let label = null;
+        if (value?.user) {
+            label = String(value.user) === String(agreement.renter) ? "the renter" : "the landlord";
+        } else if (value) {
+            label = [value.name, value.organization].filter(Boolean).join(", ");
+        }
+        request.history.push({
+            actor: actorId(req),
+            message: value ? `Assigned to ${label}.` : "Assignment removed.",
+            assigneeChange: value ? "assigned" : "unassigned",
+            createdAt: new Date(),
+        });
+        await request.save();
+        appendAgreementAudit(
+            agreement,
+            actorId(req),
+            "maintenance_request_assigned",
+            "maintenance_request",
+            request._id
+        );
+        await agreement.save();
+        await logAgreementEvent(
+            req,
+            agreement,
+            "maintenance_request_assigned",
             "maintenance_request",
             request._id
         );

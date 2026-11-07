@@ -1,6 +1,7 @@
 import express from "express";
 
 import {
+    changeAccountStatus,
     changeReviewerRole,
     listUsers,
 } from "../controllers/adminUser.controller.js";
@@ -14,5 +15,6 @@ router.use(allowRoles("admin"));
 
 router.get("/", listUsers);
 router.patch("/:userId/role", changeReviewerRole);
+router.patch("/:userId/status", changeAccountStatus);
 
 export default router;

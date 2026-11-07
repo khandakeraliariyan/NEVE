@@ -1,4 +1,25 @@
 import mongoose from "mongoose";
+import {
+    BATHROOM_TYPES,
+    OCCUPANT_GENDERS,
+    PROPERTY_TYPES,
+    SHARED_FACILITIES,
+    SHARED_PROPERTY_TYPES,
+} from "../constants/propertyTypes.js";
+
+const sharedAccommodationSchema = new mongoose.Schema(
+    {
+        totalOccupants: { type: Number, min: 1, max: 50, validate: Number.isInteger },
+        availableSpots: { type: Number, min: 1, max: 50, validate: Number.isInteger },
+        occupantGender: { type: String, enum: OCCUPANT_GENDERS, default: "any" },
+        bathroomType: { type: String, enum: BATHROOM_TYPES, default: null },
+        sharedFacilities: {
+            type: [{ type: String, enum: SHARED_FACILITIES }],
+            default: [],
+        },
+    },
+    { _id: false }
+);
 
 export const UTILITY_TYPES = [
     "electricity",
@@ -94,8 +115,33 @@ const propertySchema = new mongoose.Schema(
 
         propertyType: {
             type: String,
-            enum: ["apartment", "house"],
+            enum: PROPERTY_TYPES,
             required: true,
+        },
+
+        // Only for "room" and "shared_room" listings.
+        sharedAccommodation: {
+            type: sharedAccommodationSchema,
+            default: null,
+            validate: [
+                {
+                    validator(value) {
+                        return (
+                            !value ||
+                            value.availableSpots == null ||
+                            value.totalOccupants == null ||
+                            value.availableSpots <= value.totalOccupants
+                        );
+                    },
+                    message: "availableSpots cannot exceed totalOccupants",
+                },
+                {
+                    validator(value) {
+                        return !value || SHARED_PROPERTY_TYPES.includes(this.propertyType);
+                    },
+                    message: "sharedAccommodation is only for room and shared_room listings",
+                },
+            ],
         },
 
         address: {
@@ -316,6 +362,16 @@ const propertySchema = new mongoose.Schema(
         deletedAt: {
             type: Date,
             default: null,
+        },
+
+        // Set only by an admin after reviewing ownership documents.
+        ownershipVerification: {
+            status: {
+                type: String,
+                enum: ["unverified", "pending", "verified", "rejected"],
+                default: "unverified",
+            },
+            verifiedAt: { type: Date, default: null },
         },
     },
     {

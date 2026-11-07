@@ -1,39 +1,131 @@
 @import "tailwindcss";
 
+/*
+ * Theme modelled on the Homevia look: warm off-white canvas, beige surfaces,
+ * charcoal ink, taupe accent, tight grotesk headings, pill buttons, soft radii.
+ * Token names are kept from the previous theme so every page re-themes from here.
+ */
 @theme {
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-serif: Arial, Helvetica, sans-serif;
-  --font-mono: Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-body), "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-heading), "Inter Tight", var(--font-body), ui-sans-serif, sans-serif;
+  --font-serif: var(--font-display);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --color-canvas: #eef6f0;
-  --color-panel: #ffffff;
-  --color-mist: #f4f9f5;
-  --color-sage: #dcebe0;
-  --color-sage-strong: #c6dfcd;
-  --color-line: #d5e4da;
-  --color-forest: #173f2f;
-  --color-forest-hover: #0f2e21;
-  --color-moss: #2f6b4f;
-  --color-ink: #13231b;
-  --color-muted: #5b6e63;
-  --color-amber: #f6dfb8;
-  --color-amber-ink: #7a4b0d;
-  --color-rose: #f7dcdc;
-  --color-rose-ink: #8a2323;
+  /* Surfaces */
+  --color-canvas: #fdfcfa;        /* page background (white) */
+  --color-panel: #ffffff;         /* cards */
+  --color-mist: #f5f2ee;          /* subtle inset surface */
+  --color-sage: #efebe6;          /* beige surface / secondary button */
+  --color-sage-strong: #e4ddd5;   /* hover on beige */
+  --color-line: #e7e1da;          /* hairlines */
+
+  /* Ink & brand */
+  --color-forest: #222222;        /* primary (charcoal) */
+  --color-forest-hover: #000000;
+  --color-moss: #a39587;          /* taupe accent */
+  --color-taupe: #a39587;
+  --color-taupe-soft: #b8aea4;
+  --color-taupe-deep: #8a7b6e;     /* taupe that reads on white */
+  --color-night: #120a0b;         /* dark sections / footer */
+  --color-ink: #222222;
+  --color-muted: #332d29;        /* darker so small text stays readable on the taupe page */
+  --color-page-top: #a39587;      /* page gradient, from the Homevia backdrop */
+  --color-page-bottom: #b4a99e;
+  --color-page-glow: #e2ddd6;
+
+  /* Status */
+  --color-amber: #f4e6cf;
+  --color-amber-ink: #7a5212;
+  --color-rose: #f6dede;
+  --color-rose-ink: #9b2b2b;
+
+  /* Softer, larger radii */
+  --radius-md: 0.625rem;   /* 10px */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
+  --radius-2xl: 1.5rem;    /* 24px */
+  --radius-3xl: 2.5rem;    /* 40px */
+
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 0.08), 0 2px 6px -3px rgb(0 0 0 / 0.06);
+  --shadow-soft: 0 0.6px 1.6px -1.5px rgb(0 0 0 / 0.17), 0 2.3px 6px -3px rgb(0 0 0 / 0.14), 0 10px 26px -4.5px rgb(0 0 0 / 0.04);
+
+  --tracking-tight: -0.02em;
+  --tracking-tighter: -0.04em;
 }
 
 html,
-body,
-#root {
+body {
   min-height: 100%;
 }
 
 body {
+  position: relative;
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
   background: var(--color-canvas);
   color: var(--color-ink);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* White page that opens with the taupe gradient: taupe at the top of every page,
+   melting into white as you scroll, with the soft light glow on the right. */
+body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 760px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(26rem 26rem at 100% 62%, rgb(226 221 214 / 0.9), transparent 65%),
+    linear-gradient(180deg, var(--color-page-top) 0%, var(--color-page-bottom) 45%, rgb(253 252 250 / 0) 100%);
+}
+
+/* Taupe section band — the screenshot look: vertical taupe gradient plus a light circle glow
+   in the bottom-right corner. Alternate it with white sections. */
+.taupe-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--color-page-top) 0%, var(--color-page-bottom) 100%);
+}
+.taupe-band::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -8rem;
+  bottom: -10rem;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 999px;
+  background: var(--color-page-glow);
+  opacity: 0.9;
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+h1 {
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+::selection {
+  background: var(--color-ink);
+  color: #fff;
 }
 
 button,
@@ -43,25 +135,321 @@ textarea {
   font-family: inherit;
 }
 
+a,
+button {
+  transition-property: color, background-color, border-color, opacity, transform, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
 .eyebrow {
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-muted);
+}
+
+.eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .field {
   width: 100%;
   border: 1px solid var(--color-line);
-  background: var(--color-mist);
-  border-radius: 0.5rem;
-  padding: 0.55rem 0.75rem;
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.9rem;
   font-size: 0.9rem;
   color: var(--color-ink);
   outline: none;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.field::placeholder {
+  color: #a8a09a;
 }
 
 .field:focus {
-  border-color: var(--color-moss);
-  background: #fff;
+  border-color: var(--color-ink);
+  box-shadow: 0 0 0 4px rgb(34 34 34 / 0.06);
+}
+
+/* Frosted glass, as used on the Homevia navbar and floating chips */
+.glass {
+  background: rgb(250 248 246 / 0.72);
+  backdrop-filter: blur(17px);
+  -webkit-backdrop-filter: blur(17px);
+}
+
+.glass-dark {
+  background: rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(17px);
+  -webkit-backdrop-filter: blur(17px);
+}
+
+/* Warm architectural placeholder used where listings have no photo URL */
+.hero-surface {
+  background:
+    radial-gradient(120% 80% at 80% 10%, rgb(184 174 164 / 0.55), transparent 60%),
+    radial-gradient(90% 70% at 10% 100%, rgb(69 65 64 / 0.9), transparent 65%),
+    linear-gradient(160deg, #6f655c 0%, #3a3331 55%, #120a0b 100%);
+}
+
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+
+/* Table headers use the same quiet, uppercase label style as the eyebrow */
+thead th {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion — Homevia-style entrances, hovers and glows                  */
+/* ------------------------------------------------------------------ */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Scroll reveal. Hidden state only applies once JS has flagged <html>, so content never stays invisible without JS. */
+html.reveal-ready [data-reveal]:not(.is-in) {
+  opacity: 0.001;
+  transform: translateY(34px);
+}
+html.reveal-ready [data-reveal="right"]:not(.is-in) {
+  transform: translateX(24px);
+}
+html.reveal-ready [data-reveal="left"]:not(.is-in) {
+  transform: translateX(-24px);
+}
+html.reveal-ready [data-reveal="scale"]:not(.is-in) {
+  transform: scale(0.9);
+}
+html.reveal-ready [data-reveal="word"]:not(.is-in) {
+  transform: translateY(105%);
+}
+[data-reveal].is-in:not(.reveal-done) {
+  transition:
+    opacity 0.6s cubic-bezier(0.44, 0, 0.56, 1) var(--reveal-delay, 0ms),
+    transform 0.6s cubic-bezier(0.44, 0, 0.56, 1) var(--reveal-delay, 0ms);
+}
+[data-reveal="word"].is-in:not(.reveal-done) {
+  transition-duration: 0.8s;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Hero photo: starts faint and zoomed in, settles on load */
+@keyframes hero-zoom {
+  from {
+    opacity: 0.2;
+    transform: scale(1.15);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.hero-zoom {
+  animation: hero-zoom 1.4s cubic-bezier(0.44, 0, 0.56, 1) both;
+}
+
+/* Rolling button label */
+.roll {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+  line-height: 1.25;
+}
+.roll > span {
+  grid-area: 1 / 1;
+  transition:
+    transform 0.45s cubic-bezier(0.44, 0, 0.56, 1),
+    opacity 0.45s cubic-bezier(0.44, 0, 0.56, 1);
+}
+.roll > span:last-child {
+  transform: translateY(110%);
+  opacity: 0;
+}
+:is(a, button):hover > .roll > span:first-child {
+  transform: translateY(-110%);
+  opacity: 0;
+}
+:is(a, button):hover > .roll > span:last-child {
+  transform: none;
+  opacity: 1;
+}
+
+/* Soft glowing blobs */
+.glow {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 999px;
+  filter: blur(80px);
+  -webkit-filter: blur(80px);
+}
+@keyframes glow-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(4%, -6%) scale(1.08);
+  }
+}
+.glow-drift {
+  animation: glow-drift 14s ease-in-out infinite;
+}
+
+/* Subtle underline sweep for text links in nav/footer */
+.link-sweep {
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+  transition: background-size 0.4s cubic-bezier(0.44, 0, 0.56, 1), color 0.2s;
+}
+.link-sweep:hover {
+  background-size: 100% 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .hero-zoom,
+  .glow-drift {
+    animation: none;
+  }
+  .roll > span {
+    transition: none;
+  }
+}
+
+@keyframes nav-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.nav-drop {
+  animation: nav-drop 0.8s cubic-bezier(0.44, 0, 0.56, 1) 0.1s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-drop {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Homevia navbar — values taken from the live site                    */
+/* Transparent bar over the top of the page (not sticky), 1180px max,  */
+/* 20px padding. Links 24px / 1.416, white at 70%; on hover the text   */
+/* rolls up out of a clipped box and a full-white copy rises in.       */
+/* ------------------------------------------------------------------ */
+.hv-nav-link {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.416;
+  letter-spacing: 0;
+  color: #fff;
+}
+@media (min-width: 1200px) {
+  .hv-nav-link {
+    font-size: 24px;
+  }
+}
+
+.nav-roll {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+}
+.nav-roll > span {
+  grid-area: 1 / 1;
+  transition:
+    transform 0.5s cubic-bezier(0.44, 0, 0.56, 1),
+    opacity 0.5s cubic-bezier(0.44, 0, 0.56, 1);
+}
+.nav-roll > span:first-child {
+  opacity: 0.7;
+}
+.nav-roll > span:last-child {
+  transform: translateY(32px);
+}
+a:hover > .nav-roll > span:first-child,
+a:focus-visible > .nav-roll > span:first-child {
+  transform: translateY(-32px);
+}
+a:hover > .nav-roll > span:last-child,
+a:focus-visible > .nav-roll > span:last-child {
+  transform: none;
+}
+a[aria-current="page"] > .nav-roll > span:first-child {
+  opacity: 1;
+}
+
+/* "Book a Visit"-style button: outline, 6px radius, 16px text, 24px arrow */
+.hv-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.hv-nav-cta:hover {
+  border-color: rgb(255 255 255 / 0.45);
+}
+
+/* Arrow swap: the arrow leaves 20px up-right while its twin arrives from 20px down-left */
+.arrow-swap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.arrow-swap > svg {
+  transition: transform 0.5s cubic-bezier(0.44, 0, 0.56, 1);
+}
+.arrow-swap > svg:last-child {
+  position: absolute;
+  transform: translate(-20px, 20px);
+}
+a:hover .arrow-swap > svg:first-child,
+button:hover .arrow-swap > svg:first-child {
+  transform: translate(20px, -20px);
+}
+a:hover .arrow-swap > svg:last-child,
+button:hover .arrow-swap > svg:last-child {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-roll > span,
+  .arrow-swap > svg {
+    transition: none;
+  }
 }

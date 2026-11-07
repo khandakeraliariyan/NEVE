@@ -23,6 +23,8 @@ const uploadedFileSchema = new mongoose.Schema(
                 "property_video",
                 "floor_plan",
                 "tenancy_evidence",
+                "profile_photo",
+                "verification_document",
             ],
             required: true,
         },
@@ -56,6 +58,18 @@ const uploadedFileSchema = new mongoose.Schema(
             type: Number,
             required: true,
             min: 1,
+        },
+
+        // SHA-256 of the stored bytes, computed when the upload is confirmed.
+        // null if hashing failed; the upload still completes.
+        sha256: {
+            type: String,
+            default: null,
+            match: /^[a-f0-9]{64}$/,
+        },
+        hashedAt: {
+            type: Date,
+            default: null,
         },
 
         imageFingerprint: {

@@ -1,3 +1,6 @@
+import { findMeterReadingIssues, findPaymentConflicts } from "./evidenceChecks.service.js";
+import { buildFactStates, findUnmetRequirements } from "./evidenceFacts.service.js";
+
 // Compares values extracted from the agreement file with the values a
 // participant recorded. A mismatch is a conflict to review, not a finding of
 // which value is right.
@@ -38,7 +41,10 @@ export function findExtractionMismatches(agreement) {
     return mismatches;
 }
 
-export function analyzeAgreementEvidence(agreement, links) {
+export function analyzeAgreementEvidence(agreement, allLinks, recordLinks = [], conditionReports = []) {
+    // AI proposals count only once a participant accepts them.
+    const links = allLinks.filter((link) => (link.reviewStatus ?? "accepted") === "accepted");
+    const proposedLinks = allLinks.filter((link) => link.reviewStatus === "proposed");
     const missingInformation = [];
     const potentialConflicts = [];
     const uncertainInterpretations = [];
@@ -178,11 +184,43 @@ export function analyzeAgreementEvidence(agreement, links) {
         }
     }
 
+    missingInformation.push(...findUnmetRequirements(agreement, recordLinks));
+    potentialConflicts.push(...findPaymentConflicts(agreement));
+    const meterIssues = findMeterReadingIssues(conditionReports);
+    missingInformation.push(...meterIssues.missing);
+    potentialConflicts.push(...meterIssues.conflicts);
+    for (const link of recordLinks) {
+        if (link.relationship === "contradicts") {
+            potentialConflicts.push({
+                type: "record_contradiction",
+                linkId: String(link._id),
+                targetId: String(link.fromId),
+                relatedId: String(link.toId),
+                message: `A participant marked this ${link.fromType} as contradicting a ${link.toType}.`,
+            });
+        }
+    }
+
+    for (const link of proposedLinks) {
+        uncertainInterpretations.push({
+            type: "unreviewed_ai_link",
+            linkId: String(link._id),
+            targetId: String(link.targetId),
+            relationship: link.relationship,
+            confidence: link.confidence ?? null,
+            message: "This link was suggested automatically and has not been accepted by a participant.",
+        });
+    }
+
+    const factStates = buildFactStates(agreement, links, recordLinks);
+
     return {
         method: "deterministic_record_completeness_and_user_assessments",
         missingInformation,
         potentialConflicts,
         uncertainInterpretations,
+        factStates,
+        documentedFacts: factStates.filter((fact) => fact.state === "documented"),
         disclaimer:
             "These flags reflect recorded fields, participant assessments, and any automated extraction of the agreement file. Extracted clauses are proposals until a participant confirms them. Flags do not verify facts or determine legal liability.",
     };

@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "./ui";
 import { BILLING_OPTIONS, UTILITY_OPTIONS, needsAmount } from "../lib/utilityCosts";
 

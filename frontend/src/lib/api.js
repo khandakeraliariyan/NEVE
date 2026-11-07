@@ -1,7 +1,8 @@
 import { auth } from "./firebase";
+import { endAdminSession, getAdminToken } from "./adminSession";
 
 export const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api/v1";
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api/v1";
 
 export class ApiError extends Error {
     constructor(status, message, errors = [], code = null) {
@@ -36,8 +37,12 @@ export async function apiRequest(path, { method = "GET", body, params, auth: nee
     const headers = {};
     if (body !== undefined) headers["Content-Type"] = "application/json";
 
+    // An admin portal session takes precedence over a Firebase one.
+    const adminToken = needsAuth ? getAdminToken() : null;
     const user = auth?.currentUser;
-    if (needsAuth && user) {
+    if (adminToken) {
+        headers.Authorization = `Bearer ${adminToken}`;
+    } else if (needsAuth && user) {
         headers.Authorization = `Bearer ${await user.getIdToken()}`;
     }
 
@@ -55,6 +60,8 @@ export async function apiRequest(path, { method = "GET", body, params, auth: nee
     const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
+        // The admin token expired or was revoked (password changed, account deactivated).
+        if (response.status === 401 && adminToken) endAdminSession();
         const message =
             FRIENDLY[response.status] ??
             payload?.message ??

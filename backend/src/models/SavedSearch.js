@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { PROPERTY_TYPES } from "../constants/propertyTypes.js";
 
 const savedSearchSchema = new mongoose.Schema(
     {
@@ -26,7 +27,7 @@ const savedSearchSchema = new mongoose.Schema(
         area: { type: String, trim: true, maxlength: 100, default: "" },
         propertyType: {
             type: String,
-            enum: ["apartment", "house"],
+            enum: PROPERTY_TYPES,
             default: null,
         },
         furnishing: {

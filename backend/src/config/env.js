@@ -9,6 +9,10 @@ const envSchema = z.object({
     CLIENT_URL: z.string().url(),
     MONGODB_URI: z.string().min(1),
     FIREBASE_SERVICE_ACCOUNT_PATH: z.string().min(1),
+    // Signs admin session JWTs. Use a long random value, e.g.
+    // node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
+    ADMIN_JWT_SECRET: z.string().min(32, "ADMIN_JWT_SECRET must be at least 32 characters"),
+    ADMIN_JWT_EXPIRES_IN: z.string().min(1).default("8h"),
     R2_ACCOUNT_ID: z.string().optional(),
     R2_ACCESS_KEY_ID: z.string().optional(),
     R2_SECRET_ACCESS_KEY: z.string().optional(),
@@ -40,10 +44,43 @@ const envSchema = z.object({
         .string()
         .url()
         .default("https://overpass-api.de/api/interpreter"),
+    // OSRM-compatible routing services for walking and driving times.
+    ROUTING_WALKING_URL: z
+        .string()
+        .url()
+        .default("https://routing.openstreetmap.de/routed-foot"),
+    ROUTING_DRIVING_URL: z
+        .string()
+        .url()
+        .default("https://routing.openstreetmap.de/routed-car"),
     // The Anthropic SDK reads ANTHROPIC_API_KEY itself; it is listed here so a
     // missing key can be reported as "extraction not configured".
     ANTHROPIC_API_KEY: z.string().optional(),
     AGREEMENT_EXTRACTION_MODEL: z.string().min(1).default("claude-opus-5-5"),
+    // Email delivery through an HTTP email API. All three are needed.
+    EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).optional(),
+    EMAIL_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().email().optional(),
+    // Push delivery through Firebase Cloud Messaging.
+    PUSH_NOTIFICATIONS_ENABLED: z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((value) => value === "true"),
+    // Background jobs. Both are off unless enabled.
+    RETENTION_PURGE_ENABLED: z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((value) => value === "true"),
+    RETENTION_PURGE_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(10080).default(60),
+    ABANDONED_UPLOAD_HOURS: z.coerce.number().int().min(1).max(720).default(24),
+    VERIFICATION_DOCUMENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+    BACKUP_ENABLED: z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((value) => value === "true"),
+    BACKUP_INTERVAL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
+    BACKUP_RETENTION_COUNT: z.coerce.number().int().min(1).max(365).default(14),
+    BACKUP_BUCKET_NAME: z.string().optional(),
     NEVE_API_BASE_URL: z
         .string()
         .url()

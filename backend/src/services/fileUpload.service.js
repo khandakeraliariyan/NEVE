@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
     PutObjectCommand,
     HeadObjectCommand,
@@ -26,6 +27,14 @@ const uploadLimits = {
             "application/pdf",
         ],
         maxBytes: env.MAX_FLOOR_PLAN_SIZE_MB * 1024 * 1024,
+    },
+    profile_photo: {
+        mimeTypes: ["image/jpeg", "image/png", "image/webp"],
+        maxBytes: env.MAX_PROPERTY_IMAGE_SIZE_MB * 1024 * 1024,
+    },
+    verification_document: {
+        mimeTypes: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+        maxBytes: env.MAX_TENANCY_EVIDENCE_SIZE_MB * 1024 * 1024,
     },
     tenancy_evidence: {
         mimeTypes: [
@@ -121,4 +130,19 @@ export async function deleteStoredObject(storageKey) {
             Key: storageKey,
         })
     );
+}
+// Streams a stored object through SHA-256 without holding it in memory.
+export async function hashStoredObject(storageKey) {
+    const { client, bucket } = requireR2();
+    const response = await client.send(
+        new GetObjectCommand({
+            Bucket: bucket,
+            Key: storageKey,
+        })
+    );
+    const hash = createHash("sha256");
+    for await (const chunk of response.Body) {
+        hash.update(chunk);
+    }
+    return hash.digest("hex");
 }

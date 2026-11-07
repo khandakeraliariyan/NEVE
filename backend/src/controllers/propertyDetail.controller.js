@@ -1,3 +1,4 @@
+import { publicVerificationSummary } from "../services/verification.service.js";
 import mongoose from "mongoose";
 
 import Property from "../models/Property.js";
@@ -54,7 +55,7 @@ export const getPropertyDetails = async (req, res, next) => {
         }).populate([
             {
                 path: "landlord",
-                select: "displayName photoURL role createdAt",
+                select: "displayName photoURL role createdAt verification",
             },
             {
                 path: "images",
@@ -148,6 +149,7 @@ export const getPropertyDetails = async (req, res, next) => {
                 title: property.title,
                 description: property.description,
                 propertyType: property.propertyType,
+                sharedAccommodation: property.sharedAccommodation ?? null,
                 address: {
                     area: property.address?.area ?? null,
                     city: property.address?.city ?? null,
@@ -178,6 +180,7 @@ export const getPropertyDetails = async (req, res, next) => {
                       photoURL: property.landlord.photoURL,
                       role: property.landlord.role,
                       memberSince: property.landlord.createdAt,
+                      verification: publicVerificationSummary(property.landlord, property),
                   }
                 : null,
 

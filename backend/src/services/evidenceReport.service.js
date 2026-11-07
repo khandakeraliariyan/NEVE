@@ -7,6 +7,8 @@ export function buildAgreementEvidenceReport({
     links,
     files,
     messages,
+    recordLinks = [],
+    conditionReports = [],
     generatedAt = new Date(),
     messageCount = messages.length,
     messageLimit = 500,
@@ -53,6 +55,7 @@ export function buildAgreementEvidenceReport({
                 mimeType: file.mimeType,
                 sizeBytes: file.sizeBytes,
                 status: file.status,
+                sha256: file.sha256 ?? null,
             })),
             clauses: agreement.clauses.map((clause) => ({
                 id: idOf(clause._id),
@@ -125,6 +128,10 @@ export function buildAgreementEvidenceReport({
                     relationship: link.relationship,
                     explanation: link.explanation,
                     confidence: link.confidence ?? null,
+                    confirmedBy: (link.confirmations ?? []).map((entry) => ({
+                        userId: idOf(entry.user),
+                        confirmedAt: entry.confirmedAt,
+                    })),
                     linkedBy: link.linkedBy
                         ? {
                               id: idOf(link.linkedBy._id ?? link.linkedBy),
@@ -143,15 +150,28 @@ export function buildAgreementEvidenceReport({
                     })),
                 };
             }),
+            recordRelationships: recordLinks.map((link) => ({
+                id: idOf(link._id),
+                fromType: link.fromType,
+                fromId: idOf(link.fromId),
+                toType: link.toType,
+                toId: idOf(link.toId),
+                relationship: link.relationship,
+                explanation: link.explanation,
+                createdBy: idOf(link.createdBy),
+                createdAt: link.createdAt,
+            })),
             auditHistory: agreement.auditTrail.map((event) => ({
                 actorId: idOf(event.actor),
                 action: event.action,
                 targetType: event.targetType,
                 targetId: idOf(event.targetId),
                 createdAt: event.createdAt,
+                prevHash: event.prevHash ?? null,
+                hash: event.hash ?? null,
             })),
         },
-        analysis: analyzeAgreementEvidence(agreement, links),
+        analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports),
         disclaimer:
             "This report compiles user-entered records and participant assessments. It does not independently verify evidence, provide legal advice, or determine liability. File contents are not embedded; sources are identified by their record IDs and metadata.",
     };

@@ -30,6 +30,11 @@ const maintenanceEventSchema = new mongoose.Schema(
             type: [{ type: mongoose.Schema.Types.ObjectId, ref: "UploadedFile" }],
             default: [],
         },
+        assigneeChange: {
+            type: String,
+            enum: ["assigned", "unassigned", null],
+            default: null,
+        },
         createdAt: { type: Date, default: Date.now },
     },
     { _id: false }
@@ -107,6 +112,22 @@ const maintenanceRequestSchema = new mongoose.Schema(
         evidenceFiles: {
             type: [{ type: mongoose.Schema.Types.ObjectId, ref: "UploadedFile" }],
             default: [],
+        },
+        // Who is doing the repair: an agreement participant or a named
+        // person outside Neve.
+        assignee: {
+            type: new mongoose.Schema(
+                {
+                    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+                    name: { type: String, trim: true, maxlength: 100, default: "" },
+                    phone: { type: String, trim: true, default: null },
+                    organization: { type: String, trim: true, maxlength: 100, default: "" },
+                    assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                    assignedAt: { type: Date, default: Date.now },
+                },
+                { _id: false }
+            ),
+            default: null,
         },
         history: { type: [maintenanceEventSchema], default: [] },
         completedAt: { type: Date, default: null },

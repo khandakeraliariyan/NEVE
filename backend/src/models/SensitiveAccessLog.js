@@ -1,4 +1,9 @@
 import mongoose from "mongoose";
+import { logChainPlugin } from "../services/logChain.service.js";
+
+const idOf = (value) => (value == null ? null : String(value._id ?? value));
+const plain = (value) => (value && typeof value.toObject === "function" ? value.toObject() : value);
+
 
 const sensitiveAccessLogSchema = new mongoose.Schema(
     {
@@ -16,7 +21,7 @@ const sensitiveAccessLogSchema = new mongoose.Schema(
         resourceType: {
             type: String,
             required: true,
-            enum: ["agreement", "case", "file", "privacy_request"],
+            enum: ["agreement", "case", "file", "privacy_request", "verification_request"],
         },
         resourceId: {
             type: mongoose.Schema.Types.ObjectId,
@@ -42,6 +47,20 @@ const sensitiveAccessLogSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+sensitiveAccessLogSchema.plugin(logChainPlugin, {
+    fields: (entry) => ({
+        actor: idOf(entry.actor),
+        action: entry.action,
+        resourceType: entry.resourceType,
+        resourceId: idOf(entry.resourceId),
+        agreement: idOf(entry.agreement),
+        outcome: entry.outcome,
+        details: plain(entry.details) ?? {},
+        ipAddress: entry.ipAddress ?? null,
+        createdAt: new Date(entry.createdAt).toISOString(),
+    }),
+});
 
 sensitiveAccessLogSchema.index({ createdAt: -1 });
 sensitiveAccessLogSchema.index({ agreement: 1, createdAt: -1 });

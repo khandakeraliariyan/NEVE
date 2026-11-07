@@ -1,33 +1,21 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
+import nextVitals from "eslint-config-next/core-web-vitals";
 
-export default [
-  { ignores: ['dist'] },
-  {
-    files: ['**/*.{js,jsx}'],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        ecmaFeatures: { jsx: true },
-        sourceType: 'module',
-      },
+const config = [
+    ...nextVitals,
+    { ignores: [".next/**", "node_modules/**"] },
+    {
+        rules: {
+            "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
+            // Plain apostrophes in JSX text render fine.
+            "react/no-unescaped-entities": "off",
+            // Newer React Compiler-era checks the code predates; surfaced, not blocking.
+            "react-hooks/set-state-in-effect": "warn",
+            "react-hooks/refs": "warn",
+            "react-hooks/purity": "warn",
+            // Cell values passed to <Row cells> are keyed inside Row.
+            "react/jsx-key": "warn",
+        },
     },
-    plugins: {
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
-    },
-    rules: {
-      ...js.configs.recommended.rules,
-      ...reactHooks.configs.recommended.rules,
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
-    },
-  },
-]
+];
+
+export default config;

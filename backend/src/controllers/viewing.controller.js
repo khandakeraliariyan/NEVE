@@ -254,3 +254,76 @@ export async function cancelMyViewingRequest(req, res, next) {
         next(error);
     }
 }
+// PATCH /api/v1/viewings/:viewingId/complete  { landlordNote?: string }
+// The landlord (or a manager of the property) marks a confirmed viewing as
+// completed once its time has passed.
+export async function completeViewingRequest(req, res, next) {
+    try {
+        const { viewingId } = req.params;
+        const { landlordNote } = req.body ?? {};
+
+        if (!mongoose.isValidObjectId(viewingId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid viewing request ID",
+            });
+        }
+
+        if (
+            landlordNote !== undefined &&
+            (typeof landlordNote !== "string" ||
+                landlordNote.trim().length > 1000)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Landlord note must be at most 1000 characters",
+            });
+        }
+
+        const propertyIds = await Property.find(
+            manageablePropertyFilter(req.neveUser._id)
+        ).distinct("_id");
+        const viewing = await ViewingRequest.findOne({
+            _id: viewingId,
+            property: { $in: propertyIds },
+        });
+
+        if (!viewing) {
+            return res.status(404).json({
+                success: false,
+                message: "Viewing request not found",
+            });
+        }
+
+        if (viewing.status !== "confirmed") {
+            return res.status(409).json({
+                success: false,
+                message: "Only confirmed viewings can be marked completed",
+            });
+        }
+
+        if (viewing.requestedDate > new Date()) {
+            return res.status(409).json({
+                success: false,
+                message: "A viewing can be marked completed only after its scheduled time",
+            });
+        }
+
+        viewing.status = "completed";
+        viewing.completedAt = new Date();
+
+        if (landlordNote !== undefined) {
+            viewing.landlordNote = landlordNote.trim();
+        }
+
+        await viewing.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Viewing marked completed",
+            viewing,
+        });
+    } catch (error) {
+        next(error);
+    }
+}

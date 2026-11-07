@@ -1,3 +1,4 @@
+import { appendChainedAgreementEvent } from "./hashChain.service.js";
 import mongoose from "mongoose";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import ConditionReport from "../models/ConditionReport.js";
@@ -62,7 +63,7 @@ export function appendAuditEvent(
     targetType = "agreement",
     targetId = null
 ) {
-    agreement.auditTrail.push({
+    appendChainedAgreementEvent(agreement, {
         actor,
         action,
         targetType,

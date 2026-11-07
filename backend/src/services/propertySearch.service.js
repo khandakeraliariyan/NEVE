@@ -26,6 +26,25 @@ export function buildPropertySearchFilter(query = {}) {
         filter.propertyType = query.propertyType;
     }
 
+    // Shared-accommodation filters. "any" listings suit every renter, so a
+    // gender filter also includes them.
+    if (query.occupantGender) {
+        filter["sharedAccommodation.occupantGender"] =
+            query.occupantGender === "any"
+                ? "any"
+                : { $in: [query.occupantGender, "any"] };
+    }
+
+    if (query.bathroomType) {
+        filter["sharedAccommodation.bathroomType"] = query.bathroomType;
+    }
+
+    if (query.minAvailableSpots !== undefined) {
+        filter["sharedAccommodation.availableSpots"] = {
+            $gte: query.minAvailableSpots,
+        };
+    }
+
     if (query.furnishing) {
         filter.furnishing = query.furnishing;
     }

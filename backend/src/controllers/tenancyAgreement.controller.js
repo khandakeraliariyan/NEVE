@@ -2,8 +2,29 @@ import mongoose from "mongoose";
 import Inquiry from "../models/Inquiry.js";
 import InquiryMessage from "../models/InquiryMessage.js";
 import Property from "../models/Property.js";
+import ConditionReport from "../models/ConditionReport.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
+import TenancyRecordLink, {
+    LEGAL_LINK_RELATIONSHIPS,
+    RECORD_LINK_NODE_TYPES,
+    RECORD_LINK_RELATIONSHIPS,
+} from "../models/TenancyRecordLink.js";
+import LegalSource from "../models/LegalSource.js";
+import { searchSections } from "../services/legalSource.service.js";
+import { normalizeRewrite, requestClauseRewrite } from "../services/clauseRewrite.service.js";
+import { validateRecordLinkInput } from "../services/evidenceFacts.service.js";
+import { agreementEventFields, verifyHashChain } from "../services/hashChain.service.js";
+import {
+    EXTRACTABLE_MIME_TYPES,
+    ExtractionError,
+    isExtractionConfigured,
+} from "../services/agreementExtraction.service.js";
+import {
+    normalizeSuggestions,
+    requestEvidenceLinkSuggestions,
+} from "../services/evidenceLinkSuggestion.service.js";
+import { hashStoredObject, readStoredObject } from "../services/fileUpload.service.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import { analyzeAgreementEvidence } from "../services/evidenceGraphAnalysis.service.js";
@@ -26,6 +47,7 @@ const relationships = [
     "cites",
     "context_only",
     "unassessed",
+    "requires",
 ];
 
 const setPrivateResponse = (res) =>
@@ -850,6 +872,9 @@ export async function updateAgreementEvidenceLink(req, res, next) {
             });
         }
 
+        if (link.relationship !== relationship) {
+            link.confirmations = [];
+        }
         link.relationship = relationship;
         link.explanation = explanation.trim();
         if (requestedConfidence !== undefined) {
@@ -1008,6 +1033,12 @@ export async function getAgreementEvidenceGraph(req, res, next) {
         }
 
         await saveAuditedChange(agreement, req, "evidence_graph_viewed");
+        const [recordLinks, conditionReports] = await Promise.all([
+            TenancyRecordLink.find({ agreement: agreement._id }).sort({ createdAt: 1 }).lean(),
+            ConditionReport.find({ agreement: agreement._id })
+                .select("stage entries._id entries.kind entries.meterType entries.reading entries.recordedAt entries.supersedes")
+                .lean(),
+        ]);
         const [messages, links] = await Promise.all([
             InquiryMessage.find({ inquiry: agreement.inquiry })
                 .populate("sender", "displayName role")
@@ -1036,13 +1067,17 @@ export async function getAgreementEvidenceGraph(req, res, next) {
         const files = await UploadedFile.find({
             _id: { $in: [...new Set(fileIds.map(String))] },
         })
-            .select("originalName mimeType sizeBytes status")
+            .select("originalName mimeType sizeBytes status sha256")
             .lean();
 
         const nodes = [
             {
                 id: String(agreement._id),
                 type: "agreement",
+                auditChain: verifyHashChain(
+                    agreement.auditTrail,
+                    (event) => agreementEventFields(agreement._id, event)
+                ),
                 title: agreement.title,
                 status: agreement.status,
                 jurisdiction: agreement.jurisdiction,
@@ -1060,6 +1095,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 mimeType: file.mimeType,
                 sizeBytes: file.sizeBytes,
                 status: file.status,
+                sha256: file.sha256 ?? null,
             })),
             ...agreement.clauses.map((clause) => ({
                 id: String(clause._id),
@@ -1110,6 +1146,8 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 targetType: event.targetType,
                 targetId: event.targetId,
                 createdAt: event.createdAt,
+                hash: event.hash ?? null,
+                prevHash: event.prevHash ?? null,
             })),
         ];
         const edges = [
@@ -1142,6 +1180,10 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 relationship: link.relationship,
                 explanation: link.explanation,
                 confidence: link.confidence ?? null,
+                confirmedBy: (link.confirmations ?? []).map((entry) => String(entry.user)),
+                origin: link.origin ?? "user",
+                reviewStatus: link.reviewStatus ?? "accepted",
+                sourceQuote: link.sourceQuote ?? "",
                 linkedBy: link.linkedBy,
                 createdAt: link.createdAt,
                 file: link.uploadedFile
@@ -1154,7 +1196,48 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                     }
                     : null,
             })),
+            ...recordLinks.map((link) => ({
+                id: String(link._id),
+                kind: link.toType === "legal_section" ? "legal_link" : "record_link",
+                from: String(link.fromId),
+                to: String(link.toId),
+                relationship: link.relationship,
+                explanation: link.explanation,
+                createdBy: String(link.createdBy),
+                createdAt: link.createdAt,
+            })),
         ];
+
+        const legalSourceIds = [
+            ...new Set(recordLinks.filter((link) => link.legalSource).map((link) => String(link.legalSource))),
+        ];
+        if (legalSourceIds.length) {
+            const legalSources = await LegalSource.find({ _id: { $in: legalSourceIds } })
+                .select("sourceKey version title citation status jurisdiction reviewedAt sections")
+                .lean();
+            const linkedSections = new Set(
+                recordLinks.filter((link) => link.toType === "legal_section").map((link) => String(link.toId))
+            );
+            for (const source of legalSources) {
+                for (const section of source.sections) {
+                    if (!linkedSections.has(String(section._id))) continue;
+                    nodes.push({
+                        id: String(section._id),
+                        type: "legal_section",
+                        legalSourceId: String(source._id),
+                        sourceKey: source.sourceKey,
+                        version: source.version,
+                        title: source.title,
+                        citation: source.citation,
+                        reviewStatus: source.status,
+                        reviewedAt: source.reviewedAt,
+                        sectionNumber: section.sectionNumber,
+                        heading: section.heading,
+                        text: section.text,
+                    });
+                }
+            }
+        }
 
         setPrivateResponse(res);
         return res.json({
@@ -1162,7 +1245,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             agreementId: agreement._id,
             nodes,
             edges,
-            analysis: analyzeAgreementEvidence(agreement, links),
+            analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports),
             disclaimer:
                 "User-entered records and links are not independently verified and do not determine legal liability.",
         });
@@ -1179,6 +1262,12 @@ export async function getAgreementEvidenceReport(req, res, next) {
         }
 
         await saveAuditedChange(agreement, req, "evidence_report_generated");
+        const [recordLinks, conditionReports] = await Promise.all([
+            TenancyRecordLink.find({ agreement: agreement._id }).sort({ createdAt: 1 }).lean(),
+            ConditionReport.find({ agreement: agreement._id })
+                .select("stage entries._id entries.kind entries.meterType entries.reading entries.recordedAt entries.supersedes")
+                .lean(),
+        ]);
         const [messages, messageCount, links] = await Promise.all([
             InquiryMessage.find({ inquiry: agreement.inquiry })
                 .populate("sender", "displayName role")
@@ -1209,13 +1298,15 @@ export async function getAgreementEvidenceReport(req, res, next) {
         const files = await UploadedFile.find({
             _id: { $in: [...new Set(fileIds.map(String))] },
         })
-            .select("originalName mimeType sizeBytes status")
+            .select("originalName mimeType sizeBytes status sha256")
             .lean();
         const report = buildAgreementEvidenceReport({
             agreement,
             links,
             files,
             messages: includedMessages,
+            recordLinks,
+            conditionReports,
             generatedAt: new Date(),
             messageCount,
             messageLimit: 500,
@@ -1227,6 +1318,542 @@ export async function getAgreementEvidenceReport(req, res, next) {
             `attachment; filename="neve-evidence-report-${agreement._id}.json"`
         );
         return res.json({ success: true, data: report });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// POST /api/v1/tenancy/agreements/:agreementId/evidence-links/:linkId/confirm
+// A participant confirms the link's current relationship. A "supports" link
+// confirmed by both participants is a documented fact.
+export async function confirmAgreementEvidenceLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const { linkId } = req.params;
+        if (!validId(linkId)) {
+            return res.status(400).json({ success: false, message: "Invalid evidence link ID." });
+        }
+        const link = await TenancyEvidenceLink.findOne({ _id: linkId, agreement: agreement._id });
+        if (!link) {
+            return res.status(404).json({ success: false, message: "Evidence link not found." });
+        }
+        if (link.relationship === "unassessed") {
+            return res.status(409).json({
+                success: false,
+                message: "Assess the relationship before confirming it.",
+            });
+        }
+        if ((link.reviewStatus ?? "accepted") !== "accepted") {
+            return res.status(409).json({
+                success: false,
+                message: "Accept this suggested link before confirming it.",
+            });
+        }
+        if ((link.confirmations ?? []).some((entry) => String(entry.user) === String(userId(req)))) {
+            return res.status(409).json({ success: false, message: "You already confirmed this link." });
+        }
+        link.confirmations.push({ user: userId(req), confirmedAt: new Date() });
+        await link.save();
+        await saveAuditedChange(
+            agreement,
+            req,
+            "evidence_link_confirmed",
+            link.targetType,
+            link.targetId
+        );
+
+        const confirmers = new Set(link.confirmations.map((entry) => String(entry.user)));
+        const documentedFact =
+            link.relationship === "supports" &&
+            confirmers.has(String(agreement.renter)) &&
+            confirmers.has(String(agreement.landlord));
+
+        setPrivateResponse(res);
+        return res.json({ success: true, data: link, documentedFact });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// POST /api/v1/tenancy/agreements/:agreementId/record-links
+// { fromType, fromId, toType, toId, relationship, explanation? }
+export async function addAgreementRecordLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const { value, error, status } = validateRecordLinkInput(req.body, agreement, {
+            nodeTypes: RECORD_LINK_NODE_TYPES,
+            relationships: RECORD_LINK_RELATIONSHIPS,
+        });
+        if (error) {
+            return res.status(status).json({ success: false, message: error });
+        }
+        let link;
+        try {
+            link = await TenancyRecordLink.create({
+                ...value,
+                agreement: agreement._id,
+                createdBy: userId(req),
+            });
+        } catch (createError) {
+            if (createError.code === 11000) {
+                return res.status(409).json({
+                    success: false,
+                    message: "These records already have that relationship.",
+                });
+            }
+            throw createError;
+        }
+        await saveAuditedChange(agreement, req, "record_link_added", value.fromType, value.fromId);
+        setPrivateResponse(res);
+        return res.status(201).json({ success: true, data: link });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// DELETE /api/v1/tenancy/agreements/:agreementId/record-links/:linkId
+export async function removeAgreementRecordLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const { linkId } = req.params;
+        if (!validId(linkId)) {
+            return res.status(400).json({ success: false, message: "Invalid record link ID." });
+        }
+        const link = await TenancyRecordLink.findOneAndDelete({
+            _id: linkId,
+            agreement: agreement._id,
+            createdBy: userId(req),
+        });
+        if (!link) {
+            return res.status(404).json({
+                success: false,
+                message: "Record link not found, or it was created by the other participant.",
+            });
+        }
+        await saveAuditedChange(agreement, req, "record_link_removed", link.fromType, link.fromId);
+        setPrivateResponse(res);
+        return res.json({ success: true, message: "Record link removed." });
+    } catch (error) {
+        next(error);
+    }
+}
+
+const suggestionsInProgress = new Set();
+
+// POST /api/v1/tenancy/agreements/:agreementId/evidence-links/suggest  { fileId }
+// Claude proposes how one evidence file relates to the agreement's records.
+// Proposals are saved as "proposed" links for a participant to accept.
+export async function suggestAgreementEvidenceLinks(req, res, next) {
+    let key = null;
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        if (!isExtractionConfigured()) {
+            return res.status(503).json({ success: false, message: "Link suggestions are not configured." });
+        }
+        const { fileId } = req.body ?? {};
+        if (!validId(fileId)) {
+            return res.status(400).json({ success: false, message: "A valid fileId is required." });
+        }
+        const file = await UploadedFile.findOne({
+            _id: fileId,
+            purpose: "tenancy_evidence",
+            status: "uploaded",
+            uploadedBy: { $in: [agreement.renter, agreement.landlord] },
+        });
+        if (!file) {
+            return res.status(404).json({ success: false, message: "Uploaded evidence file not found." });
+        }
+        if (!EXTRACTABLE_MIME_TYPES.includes(file.mimeType)) {
+            return res.status(415).json({ success: false, message: "This file type cannot be analyzed." });
+        }
+
+        key = String(agreement._id);
+        if (suggestionsInProgress.has(key)) {
+            key = null;
+            return res.status(409).json({
+                success: false,
+                message: "Suggestions are already running for this agreement.",
+            });
+        }
+        suggestionsInProgress.add(key);
+
+        const existing = await TenancyEvidenceLink.find({ agreement: agreement._id, uploadedFile: file._id })
+            .select("targetType targetId")
+            .lean();
+        const bytes = await readStoredObject(file.storageKey);
+        const result = await requestEvidenceLinkSuggestions({ agreement, mimeType: file.mimeType, bytes });
+        const normalized = normalizeSuggestions(result.suggestions, agreement, existing);
+
+        const created = [];
+        for (const suggestion of normalized.links) {
+            try {
+                created.push(
+                    await TenancyEvidenceLink.create({
+                        agreement: agreement._id,
+                        targetType: suggestion.targetType,
+                        targetId: suggestion.targetId,
+                        uploadedFile: file._id,
+                        relationship: suggestion.relationship,
+                        explanation: suggestion.explanation,
+                        confidence: suggestion.confidence,
+                        sourceQuote: suggestion.sourceQuote,
+                        origin: "ai_proposed",
+                        reviewStatus: "proposed",
+                        suggestionModel: result.model,
+                        linkedBy: userId(req),
+                    })
+                );
+            } catch (createError) {
+                if (createError.code !== 11000) throw createError;
+            }
+        }
+        await saveAuditedChange(agreement, req, "evidence_links_suggested", "file", file._id);
+
+        setPrivateResponse(res);
+        return res.status(201).json({
+            success: true,
+            data: created,
+            fileSummary: normalized.fileSummary,
+            limitations: normalized.limitations,
+            model: result.model,
+            usage: result.usage,
+            latencyMs: result.latencyMs,
+            disclaimer:
+                "These links were suggested automatically. They don't count in the Evidence Graph until a participant accepts them, and they don't determine who is right.",
+        });
+    } catch (error) {
+        if (error instanceof ExtractionError) {
+            return res.status(error.status).json({ success: false, message: error.publicMessage });
+        }
+        next(error);
+    } finally {
+        if (key) suggestionsInProgress.delete(key);
+    }
+}
+
+// PATCH /api/v1/tenancy/agreements/:agreementId/evidence-links/:linkId/review
+// { decision: "accept" | "reject" }
+export async function reviewSuggestedEvidenceLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const { linkId } = req.params;
+        const { decision } = req.body ?? {};
+        if (!validId(linkId)) {
+            return res.status(400).json({ success: false, message: "Invalid evidence link ID." });
+        }
+        if (!["accept", "reject"].includes(decision)) {
+            return res.status(400).json({ success: false, message: "decision must be accept or reject." });
+        }
+        const link = await TenancyEvidenceLink.findOne({
+            _id: linkId,
+            agreement: agreement._id,
+            reviewStatus: "proposed",
+        });
+        if (!link) {
+            return res.status(404).json({ success: false, message: "Suggested link not found." });
+        }
+        link.reviewStatus = decision === "accept" ? "accepted" : "rejected";
+        link.reviewedBy = userId(req);
+        link.reviewedAt = new Date();
+        link.history.push({
+            actor: userId(req),
+            relationship: link.relationship,
+            explanation: decision === "accept" ? "Accepted suggested link." : "Rejected suggested link.",
+            confidence: link.confidence,
+            createdAt: new Date(),
+        });
+        await link.save();
+        await saveAuditedChange(
+            agreement,
+            req,
+            decision === "accept" ? "suggested_link_accepted" : "suggested_link_rejected",
+            link.targetType,
+            link.targetId
+        );
+        setPrivateResponse(res);
+        return res.json({ success: true, data: link });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/tenancy/agreements/:agreementId/integrity?recheckFiles=true
+// Verifies the agreement's hash-linked event history and, optionally,
+// re-hashes up to 50 stored files and compares them with their recorded hash.
+export async function getAgreementIntegrity(req, res, next) {
+    try {
+        const agreement = await getAccessibleAgreement(req, res);
+        if (!agreement) {
+            return;
+        }
+        const auditChain = verifyHashChain(
+            agreement.auditTrail,
+            (event) => agreementEventFields(agreement._id, event)
+        );
+
+        const links = await TenancyEvidenceLink.find({ agreement: agreement._id }).select("uploadedFile").lean();
+        const fileIds = [
+            agreement.documentFile,
+            ...agreement.obligations.map((obligation) => obligation.evidenceFile),
+            ...agreement.payments.map((payment) => payment.receiptFile),
+            ...links.map((link) => link.uploadedFile),
+        ].filter(Boolean);
+        const files = await UploadedFile.find({ _id: { $in: [...new Set(fileIds.map(String))] } })
+            .select("originalName sha256 hashedAt storageKey status")
+            .limit(50)
+            .lean();
+
+        const recheck = req.query.recheckFiles === "true";
+        const fileResults = [];
+        for (const file of files) {
+            const result = {
+                id: String(file._id),
+                name: file.originalName,
+                sha256: file.sha256 ?? null,
+                hashedAt: file.hashedAt ?? null,
+                status: file.sha256 ? "recorded" : "not_hashed",
+            };
+            if (recheck && file.sha256 && file.status === "uploaded") {
+                try {
+                    const current = await hashStoredObject(file.storageKey);
+                    result.status = current === file.sha256 ? "matches" : "changed";
+                } catch (hashError) {
+                    result.status = "unavailable";
+                }
+            }
+            fileResults.push(result);
+        }
+
+        await saveAuditedChange(agreement, req, "integrity_checked");
+        setPrivateResponse(res);
+        return res.json({
+            success: true,
+            data: { auditChain, files: fileResults },
+            note: "A valid chain shows the recorded history hasn't been edited since it was written. Events from before hashing was added aren't covered.",
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+function findActiveClause(agreement, clauseId) {
+    if (!validId(clauseId)) return null;
+    const clause = agreement.clauses.id(clauseId);
+    return clause && (clause.reviewStatus ?? "confirmed") !== "rejected" ? clause : null;
+}
+
+// POST /api/v1/tenancy/agreements/:agreementId/legal-links
+// { clauseId, legalSourceId, sectionId, relationship: "cites"|"relates_to"|"contradicts", explanation? }
+// Links a clause to a section of an approved legal source.
+export async function addAgreementLegalLink(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) return;
+        const { clauseId, legalSourceId, sectionId, relationship, explanation = "" } = req.body ?? {};
+        if (!LEGAL_LINK_RELATIONSHIPS.includes(relationship)) {
+            return res.status(400).json({
+                success: false,
+                message: `relationship must be one of: ${LEGAL_LINK_RELATIONSHIPS.join(", ")}.`,
+            });
+        }
+        if (typeof explanation !== "string" || explanation.length > 1000) {
+            return res.status(400).json({ success: false, message: "explanation must be at most 1000 characters." });
+        }
+        const clause = findActiveClause(agreement, clauseId);
+        if (!clause) return res.status(404).json({ success: false, message: "Clause not found in this agreement." });
+        if (!validId(legalSourceId) || !validId(sectionId)) {
+            return res.status(400).json({ success: false, message: "legalSourceId and sectionId are required." });
+        }
+        const source = await LegalSource.findOne({
+            _id: legalSourceId,
+            status: "approved",
+            jurisdiction: agreement.jurisdiction,
+            "sections._id": sectionId,
+        }).select("_id sourceKey version");
+        if (!source) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved legal-source section not found for this agreement's jurisdiction.",
+            });
+        }
+        let link;
+        try {
+            link = await TenancyRecordLink.create({
+                agreement: agreement._id,
+                fromType: "clause",
+                fromId: clause._id,
+                toType: "legal_section",
+                toId: sectionId,
+                legalSource: source._id,
+                relationship,
+                explanation: explanation.trim(),
+                createdBy: userId(req),
+            });
+        } catch (createError) {
+            if (createError.code === 11000) {
+                return res.status(409).json({ success: false, message: "This clause already has that link to the section." });
+            }
+            throw createError;
+        }
+        await saveAuditedChange(agreement, req, "legal_link_added", "clause", clause._id);
+        setPrivateResponse(res);
+        return res.status(201).json({ success: true, data: link });
+    } catch (error) {
+        next(error);
+    }
+}
+
+const rewritesInProgress = new Set();
+
+// POST /api/v1/tenancy/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions
+// Claude suggests balanced wording, citing only approved legal sources it
+// was given for this clause.
+export async function suggestClauseRewrite(req, res, next) {
+    let key = null;
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) return;
+        if (!isExtractionConfigured()) {
+            return res.status(503).json({ success: false, message: "Clause suggestions are not configured." });
+        }
+        const clause = findActiveClause(agreement, req.params.clauseId);
+        if (!clause) return res.status(404).json({ success: false, message: "Clause not found in this agreement." });
+        if ((clause.rewriteSuggestions ?? []).length >= 10) {
+            return res.status(409).json({ success: false, message: "This clause already has 10 suggestions." });
+        }
+
+        key = `${agreement._id}:${clause._id}`;
+        if (rewritesInProgress.has(key)) {
+            key = null;
+            return res.status(409).json({ success: false, message: "A suggestion is already being written for this clause." });
+        }
+        rewritesInProgress.add(key);
+
+        const sources = await LegalSource.find({ jurisdiction: agreement.jurisdiction, status: "approved" }).lean();
+        const sections = searchSections(sources, {
+            query: `${clause.heading} ${clause.text}`,
+            category: clause.category,
+            limit: 8,
+        });
+        const result = await requestClauseRewrite({ clause, sections, jurisdiction: agreement.jurisdiction });
+        const suggestion = normalizeRewrite(result.result, sections);
+        if (!suggestion.text) {
+            return res.status(502).json({ success: false, message: "Clause suggestion failed. Please try again later." });
+        }
+        clause.rewriteSuggestions.push({ ...suggestion, model: result.model, requestedBy: userId(req) });
+        await saveAuditedChange(agreement, req, "clause_rewrite_suggested", "clause", clause._id);
+
+        setPrivateResponse(res);
+        return res.status(201).json({
+            success: true,
+            data: clause.rewriteSuggestions[clause.rewriteSuggestions.length - 1],
+            consideredSections: sections.map(({ legalSourceId, sectionId, title, sectionNumber, version }) => ({
+                legalSourceId,
+                sectionId,
+                title,
+                sectionNumber,
+                version,
+            })),
+            usage: result.usage,
+            latencyMs: result.latencyMs,
+            disclaimer:
+                "A drafting suggestion for the parties to discuss, based only on legal sources a Neve legal reviewer approved. It isn't legal advice and doesn't change the clause.",
+        });
+    } catch (error) {
+        if (error instanceof ExtractionError) {
+            return res.status(error.status).json({ success: false, message: error.publicMessage });
+        }
+        next(error);
+    } finally {
+        if (key) rewritesInProgress.delete(key);
+    }
+}
+
+function findSuggestion(agreement, req, res) {
+    const clause = findActiveClause(agreement, req.params.clauseId);
+    const suggestion =
+        clause && validId(req.params.suggestionId) ? clause.rewriteSuggestions.id(req.params.suggestionId) : null;
+    if (!suggestion) {
+        res.status(404).json({ success: false, message: "Rewrite suggestion not found." });
+        return null;
+    }
+    return { clause, suggestion };
+}
+
+// PATCH .../clauses/:clauseId/rewrite-suggestions/:suggestionId/response
+// { response: "agree"|"dismiss" }  (renter or landlord)
+export async function respondToClauseRewrite(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) return;
+        const { response } = req.body ?? {};
+        if (!["agree", "dismiss"].includes(response)) {
+            return res.status(400).json({ success: false, message: "response must be agree or dismiss." });
+        }
+        const found = findSuggestion(agreement, req, res);
+        if (!found) return;
+        const { clause, suggestion } = found;
+        suggestion.responses = suggestion.responses.filter((entry) => String(entry.user) !== String(userId(req)));
+        suggestion.responses.push({ user: userId(req), response, respondedAt: new Date() });
+        await saveAuditedChange(agreement, req, `clause_rewrite_${response}`, "clause", clause._id);
+        const agreedBy = new Set(
+            suggestion.responses.filter((entry) => entry.response === "agree").map((entry) => String(entry.user))
+        );
+        setPrivateResponse(res);
+        return res.json({
+            success: true,
+            data: suggestion,
+            bothAgree: agreedBy.has(String(agreement.renter)) && agreedBy.has(String(agreement.landlord)),
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH .../clauses/:clauseId/rewrite-suggestions/:suggestionId/assessment
+// { verdict: "endorsed"|"has_concerns", note? }  (legal reviewer with access)
+export async function assessClauseRewrite(req, res, next) {
+    try {
+        if (req.neveUser.role !== "legal_reviewer") {
+            return res.status(403).json({ success: false, message: "Only a legal reviewer can assess suggestions." });
+        }
+        const agreement = await getAccessibleAgreement(req, res);
+        if (!agreement) return;
+        const { verdict, note = "" } = req.body ?? {};
+        if (!["endorsed", "has_concerns"].includes(verdict)) {
+            return res.status(400).json({ success: false, message: "verdict must be endorsed or has_concerns." });
+        }
+        if (typeof note !== "string" || note.length > 2000) {
+            return res.status(400).json({ success: false, message: "note must be at most 2000 characters." });
+        }
+        if (verdict === "has_concerns" && !note.trim()) {
+            return res.status(400).json({ success: false, message: "Describe the concerns in note." });
+        }
+        const found = findSuggestion(agreement, req, res);
+        if (!found) return;
+        const { clause, suggestion } = found;
+        suggestion.reviewerAssessments = suggestion.reviewerAssessments.filter(
+            (entry) => String(entry.reviewer) !== String(userId(req))
+        );
+        suggestion.reviewerAssessments.push({ reviewer: userId(req), verdict, note: note.trim(), assessedAt: new Date() });
+        await saveAuditedChange(agreement, req, "clause_rewrite_assessed", "clause", clause._id);
+        setPrivateResponse(res);
+        return res.json({ success: true, data: suggestion });
     } catch (error) {
         next(error);
     }
