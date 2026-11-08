@@ -5,6 +5,7 @@ import {
     verifyAgainstDummy,
     verifyPassword,
 } from "../services/adminAuth.service.js";
+import { recordSignIn } from "../services/securityAlerts.service.js";
 
 export function getCurrentUser(req, res) {
     return res.status(200).json({
@@ -36,7 +37,7 @@ export async function adminLogin(req, res, next) {
         }
         const { email, password } = parsed.data;
 
-        const user = await User.findOne({ email, role: "admin" }).select("+passwordHash");
+        const user = await User.findOne({ email, role: "admin" }).select("+passwordHash +passwordChangedAt");
 
         // Same answer and timing for an unknown email, a non-admin, an admin
         // without a password, and a wrong password.
@@ -57,6 +58,16 @@ export async function adminLogin(req, res, next) {
         const token = signAdminToken(user);
         const profile = user.toObject();
         delete profile.passwordHash;
+        delete profile.passwordChangedAt;
+
+        // New-device and password-change alerts; never blocks the sign-in.
+        recordSignIn({
+            userId: user._id,
+            authTime: new Date(),
+            userAgent: req.get("user-agent"),
+            provider: "admin",
+            passwordChangedAt: user.passwordChangedAt,
+        }).catch((error) => console.error("Admin sign-in tracking error:", error));
 
         return res.status(200).json({
             success: true,
