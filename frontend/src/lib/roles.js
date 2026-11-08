@@ -6,4 +6,6 @@ export const ROLES = {
     TENANCY: ["renter", "landlord", "legal_reviewer"],
     REVIEWER: ["legal_reviewer"],
     ADMIN: ["admin"],
+    VERIFICATION: ["renter", "landlord"],
+    ANY: ["renter", "landlord", "legal_reviewer", "admin"],
 };
