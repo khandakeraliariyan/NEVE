@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { env } from "../config/env.js";
 import SystemJobRun, { SystemJobLock } from "../models/SystemJobRun.js";
 import { runBackup } from "./backup.service.js";
-import { runDailyDigest, startNotificationJobs, stopNotificationJobs } from "./notificationJobs.service.js";
 import { runRetentionPurge } from "./retentionPurge.service.js";
 
 const OWNER = randomUUID();
@@ -12,17 +11,14 @@ const LOCK_MS = 60 * 60 * 1000;
 const JOBS = {
     retention_purge: ({ dryRun }) => runRetentionPurge({ dryRun }),
     backup: () => runBackup(),
-    notification_digest: () => runDailyDigest(),
 };
 
-export const SYSTEM_JOBS = Object.keys(JOBS);
-
-export async function acquireLock(job, lockMs = LOCK_MS) {
+async function acquireLock(job) {
     const now = new Date();
     try {
         const lock = await SystemJobLock.findOneAndUpdate(
             { _id: job, lockedUntil: { $lte: now } },
-            { $set: { lockedUntil: new Date(now.getTime() + lockMs), owner: OWNER } },
+            { $set: { lockedUntil: new Date(now.getTime() + LOCK_MS), owner: OWNER } },
             { upsert: true, new: true }
         );
         return Boolean(lock);
@@ -33,7 +29,7 @@ export async function acquireLock(job, lockMs = LOCK_MS) {
     }
 }
 
-export async function releaseLock(job) {
+async function releaseLock(job) {
     await SystemJobLock.updateOne({ _id: job, owner: OWNER }, { $set: { lockedUntil: new Date(0) } });
 }
 
@@ -82,10 +78,8 @@ export function startScheduledJobs() {
 
     schedule("retention_purge", env.RETENTION_PURGE_ENABLED, env.RETENTION_PURGE_INTERVAL_MINUTES * 60 * 1000);
     schedule("backup", env.BACKUP_ENABLED, env.BACKUP_INTERVAL_HOURS * 60 * 60 * 1000);
-    startNotificationJobs();
 }
 
 export function stopScheduledJobs() {
     while (timers.length) clearInterval(timers.pop());
-    stopNotificationJobs();
 }

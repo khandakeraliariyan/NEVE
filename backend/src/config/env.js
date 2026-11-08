@@ -66,20 +66,6 @@ const envSchema = z.object({
         .enum(["true", "false"])
         .default("false")
         .transform((value) => value === "true"),
-    // Optional SMS for viewing reminders and security alerts (Twilio).
-    SMS_PROVIDER: z.enum(["twilio"]).optional(),
-    SMS_ACCOUNT_SID: z.string().optional(),
-    SMS_AUTH_TOKEN: z.string().optional(),
-    SMS_FROM: z.string().optional(),
-    // Signs one-click unsubscribe links in emails. Falls back to ADMIN_JWT_SECRET.
-    NOTIFICATION_LINK_SECRET: z.string().min(32).optional(),
-    // Notification dispatch, reminders and the daily digest. On by default.
-    NOTIFICATION_JOBS_ENABLED: z
-        .enum(["true", "false"])
-        .default("true")
-        .transform((value) => value === "true"),
-    // Hour (UTC) the daily digest goes out. 3 = 09:00 in Bangladesh.
-    NOTIFICATION_DIGEST_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(3),
     // Background jobs. Both are off unless enabled.
     RETENTION_PURGE_ENABLED: z
         .enum(["true", "false"])

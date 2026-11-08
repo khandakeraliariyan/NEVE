@@ -224,8 +224,6 @@ const obligationSchema = new mongoose.Schema(
             default: "open",
         },
         notes: { type: String, trim: true, maxlength: 1000, default: "" },
-        // Set when the due-date reminder goes out.
-        reminderSentAt: { type: Date, default: null },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -360,8 +358,6 @@ const tenancyAgreementSchema = new mongoose.Schema(
         },
         startAt: { type: Date, default: null },
         endAt: { type: Date, default: null },
-        // Set when the lease-ending reminder goes out.
-        leaseEndReminderSentAt: { type: Date, default: null },
         monthlyRentBdt: { type: Number, min: 0, default: null },
         depositBdt: { type: Number, min: 0, default: null },
         advanceRentBdt: { type: Number, min: 0, default: null },

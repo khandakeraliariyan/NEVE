@@ -20,21 +20,18 @@ const notification = { _id: "n1", recipient: "u1", type: "inquiry_message_receiv
 const both = { email: true, push: true };
 
 test("chooses channels from preferences, mutes and tokens", () => {
-    const pick = (u, type = notification.type) => {
-        const { email, push } = chooseChannels(u, type, both);
-        return { email, push };
-    };
-    assert.deepEqual(pick(user), { email: true, push: true });
-    assert.deepEqual(pick({ ...user, notificationPreferences: { email: false, push: true, mutedTypes: [] } }), { email: false, push: true });
-    assert.deepEqual(pick({ ...user, notificationPreferences: { mutedTypes: [notification.type] } }), { email: false, push: false });
-    assert.deepEqual(pick({ ...user, pushTokens: [] }), { email: true, push: false });
-    assert.deepEqual(pick({ ...user, isActive: false }), { email: false, push: false });
-    assert.deepEqual(chooseChannels(user, notification.type, { email: false, push: false, sms: false }), {
-        email: false,
-        push: false,
-        sms: false,
-        digest: false,
-    });
+    assert.deepEqual(chooseChannels(user, notification.type, both), { email: true, push: true });
+    assert.deepEqual(
+        chooseChannels({ ...user, notificationPreferences: { email: false, push: true, mutedTypes: [] } }, notification.type, both),
+        { email: false, push: true }
+    );
+    assert.deepEqual(
+        chooseChannels({ ...user, notificationPreferences: { mutedTypes: [notification.type] } }, notification.type, both),
+        { email: false, push: false }
+    );
+    assert.deepEqual(chooseChannels({ ...user, pushTokens: [] }, notification.type, both), { email: true, push: false });
+    assert.deepEqual(chooseChannels({ ...user, isActive: false }, notification.type, both), { email: false, push: false });
+    assert.deepEqual(chooseChannels(user, notification.type, { email: false, push: false }), { email: false, push: false });
 });
 
 test("email has the notification text and a settings hint", () => {
@@ -80,11 +77,6 @@ test("validates notification preferences", () => {
     assert.deepEqual(validateNotificationPreferences({ email: false }).updates, { "notificationPreferences.email": false });
     assert.ok(validateNotificationPreferences({ email: "no" }).error);
     assert.ok(validateNotificationPreferences({ mutedTypes: ["not_a_type"] }).error);
-    assert.deepEqual(validateNotificationPreferences({ sms: true }).updates, { "notificationPreferences.sms": true });
-    assert.ok(validateNotificationPreferences({ sms: "yes" }).error);
-    assert.deepEqual(validateNotificationPreferences({ digest: "daily" }).updates, { "notificationPreferences.digest": "daily" });
-    assert.ok(validateNotificationPreferences({ digest: "weekly" }).error);
-    assert.ok(validateNotificationPreferences({ mutedTypes: ["security_new_device"] }).error);
-    assert.ok(validateNotificationPreferences({ unknown: true }).error);
+    assert.ok(validateNotificationPreferences({ sms: true }).error);
     assert.ok(validateNotificationPreferences({}).error);
 });

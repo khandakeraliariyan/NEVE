@@ -56,18 +56,6 @@ const inquirySchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
-
-        // First reply of any kind from the landlord side: a response or a
-        // message. Drives response times and stops the 24-hour reminder.
-        landlordFirstReplyAt: {
-            type: Date,
-            default: null,
-        },
-
-        reminderSentAt: {
-            type: Date,
-            default: null,
-        },
     },
     {
         timestamps: true,

@@ -53,12 +53,6 @@ const viewingRequestSchema = new mongoose.Schema(
             default: null,
         },
 
-        // Set when the 24-hours-before reminder goes out.
-        reminderSentAt: {
-            type: Date,
-            default: null,
-        },
-
         landlordNote: {
             type: String,
             trim: true,

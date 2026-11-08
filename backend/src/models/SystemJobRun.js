@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 // started by an admin.
 const systemJobRunSchema = new mongoose.Schema(
     {
-        job: { type: String, enum: ["retention_purge", "backup", "notification_digest"], required: true, index: true },
+        job: { type: String, enum: ["retention_purge", "backup"], required: true, index: true },
         trigger: { type: String, enum: ["scheduled", "manual"], required: true },
         triggeredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
         dryRun: { type: Boolean, default: false },

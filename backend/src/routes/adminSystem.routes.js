@@ -1,10 +1,7 @@
 import express from "express";
 
 import {
-    listNotificationDeliveries,
     listSystemJobRuns,
-    retryNotificationDeliveryNow,
-    runNotificationDigestNow,
     runBackupNow,
     runRetentionPurgeNow,
 } from "../controllers/adminSystem.controller.js";
@@ -19,8 +16,5 @@ router.use(allowRoles("admin"));
 router.get("/jobs", listSystemJobRuns);
 router.post("/retention-purge", runRetentionPurgeNow);
 router.post("/backups", runBackupNow);
-router.post("/notification-digest", runNotificationDigestNow);
-router.get("/notification-deliveries", listNotificationDeliveries);
-router.post("/notification-deliveries/:notificationId/retry", retryNotificationDeliveryNow);
 
 export default router;
