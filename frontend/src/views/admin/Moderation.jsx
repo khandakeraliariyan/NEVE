@@ -1,0 +1,337 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { api } from "../../lib/api";
+import { dateTime, idOf, label, money } from "../../lib/format";
+import { useApi } from "../../hooks/useApi";
+import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, Pagination, StatusBadge, Tabs } from "../../components/ui";
+
+const PAGE_SIZE = 10;
+
+// Each queue: where it lists from, which statuses it can filter by, and its default ("open") view.
+const QUEUES = {
+    reports: { label: "Listing reports", path: "/admin/dashboard/reports", statuses: ["pending", "in_review", "resolved", "dismissed"] },
+    warnings: { label: "Listing warnings", path: "/admin/dashboard/warnings", statuses: ["open", "reviewed", "resolved", "dismissed"] },
+    claims: { label: "Property claims", path: "/admin/dashboard/claims", statuses: ["unreviewed", "supported", "contradicted", "inconclusive"] },
+    messages: { label: "Message reports", path: "/admin/dashboard/communication-reports", statuses: ["pending", "in_review", "resolved", "dismissed"] },
+};
+
+function PropertyLine({ property }) {
+    if (!property) return <p className="text-xs text-muted">Property no longer available</p>;
+    return (
+        <p className="text-xs text-muted">
+            <Link href={`/properties/${idOf(property)}`} className="text-forest underline" target="_blank">
+                {property.title ?? "View property"}
+            </Link>
+            {property.address && ` · ${[property.address.area, property.address.city].filter(Boolean).join(", ")}`}
+            {property.pricing?.monthlyRent != null && ` · ${money(property.pricing.monthlyRent)}`}
+            {property.status && ` · ${label(property.status)}`}
+        </p>
+    );
+}
+
+function DuplicateCheck({ propertyId }) {
+    const [state, setState] = useState({ loading: false, data: null, error: null });
+    async function run() {
+        setState({ loading: true, data: null, error: null });
+        try {
+            const payload = await api.get(`/duplicate-listings/${propertyId}/duplicate-check`);
+            setState({ loading: false, data: payload.data, error: null });
+        } catch (error) {
+            setState({ loading: false, data: null, error });
+        }
+    }
+    if (!propertyId) return null;
+    const results = state.data?.potentialDuplicates ?? [];
+    return (
+        <div className="mt-3">
+            {!state.data && (
+                <Button variant="ghost" className="px-3 py-1 text-xs" disabled={state.loading} onClick={run}>
+                    {state.loading ? "Checking…" : "Check for duplicate listings"}
+                </Button>
+            )}
+            <ErrorBox error={state.error} />
+            {state.data && (
+                <div className="rounded-xl border border-line bg-mist p-3 text-xs">
+                    <p className="mb-2 font-medium text-ink">
+                        {results.length ? `${results.length} possible duplicate${results.length === 1 ? "" : "s"}` : "No likely duplicates"} among {state.data.candidateCount} listings
+                    </p>
+                    <ul className="space-y-2">
+                        {results.map((d) => (
+                            <li key={d.property.id}>
+                                <Link href={`/properties/${d.property.id}`} target="_blank" className="text-forest underline">{d.property.title}</Link>{" "}
+                                <Badge tone="amber">Score {d.similarityScore}</Badge>
+                                {d.matchingImageCount > 0 && <Badge tone="rose" className="ml-1">{d.matchingImageCount} matching images</Badge>}
+                                <p className="text-muted">{d.signals.join(" · ")}</p>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="mt-2 text-muted">{state.data.note}</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Approve or revoke the neutral summary renters see on the listing.
+function PublicSummary({ kind, record, reviewed, onChanged }) {
+    const [text, setText] = useState(record.publicSummary ?? "");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    async function save(publiclyVisible) {
+        setBusy(true);
+        setError(null);
+        try {
+            await api.patch(`/admin/trust-approval/${kind}/${record._id}/public-summary`, {
+                publiclyVisible,
+                ...(publiclyVisible ? { publicSummary: text.trim() } : {}),
+            });
+            onChanged(publiclyVisible ? "Public summary approved." : "Public summary hidden.");
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+    return (
+        <div className="mt-3 rounded-xl border border-line p-3">
+            <p className="mb-2 text-xs font-medium text-ink">
+                Public summary {record.publiclyVisible ? <Badge tone="green">Shown on listing</Badge> : <Badge tone="gray">Hidden</Badge>}
+            </p>
+            {!reviewed ? (
+                <p className="text-xs text-muted">Review this record before showing a summary to renters.</p>
+            ) : (
+                <>
+                    <textarea
+                        className="field min-h-16 text-sm"
+                        maxLength={500}
+                        placeholder="Neutral wording only, e.g. “Some details are under review.” Never say “fraud”."
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                    />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <Button className="px-3 py-1 text-xs" disabled={busy || !text.trim()} onClick={() => save(true)}>
+                            {record.publiclyVisible ? "Update summary" : "Show on listing"}
+                        </Button>
+                        {record.publiclyVisible && (
+                            <Button variant="outline" className="px-3 py-1 text-xs" disabled={busy} onClick={() => save(false)}>Hide</Button>
+                        )}
+                    </div>
+                </>
+            )}
+            <ErrorBox error={error} />
+        </div>
+    );
+}
+
+// Status buttons plus an optional note, shared by every queue.
+function Decision({ options, current, needsNote, onDecide }) {
+    const [note, setNote] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    async function decide(status) {
+        setBusy(true);
+        setError(null);
+        try {
+            await onDecide(status, note.trim());
+            setNote("");
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+    return (
+        <div className="mt-3 border-t border-line pt-3">
+            {needsNote && (
+                <textarea className="field mb-2 min-h-14 text-sm" maxLength={1000} placeholder="Review note (internal)" value={note} onChange={(e) => setNote(e.target.value)} />
+            )}
+            <div className="flex flex-wrap gap-2">
+                {options.filter((o) => o !== current).map((o) => (
+                    <Button key={o} variant={["dismissed", "contradicted"].includes(o) ? "outline" : "secondary"} className="px-3 py-1 text-xs" disabled={busy} onClick={() => decide(o)}>
+                        Mark {label(o).toLowerCase()}
+                    </Button>
+                ))}
+            </div>
+            <ErrorBox error={error} />
+        </div>
+    );
+}
+
+function ReportItem({ r, onDone }) {
+    return (
+        <Card>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <p className="font-semibold">{label(r.reason)}</p>
+                    <PropertyLine property={r.property} />
+                </div>
+                <StatusBadge status={r.status} />
+            </div>
+            {r.details && <p className="mt-2 text-sm text-muted">“{r.details}”</p>}
+            <p className="mt-1 text-xs text-muted">Reported {dateTime(r.createdAt)}</p>
+            {r.reviewNote && <p className="mt-1 text-xs text-muted">Note: {r.reviewNote}</p>}
+            <DuplicateCheck propertyId={idOf(r.property)} />
+            <Decision
+                options={["in_review", "resolved", "dismissed"]}
+                current={r.status}
+                needsNote
+                onDecide={async (status, reviewNote) => {
+                    await api.patch(`/property-reports/admin/${r._id}`, { status, reviewNote });
+                    onDone(`Report marked ${label(status).toLowerCase()}.`);
+                }}
+            />
+        </Card>
+    );
+}
+
+function WarningItem({ w, onDone }) {
+    return (
+        <Card>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <p className="font-semibold">{label(w.type)}</p>
+                    <PropertyLine property={w.property} />
+                </div>
+                <div className="flex gap-1">
+                    <StatusBadge status={w.severity} />
+                    <StatusBadge status={w.status} />
+                </div>
+            </div>
+            <p className="mt-2 text-sm text-muted">{w.message}</p>
+            {w.evidence && Object.keys(w.evidence).length > 0 && (
+                <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-mist p-2 text-xs text-muted">{JSON.stringify(w.evidence, null, 2)}</pre>
+            )}
+            <DuplicateCheck propertyId={idOf(w.property)} />
+            <Decision
+                options={["open", "reviewed", "resolved", "dismissed"]}
+                current={w.status}
+                onDecide={async (status) => {
+                    await api.patch(`/admin/moderation/warnings/${w._id}/status`, { status });
+                    onDone(`Warning marked ${label(status).toLowerCase()}.`);
+                }}
+            />
+            <PublicSummary kind="warnings" record={w} reviewed={["reviewed", "resolved"].includes(w.status)} onChanged={onDone} />
+        </Card>
+    );
+}
+
+function ClaimItem({ c, onDone }) {
+    return (
+        <Card>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <p className="font-semibold">{label(c.claimType)} claim</p>
+                    <PropertyLine property={c.property} />
+                </div>
+                <StatusBadge status={c.status} />
+            </div>
+            <p className="mt-2 text-sm">{c.statement}</p>
+            <p className="mt-1 text-xs text-muted">
+                Source: {label(c.source)}
+                {c.claimedValue !== undefined && c.claimedValue !== null && ` · Claimed value: ${typeof c.claimedValue === "object" ? JSON.stringify(c.claimedValue) : c.claimedValue}`}
+            </p>
+            {c.reviewNote && <p className="mt-1 text-xs text-muted">Note: {c.reviewNote}</p>}
+            <Decision
+                options={["supported", "contradicted", "inconclusive", "unreviewed"]}
+                current={c.status}
+                needsNote
+                onDecide={async (status, reviewNote) => {
+                    await api.patch(`/admin/moderation/claims/${c._id}/review`, { status, reviewNote });
+                    onDone(`Claim marked ${label(status).toLowerCase()}. Any public summary was hidden; approve it again if needed.`);
+                }}
+            />
+            <PublicSummary kind="claims" record={c} reviewed={["supported", "contradicted", "inconclusive"].includes(c.status)} onChanged={onDone} />
+        </Card>
+    );
+}
+
+function MessageReportItem({ r, onDone }) {
+    return (
+        <Card>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <p className="font-semibold">{label(r.reason)}</p>
+                    <p className="text-xs text-muted">
+                        {r.reporter?.displayName ?? "Unknown"} ({label(r.reporter?.role)}) reported {r.reportedUser?.displayName ?? "Unknown"} ({label(r.reportedUser?.role)})
+                    </p>
+                </div>
+                <StatusBadge status={r.status} />
+            </div>
+            {r.message?.body && (
+                <blockquote className="mt-2 rounded-lg border-l-4 border-taupe bg-mist px-3 py-2 text-sm">
+                    {r.message.body}
+                    <span className="mt-1 block text-xs text-muted">Sent {dateTime(r.message.createdAt)}</span>
+                </blockquote>
+            )}
+            {r.details && <p className="mt-2 text-sm text-muted">Reporter: “{r.details}”</p>}
+            <p className="mt-1 text-xs text-muted">Reported {dateTime(r.createdAt)}</p>
+            {r.reviewNote && <p className="mt-1 text-xs text-muted">Note: {r.reviewNote}</p>}
+            <Decision
+                options={["in_review", "resolved", "dismissed"]}
+                current={r.status}
+                needsNote
+                onDecide={async (status, reviewNote) => {
+                    await api.patch(`/admin/moderation/communication-reports/${r._id}/status`, { status, reviewNote });
+                    onDone(`Message report marked ${label(status).toLowerCase()}.`);
+                }}
+            />
+        </Card>
+    );
+}
+
+const ITEMS = { reports: ReportItem, warnings: WarningItem, claims: ClaimItem, messages: MessageReportItem };
+const PROP = { reports: "r", warnings: "w", claims: "c", messages: "r" };
+
+export default function Moderation() {
+    const [tab, setTab] = useState("reports");
+    const [status, setStatus] = useState("");
+    const [page, setPage] = useState(1);
+    const [message, setMessage] = useState(null);
+    const queue = QUEUES[tab];
+    const list = useApi(() => api.get(queue.path, { status, page, limit: PAGE_SIZE }), [tab, status, page]);
+    const items = list.data?.data ?? [];
+    const Item = ITEMS[tab];
+
+    function done(text) {
+        setMessage(text);
+        list.reload();
+    }
+
+    return (
+        <div>
+            <PageHeader
+                eyebrow="Trust & safety"
+                title="Moderation"
+                description="Review what renters reported and what automatic checks flagged. These are signals for human review, never verdicts."
+            />
+            <div className="flex flex-wrap items-start gap-3">
+                <Tabs
+                    tabs={Object.entries(QUEUES).map(([value, q]) => ({ value, label: q.label }))}
+                    active={tab}
+                    onChange={(v) => { setTab(v); setStatus(""); setPage(1); setMessage(null); }}
+                />
+                <select className="field w-auto" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+                    <option value="">Open queue</option>
+                    {queue.statuses.map((s) => (
+                        <option key={s} value={s}>{label(s)}</option>
+                    ))}
+                </select>
+            </div>
+            {message && <p className="mb-4 rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{message}</p>}
+            {list.loading && <Loading text="Loading queue…" />}
+            <ErrorBox error={list.error} onRetry={list.reload} />
+            {!list.loading && !list.error && items.length === 0 && <Empty title="Queue is clear">Nothing matches this filter.</Empty>}
+            <div className="grid gap-4 xl:grid-cols-2">
+                {items.map((item) => (
+                    <Item key={item._id} {...{ [PROP[tab]]: item }} onDone={done} />
+                ))}
+            </div>
+            <Pagination page={page} totalPages={list.data?.pagination?.totalPages} onChange={setPage} />
+            <Disclaimer className="mt-6" title="Wording on public pages">
+                Public summaries appear on the listing for renters. Keep them neutral and factual, and never call anyone a fraudster. Every decision here is written to the audit trail.
+            </Disclaimer>
+        </div>
+    );
+}
