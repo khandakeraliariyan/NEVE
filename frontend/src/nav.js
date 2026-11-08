@@ -15,6 +15,7 @@ const RENTER_NAV = [
         items: [
             { to: "/saved", label: "My favorites" },
             { to: "/recommendations", label: "Smart recommendations" },
+            { to: "/saved-searches", label: "Saved searches" },
         ],
     },
     {
@@ -51,30 +52,48 @@ const TENANCY_NAV = [
 const REVIEWER_NAV = [
     {
         title: "Active review",
-        items: [{ to: "/cases", label: "Case queue", end: true }],
+        items: [
+            { to: "/cases", label: "Case queue", end: true },
+            { to: "/legal-review", label: "Legal sources" },
+        ],
     },
 ];
 const ADMIN_NAV = [
+    {
+        title: "Trust & safety",
+        items: [
+            { to: "/admin/moderation", label: "Moderation" },
+            { to: "/admin/verifications", label: "Verification queue" },
+        ],
+    },
+    {
+        title: "People & content",
+        items: [
+            { to: "/admin/users", label: "Users" },
+            { to: "/admin/reviewers", label: "Legal reviewers" },
+            { to: "/admin/legal-sources", label: "Legal sources" },
+        ],
+    },
     {
         title: "System governance",
         items: [
             { to: "/admin", label: "Platform health", end: true },
             { to: "/admin/audit-logs", label: "Audit trail" },
-            { to: "/admin/reviewers", label: "Legal reviewers" },
+            { to: "/admin/system", label: "Retention & backups" },
             { to: "/admin/ai-evaluations", label: "AI evaluations" },
         ],
     },
 ];
 
-const ACCOUNT_NAV = [
-    {
-        title: "Account",
-        items: [{ to: "/settings", label: "Settings" }],
-    },
-];
+function accountNav(role) {
+    const items = [{ to: "/notifications", label: "Notifications" }];
+    if (role === "renter" || role === "landlord") items.push({ to: "/verification", label: "Verification" });
+    items.push({ to: "/settings", label: "Settings" });
+    return [{ title: "Account", items }];
+}
 
 export function workspaceNav(role) {
-    return [...roleNav(role), ...ACCOUNT_NAV];
+    return [...roleNav(role), ...accountNav(role)];
 }
 
 function roleNav(role) {
