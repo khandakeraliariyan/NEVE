@@ -12,7 +12,6 @@ const PAGE_SIZE = 20;
 
 // Where a notification should take its reader, based on what it is about.
 function linkFor(n, role) {
-    if (n.link?.startsWith("/")) return n.link;
     if (n.relatedCase) return `/cases/${idOf(n.relatedCase)}`;
     if (n.relatedViewingRequest) return role === "landlord" ? "/listings/viewings" : "/viewings";
     if (n.relatedInquiry) return "/inquiries";
@@ -33,13 +32,6 @@ function NotificationItem({ n, role, onRead }) {
                     <Badge tone="gray">{label(n.type)}</Badge>
                 </div>
                 {n.message && <p className="mt-1 text-sm text-muted">{n.message}</p>}
-                {n.details?.length > 0 && (
-                    <ul className="mt-1 space-y-0.5 text-xs text-muted">
-                        {n.details.map((line, i) => (
-                            <li key={i}>{line}</li>
-                        ))}
-                    </ul>
-                )}
                 <p className="mt-1 text-xs text-muted" title={dateTime(n.createdAt)}>
                     {relativeTime(n.createdAt)}
                     {n.relatedProperty?.title && ` · ${n.relatedProperty.title}`}
@@ -101,7 +93,6 @@ function Preferences() {
                 {[
                     ["email", "Email", "Sent to the address on your account."],
                     ["push", "Push", "Sent to browsers and devices you've allowed."],
-                    ["sms", "SMS", "Viewing reminders and security alerts only, sent to your verified phone number."],
                 ].map(([key, title, hint]) => (
                     <label key={key} className="flex items-center justify-between gap-4 border-t border-line py-3 text-sm">
                         <span>
@@ -114,22 +105,10 @@ function Preferences() {
                         <input type="checkbox" className="h-5 w-5 accent-forest" checked={data[key]} disabled={busy} onChange={(e) => save({ [key]: e.target.checked })} />
                     </label>
                 ))}
-                <label className="flex items-center justify-between gap-4 border-t border-line py-3 text-sm">
-                    <span>
-                        <span className="font-medium text-ink">Email frequency</span>
-                        <span className="block text-xs text-muted">A daily summary holds non-urgent emails for one email a day. New inquiries, viewing reminders and security alerts are always sent straight away.</span>
-                    </span>
-                    <select className="field w-auto" value={data.digest} disabled={busy} onChange={(e) => save({ digest: e.target.value })}>
-                        <option value="off">Each notification</option>
-                        <option value="daily">Daily summary</option>
-                    </select>
-                </label>
             </Card>
             <Card>
                 <h2 className="mb-1 text-xl">Event types</h2>
-                <p className="mb-4 text-sm text-muted">
-                    Unticked types still appear here, but aren't sent by email, push or SMS. Security alerts (new sign-ins and password changes) are always sent and can't be turned off.
-                </p>
+                <p className="mb-4 text-sm text-muted">Unticked types still appear here, but aren't sent by email or push.</p>
                 <ul className="grid gap-x-6 sm:grid-cols-2">
                     {data.notificationTypes.map((type) => (
                         <li key={type}>
