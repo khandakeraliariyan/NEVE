@@ -1,6 +1,5 @@
 import User from "../models/User.js";
 import { ADMIN_SIGN_IN_PROVIDER } from "../services/adminAuth.service.js";
-import { recordSignIn } from "../services/securityAlerts.service.js";
 
 // Admins may only use a session from the admin portal's email and password
 // sign-in (a Neve-signed JWT), never Firebase, even when the email matches.
@@ -53,21 +52,6 @@ export function allowRoles(...allowedRoles) {
             }
 
             req.neveUser = user;
-
-            // New-device and password-change alerts. Fire-and-forget: only
-            // the first request after a new sign-in does any work.
-            if (req.user.authTime) {
-                recordSignIn({
-                    userId: user._id,
-                    authTime: req.user.authTime,
-                    userAgent: req.get?.("user-agent"),
-                    provider: req.user.signInProvider,
-                    loadFirebaseRecord: async () => {
-                        const { firebaseAuth } = await import("../config/firebase.js");
-                        return firebaseAuth.getUser(req.user.uid);
-                    },
-                }).catch((error) => console.error("Sign-in tracking error:", error));
-            }
             next();
         } catch (error) {
             next(error);

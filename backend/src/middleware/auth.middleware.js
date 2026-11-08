@@ -66,8 +66,6 @@ export async function authenticateUser(req, res, next) {
             name: decodedToken.name ?? null,
             // "password" or "google.com"
             signInProvider: decodedToken.firebase?.sign_in_provider ?? null,
-            // When the user actually signed in (seconds); used for security alerts.
-            authTime: decodedToken.auth_time ? new Date(decodedToken.auth_time * 1000) : null,
         };
 
         next();
