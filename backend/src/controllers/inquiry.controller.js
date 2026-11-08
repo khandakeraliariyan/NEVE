@@ -3,6 +3,11 @@ import Inquiry from "../models/Inquiry.js";
 import Property from "../models/Property.js";
 import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 import { findPubliclyAvailableProperty } from "../services/propertyAvailability.service.js";
+import {
+    markLandlordReplied,
+    notifyInquiryCreated,
+    notifyInquiryResponded,
+} from "../services/notificationEvents.service.js";
 
 export async function createInquiry(req, res, next) {
     try {
@@ -48,6 +53,9 @@ export async function createInquiry(req, res, next) {
             landlord: property.landlord,
             message: message.trim(),
         });
+
+        // Landlord: "New inquiry for …"; renter: "Your inquiry … has been sent".
+        await notifyInquiryCreated({ inquiry, property, renter: req.neveUser });
 
         return res.status(201).json({
             success: true,
@@ -180,6 +188,10 @@ export async function updateInquiry(req, res, next) {
                 message: "Inquiry not found",
             });
         }
+
+        await markLandlordReplied(inquiry._id);
+        const property = await Property.findById(inquiry.property).select("title").lean();
+        await notifyInquiryResponded({ inquiry, status, response: updates.landlordResponse, property });
 
         return res.status(200).json({
             success: true,

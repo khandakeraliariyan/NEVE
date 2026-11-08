@@ -36,6 +36,7 @@ import {
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
+import { notifyEvidenceLinks } from "../services/notificationEvents.service.js";
 
 const userId = (req) => req.neveUser._id;
 const validId = mongoose.isValidObjectId;
@@ -898,6 +899,9 @@ export async function updateAgreementEvidenceLink(req, res, next) {
             link.targetType,
             link.targetId
         );
+        if (relationship === "contradicts") {
+            await notifyEvidenceLinks(agreement, userId(req), { outcome: "disputed" });
+        }
 
         setPrivateResponse(res);
         return res.json({ success: true, data: link });
@@ -1364,6 +1368,7 @@ export async function confirmAgreementEvidenceLink(req, res, next) {
             link.targetType,
             link.targetId
         );
+        await notifyEvidenceLinks(agreement, userId(req), { outcome: "confirmed" });
 
         const confirmers = new Set(link.confirmations.map((entry) => String(entry.user)));
         const documentedFact =
@@ -1520,6 +1525,9 @@ export async function suggestAgreementEvidenceLinks(req, res, next) {
             }
         }
         await saveAuditedChange(agreement, req, "evidence_links_suggested", "file", file._id);
+        if (created.length) {
+            await notifyEvidenceLinks(agreement, userId(req), { proposedCount: created.length });
+        }
 
         setPrivateResponse(res);
         return res.status(201).json({
@@ -1585,6 +1593,7 @@ export async function reviewSuggestedEvidenceLink(req, res, next) {
             link.targetType,
             link.targetId
         );
+        await notifyEvidenceLinks(agreement, userId(req), { outcome: decision === "accept" ? "confirmed" : "disputed" });
         setPrivateResponse(res);
         return res.json({ success: true, data: link });
     } catch (error) {

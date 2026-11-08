@@ -13,6 +13,7 @@ import {
 } from "../services/propertySearch.service.js";
 import { notifyRentersOfMatchingProperty } from "../services/matchingAlert.service.js";
 import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
+import { notifyFavoriteChanged } from "../services/notificationEvents.service.js";
 
 const editableFields = [
     "title",
@@ -166,6 +167,21 @@ export async function getPropertyById(req, res, next) {
 }
 
 // PATCH /api/v1/properties/:id
+// What a renter who saved the listing should hear about after an edit.
+export function favoriteChanges(before, property) {
+    const changes = [];
+    const rent = property.pricing?.monthlyRent ?? null;
+    if (before.rent !== null && rent !== null && rent !== before.rent) {
+        const fmt = (value) => `৳${Number(value).toLocaleString("en-BD")}`;
+        changes.push(`Monthly rent ${rent < before.rent ? "dropped" : "rose"} from ${fmt(before.rent)} to ${fmt(rent)}.`);
+    }
+    const availableFrom = property.availabilityDate ? new Date(property.availabilityDate).getTime() : null;
+    if (availableFrom !== before.availableFrom && availableFrom !== null) {
+        changes.push(`It's now available from ${new Date(availableFrom).toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka" })}.`);
+    }
+    return changes;
+}
+
 export async function updateProperty(req, res, next) {
     try {
         const { id } = req.params;
@@ -198,8 +214,21 @@ export async function updateProperty(req, res, next) {
                 message: "Property not found or you do not own it",
             });
         }
+        const before = {
+            rent: property.pricing?.monthlyRent ?? null,
+            availableFrom: property.availabilityDate ? new Date(property.availabilityDate).getTime() : null,
+        };
         Object.assign(property, data);
         await property.save();
+
+        if (property.status === "published") {
+            const changes = favoriteChanges(before, property);
+            if (changes.length) {
+                await notifyFavoriteChanged(property, changes).catch((error) =>
+                    console.error("Favourite change notification error:", error)
+                );
+            }
+        }
 
         return res.status(200).json({
             success: true,
@@ -255,6 +284,14 @@ export async function updatePropertyStatus(req, res, next) {
         // A paused listing can be republished; a draft can be published.
         property.status = status;
         await property.save();
+
+        if (wasPublished !== (status === "published")) {
+            await notifyFavoriteChanged(property, [
+                status === "published"
+                    ? "It's available again and accepting inquiries."
+                    : "The landlord paused it, so it isn't accepting inquiries or viewings for now.",
+            ]).catch((error) => console.error("Favourite change notification error:", error));
+        }
 
         let matchingAlerts = null;
         if (status === "published" && !wasPublished) {

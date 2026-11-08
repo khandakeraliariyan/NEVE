@@ -14,6 +14,7 @@ import {
     appendAuditEvent,
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
+import { notifyAgreementAnalysis } from "../services/notificationEvents.service.js";
 
 const EXTRACTION_DISCLAIMER =
     "Clauses and values were extracted automatically and are proposals until a participant confirms them. Summaries describe the text only; they are not legal advice and have not been legally reviewed.";
@@ -127,6 +128,7 @@ export async function extractAgreement(req, res, next) {
             model: result.model,
             proposedClauses: proposed.length,
         });
+        await notifyAgreementAnalysis(agreement, req.neveUser._id, { ok: true, clauseCount: proposed.length });
 
         setPrivateResponse(res);
         return res.status(200).json({
@@ -150,6 +152,7 @@ export async function extractAgreement(req, res, next) {
             await logAccess(req, agreement, "agreement_extracted", "failed", {
                 reason: error.publicMessage,
             }).catch(() => {});
+            await notifyAgreementAnalysis(agreement, req.neveUser._id, { ok: false });
 
             return res.status(error.status).json({
                 success: false,

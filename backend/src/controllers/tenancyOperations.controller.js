@@ -17,6 +17,11 @@ import {
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
+import {
+    notifyConditionReviewed,
+    notifyMaintenanceSubmitted,
+    notifyMaintenanceUpdated,
+} from "../services/notificationEvents.service.js";
 
 const isValidId = mongoose.isValidObjectId;
 const actorId = (req) => req.neveUser._id;
@@ -477,6 +482,7 @@ export async function reviewConditionEntry(req, res, next) {
             "condition_report",
             report._id
         );
+        await notifyConditionReviewed(agreement, report, entry, actorId(req), decision);
         privateResponse(res);
         return res.json({ success: true, data: entry });
     } catch (error) {
@@ -678,6 +684,7 @@ export async function createMaintenanceRequest(req, res, next) {
             "maintenance_request",
             request._id
         );
+        await notifyMaintenanceSubmitted(agreement, request, actorId(req));
         privateResponse(res);
         return res.status(201).json({
             success: true,
@@ -921,6 +928,16 @@ export async function updateMaintenanceRequest(req, res, next) {
             "maintenance_request",
             request._id
         );
+        await notifyMaintenanceUpdated(
+            agreement,
+            request,
+            actorId(req),
+            status !== undefined
+                ? `status changed to ${status.replace(/_/g, " ")}.`
+                : responsibility !== undefined
+                    ? `responsibility set to ${responsibility}.`
+                    : "a new update was added."
+        );
         privateResponse(res);
         return res.json({ success: true, data: request });
     } catch (error) {
@@ -990,6 +1007,12 @@ export async function assignMaintenanceRequest(req, res, next) {
             "maintenance_request_assigned",
             "maintenance_request",
             request._id
+        );
+        await notifyMaintenanceUpdated(
+            agreement,
+            request,
+            actorId(req),
+            value ? `assigned to ${label}.` : "the assignment was removed."
         );
         privateResponse(res);
         return res.json({ success: true, data: request });

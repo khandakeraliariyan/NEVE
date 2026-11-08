@@ -190,6 +190,13 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `EMAIL_API_KEY` | For email | Optional | API key for the email provider |
 | `EMAIL_FROM` | For email | Optional; email address | Sender address for notification emails |
 | `PUSH_NOTIFICATIONS_ENABLED` | No | `false`; `true` or `false` | Sends push notifications through Firebase Cloud Messaging with the existing service account |
+| `SMS_PROVIDER` | For SMS | Optional; `twilio` | Sends viewing reminders and security alerts by SMS to users who opt in |
+| `SMS_ACCOUNT_SID` | For SMS | Optional | Twilio account SID |
+| `SMS_AUTH_TOKEN` | For SMS | Optional | Twilio auth token |
+| `SMS_FROM` | For SMS | Optional | Twilio sending number |
+| `NOTIFICATION_LINK_SECRET` | No | Falls back to `ADMIN_JWT_SECRET`; at least 32 characters | Signs one-click unsubscribe links in emails |
+| `NOTIFICATION_JOBS_ENABLED` | No | `true`; `true` or `false` | Runs delivery retries, reminders and the daily digest every minute |
+| `NOTIFICATION_DIGEST_HOUR_UTC` | No | `3` (09:00 Bangladesh); 0 to 23 | Hour the daily digest email goes out |
 | `RETENTION_PURGE_ENABLED` | No | `false`; `true` or `false` | Runs the retention purge on a schedule |
 | `RETENTION_PURGE_INTERVAL_MINUTES` | No | `60`; 5 to 10080 | How often the retention purge runs |
 | `ABANDONED_UPLOAD_HOURS` | No | `24`; 1 to 720 | Age after which an unconfirmed upload is purged |
@@ -785,15 +792,50 @@ when it is set, so scores for renters who don't use them are unchanged.
   two people per bedroom (or available spots for shared listings), whether
   house rules allow or forbid pets, and ground floor or a listed lift.
 
-### Email and push notifications
+### Notifications: events, delivery, reminders and digest
 
-Every new in-app notification is also sent by email and push when those
-channels are configured (`EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM`;
-`PUSH_NOTIFICATIONS_ENABLED=true`). Delivery runs after the notification is
-saved, never blocks or fails the original action, and its result is stored
-on the notification's `delivery` field. Users turn channels off or mute
-specific notification types at `/api/v1/notifications/preferences`; muted
-types still appear in the app. The app registers each device's FCM token at
+**Events.** In-app notifications are created for: new inquiries (landlord:
+"New inquiry for …" with the renter's name, verification badges and a
+200-character preview; renter: a confirmation with their message, the
+landlord's typical response time and a deposit safety reminder), landlord
+replies, new messages, viewing requests, decisions and cancellations,
+maintenance requests and their updates, condition entries confirmed or
+disputed, evidence links proposed, accepted, disputed or confirmed, agreement
+analysis finished, listings flagged (admins and a neutral notice to the
+landlord), legal sources submitted for review, saved listings whose rent or
+availability changed, and security alerts. Notification text never includes
+phone numbers, email addresses, ID numbers, home addresses, documents or
+payment links.
+
+**Reminders.** Every five minutes: inquiries with no landlord reply after
+24 hours, confirmed viewings in the next 24 hours (renter and landlord),
+leases ending within 30 days, and open obligations due within 3 days. Each
+reminder is sent once.
+
+**Delivery.** Each notification is a queue entry in MongoDB. It is sent by
+email, push and SMS straight away, retried by the dispatcher after 1, 5, 15
+and 60 minutes, and marked `dead` after 5 attempts. A channel that already
+succeeded is never sent again, and a `dedupeKey` stops one event from
+notifying the same person twice. Admins see failed and waiting deliveries,
+and retry them, at `GET /api/v1/admin/system/notification-deliveries` and
+`POST /api/v1/admin/system/notification-deliveries/:notificationId/retry`.
+
+**Preferences** (`/api/v1/notifications/preferences`): `email`, `push`,
+`sms` (viewing reminders and security alerts, to a verified phone),
+`digest` (`off` or `daily`) and `mutedTypes`. With the daily digest,
+non-urgent emails are held and sent as one summary at
+`NOTIFICATION_DIGEST_HOUR_UTC` (`POST /api/v1/admin/system/notification-digest`
+sends it now). Every non-security email has a signed one-click unsubscribe
+link (`GET /api/v1/notifications/unsubscribe`) that mutes that type.
+Security alerts can't be muted, digested or unsubscribed.
+
+**Security alerts.** On the first request after a new Firebase sign-in, the
+API compares the device with the user's known devices and alerts on a new
+one (the first sign-in is silent). It alerts on a password change when
+Firebase's `tokensValidAfterTime` moves forward. Admin portal sign-ins are
+checked the same way, using `passwordChangedAt`.
+
+The app registers each device's FCM token at
 `POST /api/v1/notifications/push-tokens`, and tokens FCM reports as invalid
 are removed automatically.
 

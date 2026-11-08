@@ -9,6 +9,7 @@ import {
     detectListingInconsistencies,
 } from "../services/listingConsistency.service.js";
 import { canManageProperty } from "../services/propertyAccess.service.js";
+import { notifyListingFlagged } from "../services/notificationEvents.service.js";
 
 const getUserId = (req) =>
     req.neveUser?._id ?? req.user?._id ?? req.user?.id;
@@ -146,7 +147,16 @@ export const reviewListingConsistency = async (req, res, next) => {
         }));
 
         if (operations.length > 0) {
-            await ListingWarning.bulkWrite(operations);
+            const result = await ListingWarning.bulkWrite(operations);
+            const newIds = Object.values(result.upsertedIds ?? {});
+            if (newIds.length) {
+                await notifyListingFlagged(property, {
+                    source: "automatic",
+                    count: newIds.length,
+                    actorId: getUserId(req),
+                    dedupeKey: `listing_flagged:${newIds.map(String).sort().join(",")}`.slice(0, 160),
+                }).catch((error) => console.error("Listing flagged notification error:", error));
+            }
         }
 
         const warnings = await ListingWarning.find({
