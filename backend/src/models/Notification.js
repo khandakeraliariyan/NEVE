@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { queueNotificationDelivery } from "../services/notificationDelivery.service.js";
+import { NOTIFICATION_TYPES } from "../services/notificationTypes.js";
 
 const notificationSchema = new mongoose.Schema(
     {
@@ -12,20 +13,7 @@ const notificationSchema = new mongoose.Schema(
 
         type: {
             type: String,
-            enum: [
-                "viewing_request_received",
-                "viewing_request_confirmed",
-                "viewing_request_declined",
-                "viewing_request_approved",
-                "viewing_request_rejected",
-                "inquiry_message_received",
-                "matching_listing_available",
-                "tenancy_case_shared",
-                "tenancy_case_review_activity",
-                "staff_role_changed",
-                "account_status_changed",
-                "verification_reviewed",
-            ],
+            enum: NOTIFICATION_TYPES,
             required: true,
         },
 
@@ -41,6 +29,21 @@ const notificationSchema = new mongoose.Schema(
             required: true,
             trim: true,
             maxlength: 1000,
+        },
+
+        // Longer, email-friendly detail lines. Built only from safe fields:
+        // never phone numbers, email addresses, ID numbers or home addresses.
+        details: {
+            type: [{ type: String, maxlength: 600 }],
+            default: undefined,
+        },
+
+        // App path the notification opens, e.g. "/inquiries".
+        link: {
+            type: String,
+            trim: true,
+            maxlength: 300,
+            default: null,
         },
 
         relatedProperty: {
@@ -64,6 +67,19 @@ const notificationSchema = new mongoose.Schema(
             ref: "TenancyCase",
             default: null,
         },
+        relatedAgreement: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TenancyAgreement",
+            default: null,
+        },
+
+        // Stops the same event from notifying the same person twice,
+        // e.g. "inquiry_reminder:<inquiryId>:<recipient>".
+        dedupeKey: {
+            type: String,
+            maxlength: 200,
+            default: undefined,
+        },
 
         isRead: {
             type: Boolean,
@@ -75,12 +91,22 @@ const notificationSchema = new mongoose.Schema(
             default: null,
         },
 
-        // Email and push results; null until delivery runs (or when no
-        // delivery channel is configured).
+        // Per-channel email, push and SMS results.
         delivery: {
             type: mongoose.Schema.Types.Mixed,
             default: null,
         },
+
+        // Delivery queue. Absent when no delivery channel is configured.
+        // pending -> processing -> done | pending (retry) | dead (gave up).
+        deliveryStatus: {
+            type: String,
+            enum: ["pending", "processing", "done", "dead"],
+            default: undefined,
+        },
+        deliveryAttempts: { type: Number, default: 0 },
+        nextDeliveryAt: { type: Date, default: undefined },
+        deliveryLockedUntil: { type: Date, default: undefined },
     },
     { timestamps: true }
 );
@@ -92,6 +118,18 @@ notificationSchema.index(
         unique: true,
         partialFilterExpression: { type: "matching_listing_available" },
     }
+);
+notificationSchema.index(
+    { dedupeKey: 1 },
+    { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } }
+);
+notificationSchema.index(
+    { deliveryStatus: 1, nextDeliveryAt: 1 },
+    { partialFilterExpression: { deliveryStatus: { $in: ["pending", "processing", "dead"] } } }
+);
+notificationSchema.index(
+    { "delivery.email.status": 1, recipient: 1 },
+    { partialFilterExpression: { "delivery.email.status": "digest" } }
 );
 
 notificationSchema.pre("save", function markNew() {

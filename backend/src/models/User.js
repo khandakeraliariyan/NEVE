@@ -103,6 +103,36 @@ const userSchema = new mongoose.Schema(
             // Notification types the user doesn't want sent by email or push.
             // They still appear in the app.
             mutedTypes: { type: [String], default: [] },
+            // Optional SMS for viewing reminders and security alerts.
+            sms: { type: Boolean, default: false },
+            // "daily" holds non-urgent emails for one summary email a day.
+            digest: { type: String, enum: ["off", "daily"], default: "off" },
+        },
+
+        // Sign-in tracking for security alerts. Never returned by default.
+        security: {
+            type: {
+                // Firebase auth_time (or admin login time) of the latest sign-in seen.
+                lastAuthTime: { type: Date, default: null },
+                // Firebase moves this forward when the password changes.
+                tokensValidAfter: { type: Date, default: null },
+                // Admin portal password change last alerted on.
+                passwordChangedAt: { type: Date, default: null },
+                knownDevices: {
+                    type: [
+                        {
+                            _id: false,
+                            fingerprint: { type: String, required: true, maxlength: 64 },
+                            label: { type: String, maxlength: 120, default: "" },
+                            firstSeenAt: { type: Date, default: Date.now },
+                            lastSeenAt: { type: Date, default: Date.now },
+                        },
+                    ],
+                    default: [],
+                },
+            },
+            default: () => ({}),
+            select: false,
         },
 
         // Firebase Cloud Messaging device tokens. Never returned by default.

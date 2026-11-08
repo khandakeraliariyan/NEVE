@@ -1,6 +1,10 @@
+import mongoose from "mongoose";
+
+import Notification from "../models/Notification.js";
 import SystemJobRun from "../models/SystemJobRun.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
-import { runSystemJob } from "../services/systemJobs.service.js";
+import { retryNotificationDelivery } from "../services/notificationJobs.service.js";
+import { runSystemJob, SYSTEM_JOBS } from "../services/systemJobs.service.js";
 
 async function startJob(req, res, next, job, dryRun) {
     try {
@@ -44,8 +48,8 @@ export async function listSystemJobRuns(req, res, next) {
     try {
         const filter = {};
         if (req.query.job !== undefined) {
-            if (!["retention_purge", "backup"].includes(req.query.job)) {
-                return res.status(400).json({ success: false, message: "job must be retention_purge or backup." });
+            if (!SYSTEM_JOBS.includes(req.query.job)) {
+                return res.status(400).json({ success: false, message: `job must be one of: ${SYSTEM_JOBS.join(", ")}.` });
             }
             filter.job = req.query.job;
         }
@@ -56,6 +60,77 @@ export async function listSystemJobRuns(req, res, next) {
         const runs = await SystemJobRun.find(filter).sort({ startedAt: -1 }).limit(limit).lean();
         res.set("Cache-Control", "private, no-store");
         return res.json({ success: true, data: runs });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// POST /api/v1/admin/system/notification-digest
+export function runNotificationDigestNow(req, res, next) {
+    return startJob(req, res, next, "notification_digest", false);
+}
+
+const DELIVERY_STATUSES = ["dead", "pending", "processing"];
+
+// GET /api/v1/admin/system/notification-deliveries?status=dead&page=&limit=
+// Emails, pushes and texts that failed or are waiting for a retry.
+export async function listNotificationDeliveries(req, res, next) {
+    try {
+        const status = req.query.status ?? "dead";
+        if (!DELIVERY_STATUSES.includes(status)) {
+            return res.status(400).json({ success: false, message: `status must be one of: ${DELIVERY_STATUSES.join(", ")}.` });
+        }
+        const page = Number(req.query.page ?? 1);
+        const limit = Number(req.query.limit ?? 20);
+        if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+            return res.status(400).json({ success: false, message: "Page must be positive and limit between 1 and 100." });
+        }
+        const filter = { deliveryStatus: status };
+        const [data, total, counts] = await Promise.all([
+            Notification.find(filter)
+                .select("recipient type title deliveryStatus deliveryAttempts nextDeliveryAt delivery createdAt")
+                .populate("recipient", "displayName role")
+                .sort({ updatedAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .lean(),
+            Notification.countDocuments(filter),
+            Notification.aggregate([
+                { $match: { deliveryStatus: { $in: DELIVERY_STATUSES } } },
+                { $group: { _id: "$deliveryStatus", count: { $sum: 1 } } },
+            ]),
+        ]);
+        res.set("Cache-Control", "private, no-store");
+        return res.json({
+            success: true,
+            data,
+            counts: Object.fromEntries(DELIVERY_STATUSES.map((s) => [s, counts.find((c) => c._id === s)?.count ?? 0])),
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// POST /api/v1/admin/system/notification-deliveries/:notificationId/retry
+export async function retryNotificationDeliveryNow(req, res, next) {
+    try {
+        const { notificationId } = req.params;
+        if (!mongoose.isValidObjectId(notificationId)) {
+            return res.status(400).json({ success: false, message: "Invalid notification ID." });
+        }
+        const state = await retryNotificationDelivery(notificationId);
+        if (!state) {
+            return res.status(404).json({ success: false, message: "No failed or waiting delivery found for this notification." });
+        }
+        await recordAdminAction({
+            req,
+            action: "notification_delivery_retried",
+            targetType: "notification",
+            targetId: notificationId,
+            details: { result: state.deliveryStatus },
+        });
+        return res.json({ success: true, data: state });
     } catch (error) {
         next(error);
     }
