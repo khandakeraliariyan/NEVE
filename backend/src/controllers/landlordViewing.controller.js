@@ -182,7 +182,6 @@ export const respondToViewingRequest = async (req, res, next) => {
                 message: confirmed
                     ? "Your property viewing request has been confirmed."
                     : "Your property viewing request has been declined.",
-                link: "/viewings",
                 relatedProperty: propertyId,
                 relatedViewingRequest: updatedRequest._id,
             });

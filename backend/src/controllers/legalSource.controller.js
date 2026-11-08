@@ -7,7 +7,6 @@ import {
     searchSections,
     validateLegalSourceInput,
 } from "../services/legalSource.service.js";
-import { notifyLegalSourceSubmitted } from "../services/notificationEvents.service.js";
 
 const privateResponse = (res) => res.set("Cache-Control", "private, no-store");
 
@@ -262,12 +261,6 @@ export async function transitionLegalSource(req, res, next) {
                 return res.status(409).json({ success: false, message: "Another version of this source was approved at the same time." });
             }
             throw saveError;
-        }
-
-        if (action === "submit") {
-            await notifyLegalSourceSubmitted(source, req.neveUser._id).catch((error) =>
-                console.error("Legal source notification error:", error)
-            );
         }
 
         if (req.neveUser.role === "admin") {

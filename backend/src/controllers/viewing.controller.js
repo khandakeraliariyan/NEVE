@@ -4,7 +4,6 @@ import { createNotification } from "../services/notification.service.js";
 import { findPubliclyAvailableProperty } from "../services/propertyAvailability.service.js";
 import Property from "../models/Property.js";
 import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
-import { notifyViewingCancelled, notifyViewingDecision } from "../services/notificationEvents.service.js";
 
 export async function createViewingRequest(req, res, next) {
     try {
@@ -75,8 +74,7 @@ export async function createViewingRequest(req, res, next) {
                 recipient: property.landlord,
                 type: "viewing_request_received",
                 title: "New viewing request",
-                message: `${req.neveUser.displayName ?? "A renter"} has requested to view ${property.title} on ${date.toLocaleString("en-GB", { timeZone: "Asia/Dhaka", dateStyle: "medium", timeStyle: "short" })} (Bangladesh time).`,
-                link: "/listings/viewings",
+                message: `A renter has requested to view ${property.title}.`,
                 relatedProperty: property._id,
                 relatedViewingRequest: viewing._id,
             });
@@ -204,9 +202,6 @@ export async function updateViewingRequest(req, res, next) {
 
         await viewing.save();
 
-        const property = await Property.findById(viewing.property).select("title").lean();
-        await notifyViewingDecision({ viewing, property, status, note: viewing.landlordNote });
-
         return res.status(200).json({
             success: true,
             message: `Viewing request ${status}`,
@@ -249,9 +244,6 @@ export async function cancelMyViewingRequest(req, res, next) {
                 message: "Pending viewing request not found",
             });
         }
-
-        const property = await Property.findById(viewing.property).select("title").lean();
-        await notifyViewingCancelled({ viewing, property });
 
         return res.status(200).json({
             success: true,

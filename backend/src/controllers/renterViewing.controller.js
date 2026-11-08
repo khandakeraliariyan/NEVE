@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import ViewingRequest from "../models/ViewingRequest.js";
-import { notifyViewingCancelled } from "../services/notificationEvents.service.js";
 
 // GET /api/v1/viewings/my-requests
 export const getMyViewingRequests = async (req, res, next) => {
@@ -89,7 +88,6 @@ export const cancelMyViewingRequest = async (req, res, next) => {
         ).populate("property", "title address");
 
         if (updatedRequest) {
-            await notifyViewingCancelled({ viewing: updatedRequest, property: updatedRequest.property });
             return res.status(200).json({
                 success: true,
                 message: "Viewing request cancelled successfully.",

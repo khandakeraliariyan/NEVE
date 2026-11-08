@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import Property from "../models/Property.js";
 import PropertyReport from "../models/PropertyReport.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
-import { notifyListingFlagged } from "../services/notificationEvents.service.js";
 
 const VALID_REASONS = [
     "duplicate_listing",
@@ -66,13 +65,6 @@ export const createPropertyReport = async (req, res, next) => {
             reason,
             details: details.trim(),
         });
-
-        // Admins review it; the landlord gets a neutral notice, never the reporter's identity.
-        await notifyListingFlagged(property, {
-            source: "report",
-            actorId: req.neveUser._id,
-            dedupeKey: `listing_reported:${report._id}`,
-        }).catch((error) => console.error("Listing report notification error:", error));
 
         return res.status(201).json({
             success: true,

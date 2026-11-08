@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import Inquiry from "../models/Inquiry.js";
 import InquiryMessage from "../models/InquiryMessage.js";
 import Notification from "../models/Notification.js";
-import { markLandlordReplied, messagePreview } from "../services/notificationEvents.service.js";
 
 const getParticipantInquiry = async (inquiryId, user) => {
     if (!mongoose.isValidObjectId(inquiryId)) {
@@ -159,18 +158,13 @@ export async function sendInquiryMessage(req, res, next) {
             body: body.trim(),
         });
 
-        const fromRenter = String(sender) === String(inquiry.renter);
-        if (!fromRenter) await markLandlordReplied(inquiry._id);
-
         let notificationStatus = "created";
         try {
             await Notification.create({
                 recipient,
                 type: "inquiry_message_received",
-                title: fromRenter ? "New message from a renter" : "The landlord replied",
-                message: `${req.neveUser.displayName ?? (fromRenter ? "The renter" : "The landlord")} sent you a message about a property inquiry.`,
-                details: [`Message: “${messagePreview(body)}”`, "Reply on Neve so both of your contact details stay private."],
-                link: "/inquiries",
+                title: "New inquiry message",
+                message: "You received a new message about a property inquiry.",
                 relatedProperty: inquiry.property,
                 relatedInquiry: inquiry._id,
             });
