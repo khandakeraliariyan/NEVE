@@ -27,6 +27,95 @@ function SummaryCell({ summary }) {
     );
 }
 
+const CHANNELS = ["email", "push", "sms"];
+
+function DeliveryQueue() {
+    const [status, setStatus] = useState("dead");
+    const [busyId, setBusyId] = useState(null);
+    const [error, setError] = useState(null);
+    const list = useApi(() => api.get("/admin/system/notification-deliveries", { status, limit: 50 }), [status]);
+    const items = list.data?.data ?? [];
+    const counts = list.data?.counts ?? {};
+
+    async function retry(n) {
+        setBusyId(n._id);
+        setError(null);
+        try {
+            await api.post(`/admin/system/notification-deliveries/${n._id}/retry`);
+            list.reload();
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusyId(null);
+        }
+    }
+
+    return (
+        <section className="mt-10">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 className="text-xl">Notification delivery</h2>
+                    <p className="text-xs text-muted">Emails, push and texts are retried 5 times with backoff, then listed here as failed.</p>
+                </div>
+                <select className="field w-auto" value={status} onChange={(e) => setStatus(e.target.value)}>
+                    <option value="dead">Failed ({counts.dead ?? 0})</option>
+                    <option value="pending">Waiting to retry ({counts.pending ?? 0})</option>
+                    <option value="processing">Sending now ({counts.processing ?? 0})</option>
+                </select>
+            </div>
+            <ErrorBox error={error} />
+            {list.loading && <Loading />}
+            <ErrorBox error={list.error} onRetry={list.reload} />
+            {!list.loading && !list.error && items.length === 0 && <Empty title="Nothing here">No deliveries in this state.</Empty>}
+            {items.length > 0 && (
+                <Card className="overflow-x-auto p-0">
+                    <table className="w-full min-w-[720px] text-sm">
+                        <thead className="bg-mist text-left">
+                            <tr>
+                                {["Created", "Recipient", "Notification", "Channels", "Attempts", ""].map((h) => (
+                                    <th key={h} className="px-4 py-3 text-xs uppercase tracking-wide text-muted">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-line align-top">
+                            {items.map((n) => (
+                                <tr key={n._id}>
+                                    <td className="px-4 py-3 text-xs">{dateTime(n.createdAt)}</td>
+                                    <td className="px-4 py-3">
+                                        {n.recipient?.displayName ?? "Deleted user"}
+                                        <span className="block text-xs text-muted">{label(n.recipient?.role)}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {n.title}
+                                        <span className="block text-xs text-muted">{label(n.type)}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs">
+                                        {CHANNELS.filter((c) => n.delivery?.[c] && n.delivery[c].status !== "skipped").map((c) => (
+                                            <p key={c}>
+                                                {label(c)}: <StatusBadge status={n.delivery[c].status} />
+                                                {n.delivery[c].error && <span className="block text-rose-ink">{n.delivery[c].error}</span>}
+                                            </p>
+                                        ))}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs">
+                                        {n.deliveryAttempts}
+                                        {n.nextDeliveryAt && <span className="block text-muted">next {dateTime(n.nextDeliveryAt)}</span>}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        {n.deliveryStatus !== "processing" && (
+                                            <Button variant="outline" disabled={busyId === n._id} onClick={() => retry(n)}>Retry now</Button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </Card>
+            )}
+        </section>
+    );
+}
+
 export default function SystemJobs() {
     const [job, setJob] = useState("");
     const [busy, setBusy] = useState(null);
@@ -55,13 +144,13 @@ export default function SystemJobs() {
         <div>
             <PageHeader
                 eyebrow="System governance"
-                title="Data retention & backups"
-                description="These jobs also run on a schedule when the server enables them. Run them here when you need to act now."
+                title="System jobs & delivery"
+                description="Retention, backups, the daily digest and notification delivery. Jobs also run on a schedule; run them here when you need to act now."
             />
             <ErrorBox error={error} />
             {message && <p className="mb-4 rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{message}</p>}
 
-            <div className="mb-8 grid gap-4 md:grid-cols-2">
+            <div className="mb-8 grid gap-4 md:grid-cols-3">
                 <Card>
                     <h2 className="text-xl">Retention purge</h2>
                     <p className="mt-1 text-sm text-muted">Deletes records and files that are past their retention period and not under a legal hold. Start with a dry run to see what would be removed.</p>
@@ -75,6 +164,15 @@ export default function SystemJobs() {
                             onClick={() => start("purge", "/admin/system/retention-purge", { dryRun: false }, "Run the retention purge now? Deleted data can only come back from a backup.")}
                         >
                             {busy === "purge" ? "Purging…" : "Purge now"}
+                        </Button>
+                    </div>
+                </Card>
+                <Card>
+                    <h2 className="text-xl">Daily digest</h2>
+                    <p className="mt-1 text-sm text-muted">Sends one summary email to everyone who chose the daily digest. It also runs automatically once a day.</p>
+                    <div className="mt-4">
+                        <Button variant="secondary" disabled={!!busy} onClick={() => start("digest", "/admin/system/notification-digest", {}, "Send the daily digest now?")}>
+                            {busy === "digest" ? "Sending…" : "Send digest now"}
                         </Button>
                     </div>
                 </Card>
@@ -95,6 +193,7 @@ export default function SystemJobs() {
                     <option value="">All jobs</option>
                     <option value="retention_purge">Retention purge</option>
                     <option value="backup">Backup</option>
+                    <option value="notification_digest">Daily digest</option>
                 </select>
             </div>
             {runs.loading && <Loading />}
@@ -129,6 +228,8 @@ export default function SystemJobs() {
                     </table>
                 </Card>
             )}
+            <DeliveryQueue />
+
             <Disclaimer className="mt-6" title="Audit">
                 Manual runs are recorded in the audit trail with your account. Only one run of each job can happen at a time.
             </Disclaimer>
