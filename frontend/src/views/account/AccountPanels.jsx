@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
-import { api, uploadFile } from "../../lib/api";
+import { api } from "../../lib/api";
 import { auth } from "../../lib/firebase";
 import { dateTime, label, relativeTime } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
@@ -178,82 +178,6 @@ export function ProfileDetailsCard({ profile, setProfile }) {
 
 // --- Public profile, privacy and photo ----------------------------------------
 
-const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-// Upload your own profile photo or remove it.
-function PhotoControls({ profile, setProfile }) {
-    const [busy, setBusy] = useState(null);
-    const [error, setError] = useState(null);
-    const [version, setVersion] = useState(0);
-    const source = profile.photoSource;
-
-    async function upload(file) {
-        if (!file) return;
-        if (!PHOTO_TYPES.includes(file.type)) return setError("Choose a JPG, PNG or WebP image.");
-        setBusy("upload");
-        setError(null);
-        try {
-            const fileId = await uploadFile(file, { purpose: "profile_photo" });
-            const payload = await api.put("/users/me/photo", { fileId });
-            setProfile(payload.user);
-            setVersion((v) => v + 1);
-        } catch (err) {
-            setError(err);
-        } finally {
-            setBusy(null);
-        }
-    }
-
-    async function remove() {
-        if (!window.confirm("Remove your profile photo?")) return;
-        setBusy("remove");
-        setError(null);
-        try {
-            const payload = await api.del("/users/me/photo");
-            setProfile(payload.user);
-        } catch (err) {
-            setError(err);
-        } finally {
-            setBusy(null);
-        }
-    }
-
-    const src = profile.photoURL ? (source === "upload" ? `${profile.photoURL}?v=${version}` : profile.photoURL) : null;
-
-    return (
-        <div className="flex flex-wrap items-center gap-4 border-t border-line py-3 text-sm">
-            {src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={src} alt="Your profile photo" className="h-16 w-16 rounded-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-mist text-xl font-semibold text-muted">
-                    {(profile.displayName ?? "?").slice(0, 1).toUpperCase()}
-                </span>
-            )}
-            <div className="flex-1 space-y-2">
-                <p>
-                    <span className="font-medium text-ink">Profile photo</span>
-                    <span className="block text-xs text-muted">
-                        {source === "google" ? "From your Google account." : source === "upload" ? "Uploaded by you." : "No photo yet."} JPG, PNG or WebP.
-                    </span>
-                </p>
-                <div className="flex flex-wrap gap-2">
-                    <label className={`inline-flex cursor-pointer items-center rounded-full border border-forest/15 bg-white/60 px-4 py-1.5 text-xs font-medium text-forest transition hover:border-forest/40 hover:bg-white ${busy ? "pointer-events-none opacity-50" : ""}`}>
-                        {busy === "upload" ? "Uploading…" : src ? "Upload a new photo" : "Upload a photo"}
-                        <input type="file" accept={PHOTO_TYPES.join(",")} className="sr-only" onChange={(e) => upload(e.target.files?.[0])} />
-                    </label>
-                    {src && (
-                        <Button variant="ghost" className="px-4 py-1.5 text-xs" disabled={Boolean(busy)} onClick={remove}>
-                            {busy === "remove" ? "Removing…" : "Remove photo"}
-                        </Button>
-                    )}
-                </div>
-                <ErrorBox error={error} />
-            </div>
-        </div>
-    );
-}
-
 export function PrivacyCard({ profile, setProfile }) {
     const privacy = profile.privacy ?? {};
     const { busy, error, save } = useSave(setProfile);
@@ -286,7 +210,6 @@ export function PrivacyCard({ profile, setProfile }) {
                     />
                 </label>
             ))}
-            <PhotoControls profile={profile} setProfile={setProfile} />
             <label className="flex items-center justify-between gap-4 border-t border-line py-3 text-sm">
                 <span>
                     <span className="font-medium text-ink">Sync photo with Google</span>
