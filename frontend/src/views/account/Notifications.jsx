@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "../../lib/api";
+import { disablePush, enablePush, pushStatus } from "../../lib/push";
 import { dateTime, idOf, label, relativeTime } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { useAuth } from "../../context/AuthContext";
@@ -58,6 +59,70 @@ const CHANNELS = [
     ["email", "Email", "Sent to the address on your account."],
     ["push", "Push", "Sent to browsers and devices you've allowed."],
 ];
+
+const PUSH_TEXT = {
+    unsupported: "This browser can't receive push notifications.",
+    not_configured: "Push notifications aren't set up on this Neve site yet.",
+    blocked: "Notifications are blocked for this site. Allow them in your browser's site settings, then come back.",
+    on: "This browser will show Neve notifications, even when the tab is closed.",
+    off: "Turn on to get Neve notifications on this browser.",
+};
+
+// Registers or removes this browser for push notifications.
+function BrowserPush({ pushEnabled }) {
+    const [status, setStatus] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        let active = true;
+        pushStatus().then((value) => active && setStatus(value));
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    async function change(on) {
+        setBusy(true);
+        setError(null);
+        try {
+            if (on) await enablePush();
+            else await disablePush();
+            setStatus(await pushStatus());
+        } catch (err) {
+            setError(err);
+            setStatus(await pushStatus());
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    if (!status) return null;
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line py-3 text-sm">
+            <span>
+                <span className="font-medium text-ink">This browser</span>
+                <span className="block text-xs text-muted">
+                    {PUSH_TEXT[status]}
+                    {status === "on" && !pushEnabled && " Push is turned off above, so nothing will be sent until you turn it on."}
+                </span>
+            </span>
+            {status === "on" && (
+                <Button variant="outline" className="px-4 py-1.5 text-xs" disabled={busy} onClick={() => change(false)}>
+                    {busy ? "Turning off…" : "Turn off here"}
+                </Button>
+            )}
+            {status === "off" && (
+                <Button variant="secondary" className="px-4 py-1.5 text-xs" disabled={busy} onClick={() => change(true)}>
+                    {busy ? "Turning on…" : "Turn on here"}
+                </Button>
+            )}
+            <div className="w-full">
+                <ErrorBox error={error} />
+            </div>
+        </div>
+    );
+}
 
 function Preferences() {
     const prefs = useApi(() => api.get("/notifications/preferences"), []);
@@ -116,6 +181,7 @@ function Preferences() {
                         />
                     </label>
                 ))}
+                <BrowserPush pushEnabled={Boolean(data.push)} />
             </Card>
 
             <Card>
