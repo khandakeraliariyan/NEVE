@@ -15,7 +15,6 @@ const QUEUES = {
     warnings: { label: "Listing warnings", path: "/admin/dashboard/warnings", statuses: ["open", "reviewed", "resolved", "dismissed"] },
     claims: { label: "Property claims", path: "/admin/dashboard/claims", statuses: ["unreviewed", "supported", "contradicted", "inconclusive"] },
     messages: { label: "Message reports", path: "/admin/dashboard/communication-reports", statuses: ["pending", "in_review", "resolved", "dismissed"] },
-    reviews: { label: "Review reports", path: "/review-moderation/reports", statuses: ["pending", "reviewed", "dismissed"] },
 };
 
 function PropertyLine({ property }) {
@@ -346,134 +345,8 @@ function MessageReportItem({ r, onDone }) {
     );
 }
 
-// A renter's review that someone reported. Hiding it removes it from the
-// listing page; the report is then marked reviewed or dismissed.
-function ReviewReportItem({ r, onDone }) {
-    const [reason, setReason] = useState("");
-    const [busy, setBusy] = useState(null);
-    const [error, setError] = useState(null);
-    const review = r.review;
-    const hidden = review?.moderationStatus === "hidden";
-
-    async function act(key, fn) {
-        setBusy(key);
-        setError(null);
-        try {
-            const text = await fn();
-            onDone(text);
-        } catch (err) {
-            setError(err);
-        } finally {
-            setBusy(null);
-        }
-    }
-
-    return (
-        <Card className="space-y-2">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                    <p className="font-semibold">{label(r.reason)}</p>
-                    <p className="text-xs text-muted">
-                        Reported by {r.reporter?.displayName ?? "a user"} · {dateTime(r.createdAt)}
-                    </p>
-                </div>
-                <div className="flex gap-1">
-                    <StatusBadge status={r.status} />
-                    {hidden && <Badge tone="rose">Review hidden</Badge>}
-                </div>
-            </div>
-            {review ? (
-                <blockquote className="rounded-lg border-l-4 border-taupe bg-mist px-3 py-2 text-sm">
-                    <span className="font-semibold">{"★".repeat(review.rating ?? 0)}</span> {review.comment || <span className="text-muted">No comment</span>}
-                    <span className="mt-1 block text-xs text-muted">Written {dateTime(review.createdAt)}</span>
-                </blockquote>
-            ) : (
-                <p className="text-sm text-muted">The review was deleted.</p>
-            )}
-            {r.details && <p className="text-sm text-muted">Reporter: “{r.details}”</p>}
-            {review?.moderationReason && <p className="text-xs text-muted">Hidden because: {review.moderationReason}</p>}
-            {review && (
-                <div className="space-y-2">
-                    {!hidden && (
-                        <input
-                            className="field"
-                            maxLength={500}
-                            placeholder="Reason for hiding (required, kept in the record)"
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                        />
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                        {hidden ? (
-                            <Button
-                                variant="outline"
-                                className="px-3 py-1 text-xs"
-                                disabled={Boolean(busy)}
-                                onClick={() =>
-                                    act("restore", async () => {
-                                        await api.patch(`/review-moderation/${review._id}/moderation`, { action: "restore" });
-                                        return "Review restored to the listing.";
-                                    })
-                                }
-                            >
-                                Restore review
-                            </Button>
-                        ) : (
-                            <Button
-                                variant="danger"
-                                className="px-3 py-1 text-xs"
-                                disabled={Boolean(busy) || !reason.trim()}
-                                onClick={() =>
-                                    act("hide", async () => {
-                                        await api.patch(`/review-moderation/${review._id}/moderation`, { action: "hide", reason: reason.trim() });
-                                        if (r.status === "pending") await api.patch(`/review-moderation/reports/${r._id}`, { status: "reviewed" });
-                                        return "Review hidden from the listing and the report marked reviewed.";
-                                    })
-                                }
-                            >
-                                Hide review
-                            </Button>
-                        )}
-                        {r.status === "pending" && (
-                            <>
-                                <Button
-                                    variant="secondary"
-                                    className="px-3 py-1 text-xs"
-                                    disabled={Boolean(busy)}
-                                    onClick={() =>
-                                        act("reviewed", async () => {
-                                            await api.patch(`/review-moderation/reports/${r._id}`, { status: "reviewed" });
-                                            return "Report marked reviewed.";
-                                        })
-                                    }
-                                >
-                                    Mark reviewed
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    className="px-3 py-1 text-xs"
-                                    disabled={Boolean(busy)}
-                                    onClick={() =>
-                                        act("dismissed", async () => {
-                                            await api.patch(`/review-moderation/reports/${r._id}`, { status: "dismissed" });
-                                            return "Report dismissed. The review stays visible.";
-                                        })
-                                    }
-                                >
-                                    Dismiss report
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
-            <ErrorBox error={error} />
-        </Card>
-    );
-}
-
-const ITEMS = { reports: ReportItem, warnings: WarningItem, claims: ClaimItem, messages: MessageReportItem, reviews: ReviewReportItem };
-const PROP = { reports: "r", warnings: "w", claims: "c", messages: "r", reviews: "r" };
+const ITEMS = { reports: ReportItem, warnings: WarningItem, claims: ClaimItem, messages: MessageReportItem };
+const PROP = { reports: "r", warnings: "w", claims: "c", messages: "r" };
 
 export default function Moderation() {
     const [tab, setTab] = useState("reports");
@@ -484,7 +357,7 @@ export default function Moderation() {
     // "appeal:pending" is the warnings queue filtered to appeals awaiting a decision.
     const params = status === "appeal:pending" ? { appeal: "pending" } : { status };
     const list = useApi(() => api.get(queue.path, { ...params, page, limit: PAGE_SIZE }), [tab, status, page]);
-    const items = list.data?.data ?? list.data?.reports ?? [];
+    const items = list.data?.data ?? [];
     const Item = ITEMS[tab];
 
     function done(text) {
