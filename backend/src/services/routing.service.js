@@ -42,7 +42,6 @@ const formatPoint = ({ latitude, longitude }) =>
 function providerError(message, cause) {
     const error = new Error(message);
     error.status = 502;
-    error.publicMessage = "Travel times from OpenStreetMap routing are unavailable right now. Please try again later.";
     if (cause) error.cause = cause;
     return error;
 }
