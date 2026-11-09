@@ -5,6 +5,10 @@ const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_PLACES = 500;
 const EARTH_RADIUS_METERS = 6371000;
 
+// Shown to users when OpenStreetMap places can't be reached.
+const MAP_DATA_UNAVAILABLE =
+    "Nearby-place data from OpenStreetMap is unavailable right now. Please try again in a few minutes.";
+
 export const NEIGHBORHOOD_CATEGORIES = [
     "healthcare",
     "education",
@@ -307,6 +311,7 @@ async function fetchNearbyElements({ latitude, longitude, radius }) {
             "Nearby places provider is unavailable."
         );
         providerError.status = 502;
+        providerError.publicMessage = MAP_DATA_UNAVAILABLE;
         providerError.cause = error;
         throw providerError;
     }
@@ -316,6 +321,7 @@ async function fetchNearbyElements({ latitude, longitude, radius }) {
             `Nearby places provider returned HTTP ${response.status}.`
         );
         providerError.status = 502;
+        providerError.publicMessage = MAP_DATA_UNAVAILABLE;
         throw providerError;
     }
 
@@ -332,6 +338,7 @@ async function fetchNearbyElements({ latitude, longitude, radius }) {
             "Nearby places provider returned invalid data."
         );
         providerError.status = 502;
+        providerError.publicMessage = MAP_DATA_UNAVAILABLE;
         providerError.cause = error;
         throw providerError;
     }
