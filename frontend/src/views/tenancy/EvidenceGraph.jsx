@@ -8,6 +8,7 @@ import { date, dateTime, label, money } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { useAgreement } from "./useAgreement";
 import { ConfirmLink, EvidenceSuggestions } from "./EvidenceSuggestions";
+import RecordLinks from "./RecordLinks";
 import { useAuth } from "../../context/AuthContext";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, PageHeader } from "../../components/ui";
 import NotFound from "../NotFound";
@@ -20,6 +21,7 @@ const TYPES = {
     file: { title: "Files", color: "#8c847d" },
     inquiry_message: { title: "Messages", color: "#8a6a8c" },
     event: { title: "Events", color: "#c9bdb1" },
+    legal_section: { title: "Legal sections", color: "#5f7a63" },
 };
 const RELATIONSHIPS = ["supports", "contradicts", "relates_to", "cites", "context_only", "unassessed"];
 const TARGET_TYPES = { agreement: "agreement", clause: "clause", obligation: "obligation", payment: "payment_record", message: "inquiry_message" };
@@ -40,6 +42,8 @@ function nodeLabel(node) {
             return node.name ?? "File";
         case "inquiry_message":
             return node.body?.slice(0, 40) ?? "Message";
+        case "legal_section":
+            return `${node.title ?? "Legal source"} s. ${node.sectionNumber}`;
         default:
             return label(node.action);
     }
@@ -383,6 +387,18 @@ export default function EvidenceGraph() {
                                 <p className="text-3xl font-semibold">{analysis?.uncertainInterpretations?.length ?? 0}</p>
                             </Card>
                         </div>
+                    )}
+
+                    {graph.data && (
+                        <RecordLinks
+                            agreementId={agreementId}
+                            nodes={nodes}
+                            edges={edges}
+                            describe={nodeLabel}
+                            me={profile?._id}
+                            isParticipant={isParticipant}
+                            onChanged={graph.reload}
+                        />
                     )}
 
                     {graph.data && isParticipant && (
