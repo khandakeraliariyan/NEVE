@@ -59,6 +59,42 @@ const viewingRequestSchema = new mongoose.Schema(
             maxlength: 1000,
             default: null,
         },
+
+        cancelledBy: {
+            type: String,
+            enum: ["renter", "landlord", null],
+            default: null,
+        },
+
+        cancellationReason: {
+            type: String,
+            trim: true,
+            maxlength: 1000,
+            default: null,
+        },
+
+        rescheduledAt: {
+            type: Date,
+            default: null,
+        },
+
+        rescheduledBy: {
+            type: String,
+            enum: ["renter", "landlord", null],
+            default: null,
+        },
+
+        previousRequestedDate: {
+            type: Date,
+            default: null,
+        },
+
+        // The viewing time the 24-hour reminder was sent for; a reschedule
+        // makes it differ, so a new reminder goes out.
+        reminderSentFor: {
+            type: Date,
+            default: null,
+        },
     },
     {
         timestamps: true,

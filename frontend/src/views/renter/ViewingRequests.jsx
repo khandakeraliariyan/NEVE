@@ -6,7 +6,8 @@ import { api } from "../../lib/api";
 import { dateTime, money, relativeTime } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { PropertyImage } from "../../components/PropertyCard";
-import { Button, ButtonLink, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, StatusBadge } from "../../components/ui";
+import ViewingActions, { ViewingChangeNote } from "../../components/ViewingActions";
+import { ButtonLink, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, StatusBadge } from "../../components/ui";
 
 const FILTERS = [
     ["all", "All viewings", () => true],
@@ -31,7 +32,7 @@ const CHECKLIST = [
     ["Costs", "Confirm rent, service charge, utilities and deposit match the listing."],
 ];
 
-function ViewingCard({ viewing, onCancel, busy }) {
+function ViewingCard({ viewing, onChanged }) {
     const property = viewing.property ?? {};
     return (
         <Card className="space-y-3">
@@ -59,12 +60,9 @@ function ViewingCard({ viewing, onCancel, busy }) {
                     {viewing.landlordNote}
                 </p>
             )}
+            <ViewingChangeNote viewing={viewing} />
+            <ViewingActions viewing={viewing} side="renter" onChanged={onChanged} />
             <div className="flex flex-wrap gap-2">
-                {viewing.status === "requested" && (
-                    <Button variant="danger" disabled={busy} onClick={() => onCancel(viewing)}>
-                        Cancel request
-                    </Button>
-                )}
                 {["confirmed", "completed"].includes(viewing.status) && property._id && (
                     <ButtonLink to={`/properties/${property._id}`} variant="secondary">
                         Leave a review
@@ -83,25 +81,15 @@ function ViewingCard({ viewing, onCancel, busy }) {
 export default function ViewingRequests() {
     const [filter, setFilter] = useState("all");
     const [checked, setChecked] = useState([]);
-    const [busy, setBusy] = useState(false);
-    const [actionError, setActionError] = useState(null);
+    const [notice, setNotice] = useState(null);
     const viewings = useApi(() => api.get("/viewings/my-requests", { page: 1, limit: 50 }), []);
     const all = viewings.data?.data ?? [];
     const matcher = FILTERS.find(([key]) => key === filter)[2];
     const visible = all.filter(matcher).sort((a, b) => new Date(a.requestedDate) - new Date(b.requestedDate));
 
-    async function cancel(viewing) {
-        if (!window.confirm("Cancel this viewing request?")) return;
-        setBusy(true);
-        setActionError(null);
-        try {
-            await api.patch(`/viewings/${viewing._id}/cancel`);
-            await viewings.reload();
-        } catch (err) {
-            setActionError(err);
-        } finally {
-            setBusy(false);
-        }
+    function changed(message) {
+        setNotice(message);
+        viewings.reload();
     }
 
     return (
@@ -128,7 +116,7 @@ export default function ViewingRequests() {
 
             <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
                 <div className="space-y-8">
-                    <ErrorBox error={actionError} />
+                    {notice && <p className="rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{notice}</p>}
                     {viewings.loading && <Loading text="Loading viewings…" />}
                     <ErrorBox error={viewings.error} onRetry={viewings.reload} />
                     {!viewings.loading && !viewings.error && visible.length === 0 && (
@@ -146,7 +134,7 @@ export default function ViewingRequests() {
                                 </p>
                                 <div className="space-y-4">
                                     {items.map((v) => (
-                                        <ViewingCard key={v._id} viewing={v} onCancel={cancel} busy={busy} />
+                                        <ViewingCard key={v._id} viewing={v} onChanged={changed} />
                                     ))}
                                 </div>
                             </section>

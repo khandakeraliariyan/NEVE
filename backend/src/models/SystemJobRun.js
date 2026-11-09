@@ -1,10 +1,16 @@
 import mongoose from "mongoose";
 
-// One run of a background job (retention purge or backup), scheduled or
+// One run of a background job (retention purge, backup, notification
+// reminders or the daily digest), scheduled or
 // started by an admin.
 const systemJobRunSchema = new mongoose.Schema(
     {
-        job: { type: String, enum: ["retention_purge", "backup"], required: true, index: true },
+        job: {
+            type: String,
+            enum: ["retention_purge", "backup", "notification_reminders", "notification_digest", "photo_hash_backfill"],
+            required: true,
+            index: true,
+        },
         trigger: { type: String, enum: ["scheduled", "manual"], required: true },
         triggeredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
         dryRun: { type: Boolean, default: false },

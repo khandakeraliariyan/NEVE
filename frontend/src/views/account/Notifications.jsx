@@ -12,6 +12,7 @@ const PAGE_SIZE = 20;
 
 // Where a notification should take its reader, based on what it is about.
 function linkFor(n, role) {
+    if (n.link) return n.link;
     if (n.relatedCase) return `/cases/${idOf(n.relatedCase)}`;
     if (n.relatedViewingRequest) return role === "landlord" ? "/listings/viewings" : "/viewings";
     if (n.relatedInquiry) return "/inquiries";
@@ -53,6 +54,11 @@ function NotificationItem({ n, role, onRead }) {
     );
 }
 
+const CHANNELS = [
+    ["email", "Email", "Sent to the address on your account."],
+    ["push", "Push", "Sent to browsers and devices you've allowed."],
+];
+
 function Preferences() {
     const prefs = useApi(() => api.get("/notifications/preferences"), []);
     const [busy, setBusy] = useState(false);
@@ -76,12 +82,14 @@ function Preferences() {
     if (prefs.error) return <ErrorBox error={prefs.error} onRetry={prefs.reload} />;
     if (!data) return null;
 
-    const muted = new Set(data.mutedTypes);
-    const toggleType = (type) => {
-        const next = new Set(muted);
+    const muted = new Set(data.mutedTypes ?? []);
+    const emailMuted = new Set(data.emailMutedTypes ?? []);
+    const digestTypes = new Set(data.digestTypes ?? []);
+    const toggle = (field, set, type) => {
+        const next = new Set(set);
         if (next.has(type)) next.delete(type);
         else next.add(type);
-        save({ mutedTypes: [...next] });
+        save({ [field]: [...next] });
     };
 
     return (
@@ -90,35 +98,99 @@ function Preferences() {
             <Card>
                 <h2 className="mb-1 text-xl">Delivery channels</h2>
                 <p className="mb-4 text-sm text-muted">In-app notifications are always on. Choose where else Neve may reach you.</p>
-                {[
-                    ["email", "Email", "Sent to the address on your account."],
-                    ["push", "Push", "Sent to browsers and devices you've allowed."],
-                ].map(([key, title, hint]) => (
+                {CHANNELS.map(([key, title, hint]) => (
                     <label key={key} className="flex items-center justify-between gap-4 border-t border-line py-3 text-sm">
                         <span>
                             <span className="font-medium text-ink">{title}</span>
                             <span className="block text-xs text-muted">
                                 {hint}
-                                {!data.available[key] && " Not set up on this Neve server yet, so nothing will be sent."}
+                                {!data.available?.[key] && " Not set up on this Neve server yet, so nothing will be sent."}
                             </span>
                         </span>
-                        <input type="checkbox" className="h-5 w-5 accent-forest" checked={data[key]} disabled={busy} onChange={(e) => save({ [key]: e.target.checked })} />
+                        <input
+                            type="checkbox"
+                            className="h-5 w-5 accent-forest"
+                            checked={Boolean(data[key])}
+                            disabled={busy}
+                            onChange={(e) => save({ [key]: e.target.checked })}
+                        />
                     </label>
                 ))}
             </Card>
+
             <Card>
-                <h2 className="mb-1 text-xl">Event types</h2>
-                <p className="mb-4 text-sm text-muted">Unticked types still appear here, but aren't sent by email or push.</p>
-                <ul className="grid gap-x-6 sm:grid-cols-2">
-                    {data.notificationTypes.map((type) => (
-                        <li key={type}>
-                            <label className="flex items-center justify-between gap-4 border-t border-line py-2.5 text-sm">
-                                <span>{label(type)}</span>
-                                <input type="checkbox" className="h-4 w-4 accent-forest" checked={!muted.has(type)} disabled={busy} onChange={() => toggleType(type)} />
-                            </label>
-                        </li>
+                <h2 className="mb-1 text-xl">Daily digest</h2>
+                <p className="mb-4 text-sm text-muted">
+                    Get one email a day for non-urgent updates (saved-listing changes, tenancy activity and reminders) instead of one email each. Inquiries,
+                    viewings and security alerts are always emailed straight away.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    {[
+                        ["off", "Email each update"],
+                        ["daily", "One daily summary"],
+                    ].map(([value, title]) => (
+                        <button
+                            key={value}
+                            type="button"
+                            disabled={busy}
+                            onClick={() => save({ digest: value })}
+                            className={`rounded-full px-4 py-1.5 text-sm ${data.digest === value ? "bg-forest text-white" : "bg-sage text-forest"}`}
+                        >
+                            {title}
+                        </button>
                     ))}
-                </ul>
+                </div>
+            </Card>
+
+            <Card className="overflow-x-auto">
+                <h2 className="mb-1 text-xl">Event types</h2>
+                <p className="mb-4 text-sm text-muted">
+                    Untick "Email" to stop emails for one kind of update; untick "Any" to stop email and push for it. Everything still appears in this inbox.
+                </p>
+                <table className="w-full min-w-[420px] text-sm">
+                    <thead>
+                        <tr className="text-left text-xs uppercase tracking-wide text-muted">
+                            <th className="py-2 font-medium">Update</th>
+                            <th className="w-20 py-2 text-center font-medium">Email</th>
+                            <th className="w-20 py-2 text-center font-medium">Any</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.notificationTypes.map((type) => (
+                            <tr key={type} className="border-t border-line">
+                                <td className="py-2.5">
+                                    {label(type)}
+                                    {data.digest === "daily" && digestTypes.has(type) && <span className="ml-2 text-xs text-muted">(in digest)</span>}
+                                </td>
+                                <td className="py-2.5 text-center">
+                                    <input
+                                        type="checkbox"
+                                        aria-label={`Email for ${label(type)}`}
+                                        className="h-4 w-4 accent-forest"
+                                        checked={!muted.has(type) && !emailMuted.has(type)}
+                                        disabled={busy || muted.has(type)}
+                                        onChange={() => toggle("emailMutedTypes", emailMuted, type)}
+                                    />
+                                </td>
+                                <td className="py-2.5 text-center">
+                                    <input
+                                        type="checkbox"
+                                        aria-label={`Any delivery for ${label(type)}`}
+                                        className="h-4 w-4 accent-forest"
+                                        checked={!muted.has(type)}
+                                        disabled={busy}
+                                        onChange={() => toggle("mutedTypes", muted, type)}
+                                    />
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {data.securityTypes?.length > 0 && (
+                    <p className="mt-4 text-xs text-muted">
+                        Always on: emails when your account is signed in from a new device or your password changes. Security alerts can't be turned off.
+                    </p>
+                )}
             </Card>
         </div>
     );
@@ -205,7 +277,7 @@ export default function Notifications() {
                     )}
                     <Pagination page={page} totalPages={list.data?.pagination?.totalPages} onChange={setPage} />
                     <Disclaimer className="mt-6" title="About email and push">
-                        Email and push copies are best-effort. A delivery failure never stops the notification from appearing here.
+                        Neve retries email and push for a while if they fail. A delivery failure never stops the notification from appearing here.
                     </Disclaimer>
                 </>
             )}

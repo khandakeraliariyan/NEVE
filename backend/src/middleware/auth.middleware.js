@@ -27,6 +27,8 @@ async function authenticateAdminToken(token) {
         emailVerified: true,
         name: user.displayName,
         signInProvider: ADMIN_SIGN_IN_PROVIDER,
+        // Each admin sign-in issues a new token.
+        authTime: claims.iat,
     };
 }
 
@@ -66,6 +68,10 @@ export async function authenticateUser(req, res, next) {
             name: decodedToken.name ?? null,
             // "password" or "google.com"
             signInProvider: decodedToken.firebase?.sign_in_provider ?? null,
+            // When the user signed in (unchanged when the token refreshes).
+            authTime: decodedToken.auth_time ?? null,
+            // Google account photo, for Google sign-ins.
+            picture: decodedToken.picture ?? null,
         };
 
         next();

@@ -131,7 +131,7 @@ async function queueUpsertedDeliveries(result) {
     try {
         const created = await Notification.find({ _id: { $in: ids } });
         for (const notification of created) {
-            queueNotificationDelivery(notification, Notification);
+            queueNotificationDelivery(notification);
         }
     } catch (error) {
         console.error("Queue matching alert delivery error:", error);

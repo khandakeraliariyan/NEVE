@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 import Inquiry from "../models/Inquiry.js";
 import InquiryMessage from "../models/InquiryMessage.js";
-import Notification from "../models/Notification.js";
+import Property from "../models/Property.js";
+import { createNotification, previewText } from "../services/notification.service.js";
+import { markLandlordReplied } from "../services/notificationEvents.service.js";
 
 const getParticipantInquiry = async (inquiryId, user) => {
     if (!mongoose.isValidObjectId(inquiryId)) {
@@ -158,16 +160,39 @@ export async function sendInquiryMessage(req, res, next) {
             body: body.trim(),
         });
 
+        const fromLandlord = String(sender) === String(inquiry.landlord);
+        if (fromLandlord) {
+            await markLandlordReplied(inquiry._id, message.createdAt);
+        }
+
         let notificationStatus = "created";
         try {
-            await Notification.create({
-                recipient,
-                type: "inquiry_message_received",
-                title: "New inquiry message",
-                message: "You received a new message about a property inquiry.",
-                relatedProperty: inquiry.property,
-                relatedInquiry: inquiry._id,
-            });
+            const property = await Property.findById(inquiry.property).select("title").lean();
+            const propertyTitle = property?.title ?? "a property";
+            const senderName = req.neveUser.displayName ?? (fromLandlord ? "The landlord" : "The renter");
+            await createNotification(
+                fromLandlord
+                    ? {
+                        recipient,
+                        type: "inquiry_replied",
+                        title: `${senderName} replied about ${propertyTitle}`,
+                        message: `"${previewText(message.body, 200)}"`,
+                        link: "/inquiries",
+                        data: { propertyTitle, landlordName: senderName, replyPreview: previewText(message.body) },
+                        relatedProperty: inquiry.property,
+                        relatedInquiry: inquiry._id,
+                    }
+                    : {
+                        recipient,
+                        type: "inquiry_message_received",
+                        title: `New message about ${propertyTitle}`,
+                        message: `${senderName}: "${previewText(message.body, 200)}"`,
+                        link: "/inquiries",
+                        data: { propertyTitle, senderName, messagePreview: previewText(message.body) },
+                        relatedProperty: inquiry.property,
+                        relatedInquiry: inquiry._id,
+                    }
+            );
         } catch (error) {
             console.error("Create inquiry message notification error:", error);
             notificationStatus = "failed";

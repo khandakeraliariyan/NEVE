@@ -56,12 +56,32 @@ const inquirySchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+
+        // Optional viewing time the renter asked for in the inquiry.
+        requestedViewingAt: {
+            type: Date,
+            default: null,
+        },
+
+        // First time the landlord replied or acted on the inquiry. Used for
+        // the 24-hour reminder and the landlord's response time.
+        firstLandlordReplyAt: {
+            type: Date,
+            default: null,
+        },
+
+        reminderSentAt: {
+            type: Date,
+            default: null,
+        },
     },
     {
         timestamps: true,
         versionKey: false,
     }
 );
+
+inquirySchema.index({ firstLandlordReplyAt: 1, reminderSentAt: 1, createdAt: 1 });
 
 const Inquiry = mongoose.model("Inquiry", inquirySchema);
 

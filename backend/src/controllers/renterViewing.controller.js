@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import ViewingRequest from "../models/ViewingRequest.js";
 
 // GET /api/v1/viewings/my-requests
@@ -57,63 +56,3 @@ export const getMyViewingRequests = async (req, res, next) => {
     }
 };
 
-// PATCH /api/v1/viewings/:viewingId/cancel
-export const cancelMyViewingRequest = async (req, res, next) => {
-    try {
-        const { viewingId } = req.params;
-
-        if (!mongoose.isValidObjectId(viewingId)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid viewing request ID.",
-            });
-        }
-
-        // The renter can update only their own unconfirmed request.
-        const updatedRequest = await ViewingRequest.findOneAndUpdate(
-            {
-                _id: viewingId,
-                renter: req.neveUser._id,
-                status: "requested",
-            },
-            {
-                $set: {
-                    status: "cancelled",
-                },
-            },
-            {
-                new: true,
-                runValidators: true,
-            }
-        ).populate("property", "title address");
-
-        if (updatedRequest) {
-            return res.status(200).json({
-                success: true,
-                message: "Viewing request cancelled successfully.",
-                data: updatedRequest,
-            });
-        }
-
-        // Determine whether the request is missing, belongs to someone else,
-        // or is no longer requested. Do not reveal another renter's request.
-        const ownRequest = await ViewingRequest.findOne({
-            _id: viewingId,
-            renter: req.neveUser._id,
-        }).select("status");
-
-        if (!ownRequest) {
-            return res.status(404).json({
-                success: false,
-                message: "Viewing request not found.",
-            });
-        }
-
-        return res.status(409).json({
-            success: false,
-            message: "Only requested viewings can be cancelled.",
-        });
-    } catch (error) {
-        next(error);
-    }
-};

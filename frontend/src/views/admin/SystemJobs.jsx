@@ -5,6 +5,15 @@ import { api } from "../../lib/api";
 import { dateTime, label } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, StatusBadge } from "../../components/ui";
+import NotificationDeliveries from "./NotificationDeliveries";
+
+const JOB_OPTIONS = [
+    ["retention_purge", "Retention purge"],
+    ["backup", "Backup"],
+    ["notification_reminders", "Notification reminders"],
+    ["notification_digest", "Daily digest"],
+    ["photo_hash_backfill", "Photo hash catch-up"],
+];
 
 function duration(run) {
     if (!run.finishedAt) return "—";
@@ -55,8 +64,8 @@ export default function SystemJobs() {
         <div>
             <PageHeader
                 eyebrow="System governance"
-                title="Data retention & backups"
-                description="These jobs also run on a schedule when the server enables them. Run them here when you need to act now."
+                title="System jobs & delivery"
+                description="Background jobs run on a schedule when the server enables them; run them here when you need to act now. Below, see how notifications are being delivered."
             />
             <ErrorBox error={error} />
             {message && <p className="mb-4 rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{message}</p>}
@@ -87,14 +96,42 @@ export default function SystemJobs() {
                         </Button>
                     </div>
                 </Card>
+                <Card>
+                    <h2 className="text-xl">Notification reminders and digest</h2>
+                    <p className="mt-1 text-sm text-muted">
+                        Reminders (unanswered inquiries, upcoming viewings, due obligations, ending leases) run every 15 minutes. The digest normally goes out once a day; running it here sends today's now.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        <Button variant="secondary" disabled={!!busy} onClick={() => start("reminders", "/admin/system/notification-reminders", {})}>
+                            {busy === "reminders" ? "Running…" : "Send due reminders"}
+                        </Button>
+                        <Button variant="outline" disabled={!!busy} onClick={() => start("digest", "/admin/system/notification-digest", {}, "Send today's digest emails now?")}>
+                            {busy === "digest" ? "Sending…" : "Send digest now"}
+                        </Button>
+                    </div>
+                </Card>
+                <Card>
+                    <h2 className="text-xl">Duplicate-photo catch-up</h2>
+                    <p className="mt-1 text-sm text-muted">
+                        Checks up to 200 listing photos uploaded before duplicate-photo detection existed, and flags matches for review. Run it until the summary shows 0 checked.
+                    </p>
+                    <div className="mt-4">
+                        <Button variant="secondary" disabled={!!busy} onClick={() => start("photos", "/admin/system/photo-hash-backfill", {})}>
+                            {busy === "photos" ? "Checking…" : "Check older photos"}
+                        </Button>
+                    </div>
+                </Card>
             </div>
+
+            <NotificationDeliveries />
 
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl">Run history</h2>
                 <select className="field w-auto" value={job} onChange={(e) => setJob(e.target.value)}>
                     <option value="">All jobs</option>
-                    <option value="retention_purge">Retention purge</option>
-                    <option value="backup">Backup</option>
+                    {JOB_OPTIONS.map(([value, title]) => (
+                        <option key={value} value={value}>{title}</option>
+                    ))}
                 </select>
             </div>
             {runs.loading && <Loading />}

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import User from "../models/User.js";
+import { checkPasswordChange } from "../services/securityAlerts.service.js";
 import {
     signAdminToken,
     verifyAgainstDummy,
@@ -12,6 +13,23 @@ export function getCurrentUser(req, res) {
         message: "Authenticated successfully",
         user: req.user,
     });
+}
+
+// POST /api/v1/auth/password-changed
+// The app calls this right after the user changes their password, so the
+// security email goes out at once. The change is confirmed with Firebase,
+// so calling it without a real change does nothing.
+export async function reportPasswordChanged(req, res, next) {
+    try {
+        const user = await User.findOne({ firebaseUid: req.user.uid }).select("_id firebaseUid");
+        if (!user || req.user.signInProvider === "neve-admin-password") {
+            return res.status(404).json({ success: false, message: "Neve profile not found." });
+        }
+        const alerted = await checkPasswordChange(user);
+        return res.json({ success: true, alerted });
+    } catch (error) {
+        next(error);
+    }
 }
 
 const adminLoginSchema = z.object({

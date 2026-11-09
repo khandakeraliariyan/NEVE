@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "../lib/firebase";
-import { api, ApiError } from "../lib/api";
+import { api, ApiError, SESSION_REVOKED_EVENT } from "../lib/api";
 import {
     ADMIN_SIGNED_OUT_EVENT,
     adminTokenExpiresAt,
@@ -48,6 +48,10 @@ export function AuthProvider({ children }) {
                 if (auth) await firebaseSignOut(auth);
                 return null;
             }
+            // Signed out from another device; the event handler signs out here.
+            if (err instanceof ApiError && err.code === "SESSION_REVOKED") {
+                return null;
+            }
             if (err instanceof ApiError && err.status === 404) {
                 setProfile(null);
                 setStatus("needs_profile");
@@ -85,10 +89,22 @@ export function AuthProvider({ children }) {
             setProfile(null);
             setStatus("signed_out");
         }
+        async function onSessionRevoked() {
+            setNotice("This session was signed out from another device. Sign in again to continue.");
+            if (getAdminToken()) {
+                endAdminSession();
+            } else if (auth?.currentUser) {
+                await firebaseSignOut(auth);
+            }
+            setProfile(null);
+            setStatus("signed_out");
+        }
         window.addEventListener(ADMIN_SIGNED_OUT_EVENT, onAdminSignedOut);
+        window.addEventListener(SESSION_REVOKED_EVENT, onSessionRevoked);
         return () => {
             unsubscribe();
             window.removeEventListener(ADMIN_SIGNED_OUT_EVENT, onAdminSignedOut);
+            window.removeEventListener(SESSION_REVOKED_EVENT, onSessionRevoked);
         };
     }, [loadProfile]);
 

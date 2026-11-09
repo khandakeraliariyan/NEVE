@@ -3,10 +3,15 @@ import Inquiry from "../models/Inquiry.js";
 import Property from "../models/Property.js";
 import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 import { findPubliclyAvailableProperty } from "../services/propertyAvailability.service.js";
+import {
+    markLandlordReplied,
+    notifyInquiryCreated,
+    notifyInquiryReplied,
+} from "../services/notificationEvents.service.js";
 
 export async function createInquiry(req, res, next) {
     try {
-        const { propertyId, message } = req.body;
+        const { propertyId, message, requestedViewingDate } = req.body;
 
         if (!mongoose.isValidObjectId(propertyId)) {
             return res.status(400).json({
@@ -24,6 +29,21 @@ export async function createInquiry(req, res, next) {
                 success: false,
                 message: "Message is required and must be at most 2000 characters",
             });
+        }
+
+        let requestedViewingAt = null;
+        if (requestedViewingDate !== undefined && requestedViewingDate !== null && requestedViewingDate !== "") {
+            requestedViewingAt = new Date(requestedViewingDate);
+            if (
+                typeof requestedViewingDate !== "string" ||
+                !Number.isFinite(requestedViewingAt.getTime()) ||
+                requestedViewingAt.getTime() <= Date.now()
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "The requested viewing time must be a future date and time",
+                });
+            }
         }
 
         const property = await findPubliclyAvailableProperty(propertyId);
@@ -47,7 +67,10 @@ export async function createInquiry(req, res, next) {
             renter: req.neveUser._id,
             landlord: property.landlord,
             message: message.trim(),
+            requestedViewingAt,
         });
+
+        await notifyInquiryCreated({ inquiry, property, renter: req.neveUser });
 
         return res.status(201).json({
             success: true,
@@ -150,7 +173,7 @@ export async function updateInquiry(req, res, next) {
             updates.respondedAt = new Date();
         }
 
-        const inquiryRecord = await Inquiry.findById(id).select("property");
+        const inquiryRecord = await Inquiry.findById(id).select("property landlordResponse");
         if (!inquiryRecord) {
             return res.status(404).json({
                 success: false,
@@ -178,6 +201,17 @@ export async function updateInquiry(req, res, next) {
             return res.status(404).json({
                 success: false,
                 message: "Inquiry not found",
+            });
+        }
+
+        await markLandlordReplied(inquiry._id);
+        if (status === "responded" && updates.landlordResponse !== inquiryRecord.landlordResponse) {
+            const property = await Property.findById(inquiry.property).select("title").lean();
+            await notifyInquiryReplied({
+                inquiry,
+                propertyTitle: property?.title,
+                replyText: updates.landlordResponse,
+                landlordName: req.neveUser.displayName,
             });
         }
 

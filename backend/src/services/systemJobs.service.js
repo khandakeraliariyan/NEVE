@@ -3,15 +3,34 @@ import { randomUUID } from "node:crypto";
 import { env } from "../config/env.js";
 import SystemJobRun, { SystemJobLock } from "../models/SystemJobRun.js";
 import { runBackup } from "./backup.service.js";
-import { runRetentionPurge } from "./retentionPurge.service.js";
+import { backfillPhotoHashes } from "./duplicatePhoto.service.js";
+import {
+    isDeliveryConfigured,
+    isEmailConfigured,
+    processDueDeliveries,
+    runNotificationDigest,
+} from "./notificationDelivery.service.js";
+import { runNotificationReminders } from "./notificationReminders.service.js";
+import { clearClosedIdentityDetails, runRetentionPurge } from "./retentionPurge.service.js";
 
 const OWNER = randomUUID();
 const LOCK_MS = 60 * 60 * 1000;
 
 const JOBS = {
-    retention_purge: ({ dryRun }) => runRetentionPurge({ dryRun }),
+    retention_purge: async ({ dryRun }) => ({
+        ...(await runRetentionPurge({ dryRun })),
+        identityDetailsCleared: dryRun ? 0 : await clearClosedIdentityDetails(),
+    }),
     backup: () => runBackup(),
+    notification_reminders: () => runNotificationReminders(),
+    // A manual run sends the digest now instead of waiting for the digest hour.
+    notification_digest: ({ trigger }) => runNotificationDigest({ force: trigger === "manual" }),
+    // Hashes listing photos uploaded before perceptual hashing existed.
+    photo_hash_backfill: () => backfillPhotoHashes({ limit: 200 }),
 };
+
+export const SYSTEM_JOBS = Object.keys(JOBS);
+const DELIVERY_WORKER_MS = 30 * 1000;
 
 async function acquireLock(job) {
     const now = new Date();
@@ -44,7 +63,7 @@ export async function runSystemJob(job, { trigger, triggeredBy = null, dryRun = 
     }
     const run = await SystemJobRun.create({ job, trigger, triggeredBy, dryRun });
     try {
-        run.summary = await JOBS[job]({ dryRun });
+        run.summary = await JOBS[job]({ dryRun, trigger });
         run.status = "completed";
     } catch (error) {
         console.error(`System job ${job} failed:`, error);
@@ -78,6 +97,28 @@ export function startScheduledJobs() {
 
     schedule("retention_purge", env.RETENTION_PURGE_ENABLED, env.RETENTION_PURGE_INTERVAL_MINUTES * 60 * 1000);
     schedule("backup", env.BACKUP_ENABLED, env.BACKUP_INTERVAL_HOURS * 60 * 60 * 1000);
+    schedule("notification_reminders", env.NOTIFICATION_REMINDERS_ENABLED, 15 * 60 * 1000);
+    // Hourly; it only sends at NOTIFICATION_DIGEST_HOUR.
+    schedule("notification_digest", isEmailConfigured(), 60 * 60 * 1000);
+
+    // Delivery worker: retries and anything not sent straight away.
+    if (isDeliveryConfigured()) {
+        let busy = false;
+        const timer = setInterval(async () => {
+            if (busy) return;
+            busy = true;
+            try {
+                await processDueDeliveries({ limit: 100 });
+            } catch (error) {
+                console.error("Notification delivery worker error:", error);
+            } finally {
+                busy = false;
+            }
+        }, DELIVERY_WORKER_MS);
+        timer.unref();
+        timers.push(timer);
+        console.log("Notification delivery worker started.");
+    }
 }
 
 export function stopScheduledJobs() {
