@@ -213,7 +213,118 @@ function UpdateForm({ request, isLandlord, isRequester, onDone }) {
     );
 }
 
-function RequestDetail({ request, isLandlord, me, canEdit, onDone }) {
+function assigneeText(assignee, agreement) {
+    if (!assignee) return null;
+    if (assignee.user) {
+        const id = String(idOf(assignee.user));
+        if (id === String(idOf(agreement.landlord))) return `${assignee.user.displayName ?? agreement.landlord?.displayName ?? "The landlord"} (landlord)`;
+        if (id === String(idOf(agreement.renter))) return `${assignee.user.displayName ?? agreement.renter?.displayName ?? "The renter"} (renter)`;
+        return assignee.user.displayName ?? "A participant";
+    }
+    return [assignee.name, assignee.organization].filter(Boolean).join(", ");
+}
+
+// Who carries out the repair. Only the landlord assigns it.
+function AssigneeCard({ request, agreement, isLandlord, onDone }) {
+    const [editing, setEditing] = useState(false);
+    const [mode, setMode] = useState("landlord");
+    const [form, setForm] = useState({ name: "", phone: "", organization: "" });
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const closed = ["completed", "cancelled"].includes(request.status);
+    const current = assigneeText(request.assignee, agreement);
+
+    async function save(assignee) {
+        setBusy(true);
+        setError(null);
+        try {
+            await api.patch(`/tenancy/maintenance-requests/${request._id}/assignee`, { assignee });
+            setEditing(false);
+            setForm({ name: "", phone: "", organization: "" });
+            await onDone();
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function submit(event) {
+        event.preventDefault();
+        if (mode === "landlord") return save({ userId: String(idOf(agreement.landlord)) });
+        if (mode === "renter") return save({ userId: String(idOf(agreement.renter)) });
+        return save({
+            name: form.name.trim(),
+            ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
+            ...(form.organization.trim() ? { organization: form.organization.trim() } : {}),
+        });
+    }
+
+    return (
+        <div className="space-y-2 rounded-xl border border-line p-4 text-sm">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <p className="eyebrow">Assigned to</p>
+                    <p className="font-medium text-ink">{current || "Nobody yet"}</p>
+                    {request.assignee?.phone && <p className="text-xs text-muted">Phone {request.assignee.phone}</p>}
+                    {request.assignee?.assignedAt && <p className="text-xs text-muted">Since {dateTime(request.assignee.assignedAt)}</p>}
+                </div>
+                {isLandlord && !closed && !editing && (
+                    <div className="flex gap-2">
+                        <Button variant="outline" className="px-3 py-1 text-xs" onClick={() => setEditing(true)}>
+                            {current ? "Reassign" : "Assign"}
+                        </Button>
+                        {current && (
+                            <Button variant="ghost" className="px-3 py-1 text-xs" disabled={busy} onClick={() => save(null)}>
+                                Remove
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
+            {editing && (
+                <form onSubmit={submit} className="space-y-3 rounded-lg bg-mist p-3">
+                    <div className="flex flex-wrap gap-4">
+                        {[
+                            ["landlord", "Me"],
+                            ["renter", "The renter"],
+                            ["other", "Someone else (e.g. a plumber)"],
+                        ].map(([value, text]) => (
+                            <label key={value} className="flex items-center gap-2">
+                                <input type="radio" name="assignee-mode" className="accent-forest" checked={mode === value} onChange={() => setMode(value)} />
+                                {text}
+                            </label>
+                        ))}
+                    </div>
+                    {mode === "other" && (
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <Field label="Name *">
+                                <input className="field" required maxLength={100} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                            </Field>
+                            <Field label="Company">
+                                <input className="field" maxLength={100} value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })} />
+                            </Field>
+                            <Field label="Phone" hint="Shown to the renter so they can arrange access.">
+                                <input type="tel" className="field" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                            </Field>
+                        </div>
+                    )}
+                    <div className="flex gap-2">
+                        <Button type="submit" className="px-4 py-1.5 text-xs" disabled={busy || (mode === "other" && !form.name.trim())}>
+                            {busy ? "Saving…" : "Save"}
+                        </Button>
+                        <Button type="button" variant="ghost" className="px-4 py-1.5 text-xs" onClick={() => setEditing(false)}>
+                            Cancel
+                        </Button>
+                    </div>
+                </form>
+            )}
+            <ErrorBox error={error} />
+        </div>
+    );
+}
+
+function RequestDetail({ request, agreement, isLandlord, me, canEdit, onDone }) {
     const history = [...(request.history ?? [])].reverse();
     const isRequester = idOf(request.submittedBy) === me;
     return (
@@ -237,6 +348,7 @@ function RequestDetail({ request, isLandlord, me, canEdit, onDone }) {
                 <span className="text-muted">Repair paid by: </span>
                 <strong>{request.responsibility ? label(request.responsibility) : "Not decided yet"}</strong>
             </p>
+            <AssigneeCard request={request} agreement={agreement} isLandlord={isLandlord} onDone={onDone} />
 
             {canEdit && request.status !== "cancelled" && <UpdateForm key={request._id} request={request} isLandlord={isLandlord} isRequester={isRequester} onDone={onDone} />}
 
@@ -272,6 +384,7 @@ export default function Maintenance() {
     const [tab, setTab] = useState("open");
     const [selectedId, setSelectedId] = useState(null);
     const [creating, setCreating] = useState(false);
+    const [query, setQuery] = useState("");
 
     if (loading && !agreement) return <Loading text="Loading agreement…" />;
     if (error?.status === 404 || error?.status === 400) return <NotFound />;
@@ -280,7 +393,15 @@ export default function Maintenance() {
     const me = String(profile?._id ?? "");
     const isLandlord = myParty === "landlord";
     const all = requests.data?.data ?? [];
-    const list = all.filter((r) => (tab === "open" ? OPEN.includes(r.status) : tab === "done" ? !OPEN.includes(r.status) : true));
+    const q = query.trim().toLowerCase();
+    const list = all.filter(
+        (r) =>
+            (tab === "open" ? OPEN.includes(r.status) : tab === "done" ? !OPEN.includes(r.status) : true) &&
+            (!q ||
+                [r.title, r.description, r.location, label(r.category), ...(r.history ?? []).map((h) => h.message)].some((v) =>
+                    String(v ?? "").toLowerCase().includes(q)
+                ))
+    );
     const selected = all.find((r) => r._id === selectedId) ?? null;
 
     return (
@@ -316,6 +437,12 @@ export default function Maintenance() {
                         ]}
                         active={tab}
                         onChange={setTab}
+                    />
+                    <input
+                        className="field mb-3"
+                        placeholder="Search repairs, notes and resolutions"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
                     />
                     {requests.loading && <Loading />}
                     <ErrorBox error={requests.error} onRetry={requests.reload} />
@@ -356,7 +483,7 @@ export default function Maintenance() {
                             }}
                         />
                     ) : selected ? (
-                        <RequestDetail request={selected} isLandlord={isLandlord} me={me} canEdit={isParticipant} onDone={requests.reload} />
+                        <RequestDetail request={selected} agreement={agreement} isLandlord={isLandlord} me={me} canEdit={isParticipant} onDone={requests.reload} />
                     ) : (
                         <Card className="flex min-h-[16rem] items-center justify-center text-sm text-muted">Select a request to see its details and history.</Card>
                     )}
