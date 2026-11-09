@@ -101,6 +101,14 @@ export const getAdminWarnings = async (req, res, next) => {
         const filter = req.query.status
             ? { status: req.query.status }
             : { status: "open" };
+        // ?appeal=pending lists warnings with an appeal waiting for a decision.
+        if (req.query.appeal !== undefined) {
+            if (!["pending", "accepted", "rejected"].includes(req.query.appeal)) {
+                return res.status(400).json({ success: false, message: "appeal must be pending, accepted or rejected." });
+            }
+            filter["appeal.status"] = req.query.appeal;
+            if (!req.query.status) delete filter.status;
+        }
 
         const [warnings, total] = await Promise.all([
             ListingWarning.find(filter)

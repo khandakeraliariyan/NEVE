@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
+import { notifyListingReported } from "../services/notificationEvents.service.js";
 import PropertyReport from "../models/PropertyReport.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
 
@@ -65,6 +66,8 @@ export const createPropertyReport = async (req, res, next) => {
             reason,
             details: details.trim(),
         });
+
+        await notifyListingReported({ property, reason });
 
         return res.status(201).json({
             success: true,

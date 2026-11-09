@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { notifyListingFlagged } from "../services/notificationEvents.service.js";
 
 import Property from "../models/Property.js";
 import ListingWarning from "../models/ListingWarning.js";
@@ -146,7 +147,15 @@ export const reviewListingConsistency = async (req, res, next) => {
         }));
 
         if (operations.length > 0) {
-            await ListingWarning.bulkWrite(operations);
+            const result = await ListingWarning.bulkWrite(operations);
+            const newWarnings = Object.keys(result.upsertedIds ?? {}).map(
+                (index) => detected[Number(index)]
+            );
+            await notifyListingFlagged({
+                property,
+                warnings: newWarnings,
+                actorId: getUserId(req),
+            });
         }
 
         const warnings = await ListingWarning.find({

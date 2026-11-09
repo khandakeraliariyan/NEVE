@@ -1,4 +1,5 @@
 "use client";
+import { LandlordSummary } from "../PublicProfile";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -114,6 +115,7 @@ function ActionForm({ title, children, onSubmit, busy, submitLabel, note }) {
 
 function RenterActions({ propertyId }) {
     const [inquiry, setInquiry] = useState("");
+    const [inquiryViewing, setInquiryViewing] = useState("");
     const [viewing, setViewing] = useState({ requestedDate: "", message: "" });
     const [state, setState] = useState({ busy: false, error: null, notice: null });
 
@@ -153,10 +155,26 @@ function RenterActions({ propertyId }) {
                 note="Keep payments on the record. Be cautious if asked to pay outside the platform."
                 onSubmit={(e) => {
                     e.preventDefault();
-                    run(() => api.post("/inquiries", { propertyId, message: inquiry.trim() }), "Inquiry sent to the landlord.", () => setInquiry(""));
+                    run(
+                        () =>
+                            api.post("/inquiries", {
+                                propertyId,
+                                message: inquiry.trim(),
+                                ...(inquiryViewing ? { requestedViewingDate: new Date(inquiryViewing).toISOString() } : {}),
+                            }),
+                        "Inquiry sent. The landlord has been emailed, and we've sent you a copy.",
+                        () => {
+                            setInquiry("");
+                            setInquiryViewing("");
+                        }
+                    );
                 }}
             >
                 <textarea required maxLength={2000} className="field min-h-20" placeholder="Ask about availability, costs or the lease" value={inquiry} onChange={(e) => setInquiry(e.target.value)} />
+                <label className="block text-xs text-muted">
+                    Preferred viewing time (optional)
+                    <input type="datetime-local" className="field mt-1" value={inquiryViewing} onChange={(e) => setInquiryViewing(e.target.value)} />
+                </label>
             </ActionForm>
             <ErrorBox error={state.error} />
             {state.notice && <p className="rounded-lg bg-sage px-3 py-2 text-sm text-forest">{state.notice}</p>}
@@ -309,7 +327,8 @@ export default function PropertyDetails() {
                                     {label(landlord.role)} · on Neve since {date(landlord.memberSince, { month: "short", year: "numeric" })}
                                 </p>
                             </div>
-                            <p className="ml-auto max-w-xs text-xs text-muted">Neve doesn't verify identity or property ownership. Contact details stay private until you message.</p>
+                            <p className="ml-auto max-w-xs text-xs text-muted">Contact details stay private: messages and viewings go through Neve.</p>
+                            {landlord.id && <LandlordSummary landlordId={landlord.id} />}
                         </Card>
                     )}
 

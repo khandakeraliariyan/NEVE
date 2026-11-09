@@ -4,6 +4,7 @@ import {
   attachPropertyImage,
   removePropertyImage,
   getPropertyImages,
+  getPropertyThumbnail,
 } from "../controllers/propertyImage.controller.js";
 
 import { authenticateUser } from "../middleware/auth.middleware.js";
@@ -13,6 +14,7 @@ const router = express.Router();
 
 // Public listing image endpoint.
 router.get("/:propertyId", getPropertyImages);
+router.get("/:propertyId/thumbnail", getPropertyThumbnail);
 
 // Only authenticated users can manage property images.
 router.post(

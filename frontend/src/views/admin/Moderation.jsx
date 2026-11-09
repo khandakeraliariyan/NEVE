@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { api } from "../../lib/api";
+import { api, openPrivateFile } from "../../lib/api";
 import { dateTime, idOf, label, money } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, Pagination, StatusBadge, Tabs } from "../../components/ui";
@@ -186,6 +186,69 @@ function ReportItem({ r, onDone }) {
     );
 }
 
+function AppealReview({ w, onDone }) {
+    const appeal = w.appeal ?? {};
+    const [note, setNote] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    if (!appeal.status || appeal.status === "none") return null;
+
+    async function decide(decision) {
+        setBusy(true);
+        setError(null);
+        try {
+            await api.patch(`/admin/moderation/warnings/${w._id}/appeal`, { decision, note: note.trim() });
+            setNote("");
+            onDone(decision === "accepted" ? "Appeal accepted; the warning is dismissed." : "Appeal rejected; the landlord has been told why.");
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div className="mt-3 rounded-xl border border-line bg-mist p-3 text-sm">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+                <StatusBadge status={appeal.status} />
+                <span className="font-semibold">Landlord's appeal</span>
+                <span className="text-xs text-muted">{dateTime(appeal.submittedAt)}</span>
+            </div>
+            <p className="text-muted">“{appeal.text}”</p>
+            {appeal.evidenceFiles?.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                    {appeal.evidenceFiles.map((fileId, index) => (
+                        <button key={String(fileId)} type="button" className="text-xs text-forest underline" onClick={() => openPrivateFile(idOf(fileId))}>
+                            Evidence {index + 1}
+                        </button>
+                    ))}
+                </div>
+            )}
+            {appeal.decisionNote && <p className="mt-2 text-xs">Decision note: {appeal.decisionNote}</p>}
+            {appeal.status === "pending" && (
+                <div className="mt-3 space-y-2">
+                    <textarea
+                        className="field min-h-14 text-sm"
+                        maxLength={1000}
+                        placeholder="Note to the landlord (required to reject)"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="secondary" className="px-3 py-1 text-xs" disabled={busy} onClick={() => decide("accepted")}>
+                            Accept and dismiss warning
+                        </Button>
+                        <Button variant="outline" className="px-3 py-1 text-xs" disabled={busy || !note.trim()} onClick={() => decide("rejected")}>
+                            Reject appeal
+                        </Button>
+                    </div>
+                    <ErrorBox error={error} />
+                </div>
+            )}
+        </div>
+    );
+}
+
 function WarningItem({ w, onDone }) {
     return (
         <Card>
@@ -203,6 +266,7 @@ function WarningItem({ w, onDone }) {
             {w.evidence && Object.keys(w.evidence).length > 0 && (
                 <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-mist p-2 text-xs text-muted">{JSON.stringify(w.evidence, null, 2)}</pre>
             )}
+            <AppealReview w={w} onDone={onDone} />
             <DuplicateCheck propertyId={idOf(w.property)} />
             <Decision
                 options={["open", "reviewed", "resolved", "dismissed"]}
@@ -290,7 +354,9 @@ export default function Moderation() {
     const [page, setPage] = useState(1);
     const [message, setMessage] = useState(null);
     const queue = QUEUES[tab];
-    const list = useApi(() => api.get(queue.path, { status, page, limit: PAGE_SIZE }), [tab, status, page]);
+    // "appeal:pending" is the warnings queue filtered to appeals awaiting a decision.
+    const params = status === "appeal:pending" ? { appeal: "pending" } : { status };
+    const list = useApi(() => api.get(queue.path, { ...params, page, limit: PAGE_SIZE }), [tab, status, page]);
     const items = list.data?.data ?? [];
     const Item = ITEMS[tab];
 
@@ -317,6 +383,7 @@ export default function Moderation() {
                     {queue.statuses.map((s) => (
                         <option key={s} value={s}>{label(s)}</option>
                     ))}
+                    {tab === "warnings" && <option value="appeal:pending">Appeals awaiting decision</option>}
                 </select>
             </div>
             {message && <p className="mb-4 rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{message}</p>}

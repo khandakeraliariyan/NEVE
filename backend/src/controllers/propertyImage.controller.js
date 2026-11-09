@@ -5,6 +5,7 @@ import UploadedFile from "../models/UploadedFile.js";
 
 import { createDownloadUrl } from "../services/fileUpload.service.js";
 import { canManageProperty } from "../services/propertyAccess.service.js";
+import { checkDuplicatePhotos } from "../services/duplicatePhoto.service.js";
 
 const mediaFields = {
   property_image: { field: "images", label: "image", max: 20 },
@@ -105,12 +106,32 @@ export const attachPropertyImage = async (req, res) => {
     result.property[media.field] = [...mediaIds, file._id];
     await result.property.save();
 
+    // Same photo on another landlord's listing: flag it for admin review.
+    let duplicatePhotoWarning = null;
+    if (file.purpose === "property_image") {
+      try {
+        duplicatePhotoWarning = await checkDuplicatePhotos(result.property);
+      } catch (checkError) {
+        console.error("Duplicate photo check error:", checkError);
+      }
+    }
+
     return res.status(200).json({
       message: `Property ${media.label} attached successfully.`,
       propertyId: result.property._id,
       fileId: file._id,
       purpose: file.purpose,
       mediaCount: result.property[media.field].length,
+      ...(duplicatePhotoWarning
+        ? {
+            duplicatePhotoWarning: {
+              id: duplicatePhotoWarning._id,
+              message: duplicatePhotoWarning.message,
+              notice:
+                "This is a signal for review, not a finding of wrongdoing. If the photos are yours, you can appeal the warning.",
+            },
+          }
+        : {}),
     });
   } catch (error) {
     console.error("Attach property image error:", error);
@@ -240,6 +261,31 @@ export const getPropertyImages = async (req, res, next) => {
       videos,
       floorPlans,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/v1/property-images/:propertyId/thumbnail
+// Stable address for a published listing's first photo, used in emails.
+// Redirects to a short-lived signed URL.
+export const getPropertyThumbnail = async (req, res, next) => {
+  try {
+    const { propertyId } = req.params;
+    if (!mongoose.isValidObjectId(propertyId)) {
+      return res.status(400).json({ message: "Invalid property ID." });
+    }
+    const property = await Property.findOne({ _id: propertyId, status: "published" })
+      .select("images")
+      .populate({ path: "images", select: "purpose status storageKey" });
+    const image = (property?.images ?? []).find(
+      (file) => file && file.purpose === "property_image" && file.status === "uploaded"
+    );
+    if (!image) {
+      return res.status(404).json({ message: "No photo found for this listing." });
+    }
+    res.set("Cache-Control", "private, no-store");
+    return res.redirect(302, await createDownloadUrl(image.storageKey));
   } catch (error) {
     next(error);
   }

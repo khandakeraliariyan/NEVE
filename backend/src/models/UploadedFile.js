@@ -78,6 +78,19 @@ const uploadedFileSchema = new mongoose.Schema(
             index: { sparse: true },
         },
 
+        // Perceptual hash of a listing photo (64 bits as hex), for spotting
+        // the same picture after resizing or recompression.
+        perceptualHash: {
+            type: String,
+            match: /^[a-f0-9]{16}$/,
+            default: null,
+        },
+        // Set when the photo couldn't be decoded, so the backfill skips it.
+        perceptualHashFailed: {
+            type: Boolean,
+            default: false,
+        },
+
         status: {
             type: String,
             enum: ["pending_upload", "uploaded", "deletion_pending"],

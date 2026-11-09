@@ -64,9 +64,12 @@ test("deleting a listing soft-deletes it and cleans up renter-facing data", asyn
     const viewingUpdate = mock.method(ViewingRequest, "updateMany", async () => ({}));
     const inquiryUpdate = mock.method(Inquiry, "updateMany", async () => ({}));
     const savedDelete = mock.method(SavedProperty, "deleteMany", async () => ({}));
+    const savedBy = id();
+    mock.method(SavedProperty, "find", () => ({ distinct: async () => [savedBy] }));
+    mock.method(User, "find", () => ({ distinct: async () => [savedBy] }));
     mock.method(User, "updateMany", async () => ({}));
     const { default: Notification } = await import("../src/models/Notification.js");
-    mock.method(Notification, "create", async () => ({}));
+    const created = mock.method(Notification, "create", async (doc) => doc);
 
     const res = await run(deleteProperty, { params: { id: String(property._id) }, neveUser: { _id: id() } });
 
@@ -77,6 +80,14 @@ test("deleting a listing soft-deletes it and cleans up renter-facing data", asyn
     assert.deepEqual(viewingUpdate.mock.calls[0].arguments[1], { $set: { status: "cancelled" } });
     assert.deepEqual(inquiryUpdate.mock.calls[0].arguments[1], { $set: { status: "closed" } });
     assert.equal(savedDelete.mock.callCount(), 1);
+
+    const sent = created.mock.calls.map((call) => call.arguments[0]);
+    // One notice per renter who saved it, even when both saved lists have them.
+    const favourite = sent.filter((doc) => doc.type === "favorite_property_changed");
+    assert.equal(favourite.length, 1);
+    assert.equal(String(favourite[0].recipient), String(savedBy));
+    assert.match(favourite[0].message, /No longer listed/);
+    assert.ok(sent.some((doc) => doc.type === "viewing_request_cancelled" && String(doc.recipient) === String(viewing.renter)));
 });
 
 test("deleted is a valid property status", () => {
