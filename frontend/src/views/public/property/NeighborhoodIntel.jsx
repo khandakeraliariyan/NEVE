@@ -7,7 +7,6 @@ import { api } from "../../../lib/api";
 import { dateTime, label } from "../../../lib/format";
 import { useApi } from "../../../hooks/useApi";
 import MapView from "../../../components/MapView";
-import TravelTimes from "./TravelTimes";
 import { Card, Disclaimer, Empty, ErrorBox, Loading } from "../../../components/ui";
 import NotFound from "../../NotFound";
 
@@ -31,7 +30,6 @@ export default function NeighborhoodIntel() {
     const { id } = useParams();
     const [radius, setRadius] = useState(1000);
     const [category, setCategory] = useState("");
-    const [route, setRoute] = useState(null);
 
     const nearby = useApi(() => api.get(`/nearby-places/${id}`, { radius }, { auth: false }), [id, radius]);
     const insights = useApi(() => api.get(`/properties/${id}/neighborhood-insights`, { radius }, { auth: false }), [id, radius]);
@@ -141,15 +139,14 @@ export default function NeighborhoodIntel() {
                         </button>
                     ))}
                 </div>
-                {nearby.loading ? <Loading text="Loading mapped places…" /> : property && <MapView markers={markers} lines={route ? [route] : []} className="h-[440px]" />}
+                {nearby.loading ? <Loading text="Loading mapped places…" /> : property && <MapView markers={markers} className="h-[440px]" />}
                 <p className="mt-2 text-xs text-muted">
-                    Dark pin: the listing. Taupe pins: mapped places.{route ? " Dark line: the selected route." : ""} {nearby.data?.attribution ?? "© OpenStreetMap contributors"}
+                    Dark pin: the listing. Green pins: mapped places. {nearby.data?.attribution ?? "© OpenStreetMap contributors"}
                 </p>
             </Card>
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
                 <div className="space-y-4">
-                    {property && <TravelTimes propertyId={id} category={category} categoryLabels={CATEGORY_LABELS} onRoute={setRoute} />}
                     {!nearby.loading && !nearby.error && places.length === 0 && (
                         <Empty title="No mapped places found">Try a larger radius. OpenStreetMap coverage varies by area.</Empty>
                     )}
@@ -203,8 +200,7 @@ export default function NeighborhoodIntel() {
                             ))}
                     </Card>
                     <Disclaimer title="How we measure">
-                        {nearby.data?.distanceNote ?? "Distances are straight-line estimates, not walking or driving distances."} Travel times use
-                        OpenStreetMap routing without live traffic, and are left out when no route is found. Places come from
+                        {nearby.data?.distanceNote ?? "Distances are straight-line estimates, not walking or driving distances."} Places come from
                         OpenStreetMap through the Overpass API and may be incomplete. Counts describe what is mapped, not the safety or quality of an area.
                         {nearby.data?.fetchedAt && ` Data fetched ${dateTime(nearby.data.fetchedAt)}.`}
                     </Disclaimer>
