@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../lib/api";
+import { useApi } from "../../hooks/useApi";
+import { ClauseLegalSources, ClauseReview, ExtractionPanel, LegalSuggestionsBar } from "./ClauseAiPanels";
 import { dateTime, idOf, label } from "../../lib/format";
 import { useAgreement } from "./useAgreement";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, PageHeader } from "../../components/ui";
@@ -21,13 +23,24 @@ export default function ClausesAnnotations() {
     const [form, setForm] = useState(BLANK);
     const [busy, setBusy] = useState(false);
     const [formError, setFormError] = useState(null);
+    const [notice, setNotice] = useState(null);
+    const [showRejected, setShowRejected] = useState(false);
+    const legal = useApi(() => api.get(`/tenancy/agreements/${agreementId}/legal-suggestions`), [agreementId]);
     const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+    async function refresh(message) {
+        if (message) setNotice(message);
+        await Promise.all([reload(), legal.reload()]);
+    }
 
     if (loading && !agreement) return <Loading text="Loading clauses…" />;
     if (error?.status === 404 || error?.status === 400) return <NotFound />;
     if (error && !agreement) return <ErrorBox error={error} onRetry={reload} />;
 
-    const clauses = agreement.clauses ?? [];
+    const allClauses = agreement.clauses ?? [];
+    const rejectedCount = allClauses.filter((c) => c.reviewStatus === "rejected").length;
+    const clauses = showRejected ? allClauses : allClauses.filter((c) => c.reviewStatus !== "rejected");
+    const suggestions = legal.data?.data ?? [];
     const q = query.trim().toLowerCase();
     const visible = clauses.filter(
         (c) =>
@@ -71,9 +84,15 @@ export default function ClausesAnnotations() {
             <PageHeader
                 eyebrow="Clause repository"
                 title="Contract clauses & annotations"
-                description="Key clauses copied from the agreement document, with notes in plain language written by the people on this agreement."
+                description="Clauses from the agreement document, found by AI or added by the people on it, with plain-language notes and the legal sources they relate to."
                 actions={isParticipant && !adding && <Button onClick={() => setAdding(true)}>+ Add clause</Button>}
             />
+
+            {notice && <p className="mb-4 rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{notice}</p>}
+            <ExtractionPanel agreement={agreement} agreementId={agreementId} isParticipant={isParticipant} onDone={refresh} />
+            {allClauses.length > 0 && (
+                <LegalSuggestionsBar agreementId={agreementId} info={legal.data} isParticipant={isParticipant} onChanged={() => refresh()} />
+            )}
 
             {adding && (
                 <Card className="mb-6">
@@ -115,6 +134,12 @@ export default function ClausesAnnotations() {
 
             <Card className="mb-6 space-y-3">
                 <input className="field" placeholder="Search clauses by keyword, e.g. deposit, notice, repairs" value={query} onChange={(e) => setQuery(e.target.value)} />
+                {rejectedCount > 0 && (
+                    <label className="flex items-center gap-2 text-xs text-muted">
+                        <input type="checkbox" className="accent-forest" checked={showRejected} onChange={(e) => setShowRejected(e.target.checked)} />
+                        Show {rejectedCount} rejected AI proposal{rejectedCount === 1 ? "" : "s"}
+                    </label>
+                )}
                 <div className="flex flex-wrap gap-2">
                     {["", ...CATEGORIES].map((c) => {
                         const count = c ? clauses.filter((x) => x.category === c).length : clauses.length;
@@ -137,7 +162,7 @@ export default function ClausesAnnotations() {
                 <div className="space-y-5">
                     {visible.length === 0 && (
                         <Empty title={clauses.length ? "No clauses match" : "No clauses yet"}>
-                            {clauses.length ? "Try another keyword or category." : "Neve doesn't extract clauses automatically. Add the ones that matter to you."}
+                            {clauses.length ? "Try another keyword or category." : "Extract them from the agreement with AI above, or add the ones that matter to you."}
                         </Empty>
                     )}
                     {visible.map((clause) => (
@@ -148,14 +173,24 @@ export default function ClausesAnnotations() {
                             </div>
                             <h2 className="text-xl">{clause.heading || "Untitled clause"}</h2>
                             <blockquote className="rounded-xl bg-mist p-4 text-sm italic leading-relaxed">“{clause.text}”</blockquote>
+                            <ClauseReview clause={clause} agreementId={agreementId} isParticipant={isParticipant} onDone={refresh} />
                             {clause.plainLanguageNote && (
                                 <div className="rounded-xl border border-line p-4 text-sm">
-                                    <p className="eyebrow mb-1">User note · not legal advice</p>
+                                    <p className="eyebrow mb-1">
+                                        {clause.origin === "ai_extracted" ? "AI summary · not legal advice" : "User note · not legal advice"}
+                                    </p>
                                     <p>{clause.plainLanguageNote}</p>
                                 </div>
                             )}
+                            <ClauseLegalSources
+                                clause={clause}
+                                agreementId={agreementId}
+                                suggestions={suggestions}
+                                isParticipant={isParticipant}
+                                onChanged={refresh}
+                            />
                             <p className="text-xs text-muted">
-                                Added by {authorName(clause)} · {dateTime(clause.createdAt)}
+                                {clause.origin === "ai_extracted" ? "Found by AI" : `Added by ${authorName(clause)}`} · {dateTime(clause.createdAt)}
                             </p>
                         </Card>
                     ))}
@@ -183,7 +218,8 @@ export default function ClausesAnnotations() {
                         </Link>
                     </Card>
                     <Disclaimer title="Not legal guidance">
-                        Clauses and notes are entered by users. Neve doesn't extract text from documents or generate explanations, and notes aren't legal advice.
+                        AI-found clauses and summaries are proposals until someone on the agreement confirms them. Legal sources come only from sources a legal
+                        reviewer approved. Nothing here is legal advice.
                     </Disclaimer>
                 </aside>
             </div>

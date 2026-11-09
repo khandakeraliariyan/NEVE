@@ -45,7 +45,7 @@ test("keeps only real, new targets and clamps confidence", () => {
     assert.equal(normalized.links[0].sourceQuote, "Tk 20,000");
 });
 
-test("calls Claude with the file and the record list", async () => {
+test("calls Claude with the file's masked text and the masked record list", async () => {
     let params;
     const client = {
         beta: {
@@ -57,9 +57,10 @@ test("calls Claude with the file and the record list", async () => {
             },
         },
     };
-    const result = await requestEvidenceLinkSuggestions({ agreement, mimeType: "text/plain", bytes: Buffer.from("Paid Tk 20,000"), client, model: "claude-test" });
+    const result = await requestEvidenceLinkSuggestions({ agreement, documentText: "--- Page 1 ---\nPaid Tk 20,000", client, model: "claude-test" });
     assert.equal(result.model, "claude-test");
     assert.equal(params.messages[0].content[0].type, "document");
+    assert.equal(params.messages[0].content[0].source.type, "text");
     assert.match(params.messages[0].content[1].text, /Agreement records/);
 });
 

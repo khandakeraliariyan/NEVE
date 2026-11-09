@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { notifyLegalSourceSubmitted } from "../services/notificationEvents.service.js";
 
 import LegalSource from "../models/LegalSource.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
@@ -261,6 +262,10 @@ export async function transitionLegalSource(req, res, next) {
                 return res.status(409).json({ success: false, message: "Another version of this source was approved at the same time." });
             }
             throw saveError;
+        }
+
+        if (action === "submit") {
+            await notifyLegalSourceSubmitted({ source, actorId: req.neveUser._id });
         }
 
         if (req.neveUser.role === "admin") {
