@@ -168,65 +168,6 @@ function AccessLog() {
     );
 }
 
-const LOG_NAMES = { admin: "Admin actions", access: "Sensitive access log" };
-
-// Re-checks the hash chain of the admin audit log and the sensitive-access log.
-function ChainCheck() {
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState(null);
-    const [results, setResults] = useState(null);
-
-    async function check() {
-        setBusy(true);
-        setError(null);
-        try {
-            const [admin, access] = await Promise.all([
-                api.get("/admin/audit-logs/integrity", { log: "admin" }),
-                api.get("/admin/audit-logs/integrity", { log: "access" }),
-            ]);
-            setResults([admin, access]);
-        } catch (err) {
-            setError(err);
-        } finally {
-            setBusy(false);
-        }
-    }
-
-    return (
-        <Card className="mb-6 space-y-3 text-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h2 className="text-xl">Tamper check</h2>
-                    <p className="text-muted">Each entry stores a SHA-256 hash of itself and of the entry before it. This re-checks both logs end to end.</p>
-                </div>
-                <Button variant="secondary" disabled={busy} onClick={check}>
-                    {busy ? "Checking…" : "Check both logs"}
-                </Button>
-            </div>
-            <ErrorBox error={error} />
-            {results && (
-                <ul className="space-y-2">
-                    {results.map(({ data, note }) => (
-                        <li key={data.log} className={`rounded-xl px-4 py-3 ${data.valid ? "bg-sage/60 text-forest" : "bg-rose text-rose-ink"}`}>
-                            <p className="font-semibold">
-                                {LOG_NAMES[data.log]}: {data.valid ? "intact" : "doesn't verify"}
-                            </p>
-                            <p>
-                                {data.valid
-                                    ? `${data.checked} chained entr${data.checked === 1 ? "y" : "ies"} checked.`
-                                    : `${data.reason} (entry ${data.brokenAtSeq}, after ${data.checked} good entries). Investigate before relying on this log.`}
-                            </p>
-                            <p className="text-xs opacity-80">
-                                Checked {dateTime(data.checkedAt)}. {note}
-                            </p>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </Card>
-    );
-}
-
 export default function AuditTrail() {
     const [tab, setTab] = useState("admin");
     const adminTotal = useApi(() => api.get("/admin/audit-logs", { page: 1, limit: 1 }), []);
@@ -242,9 +183,8 @@ export default function AuditTrail() {
             <div className="mb-6 grid gap-4 sm:grid-cols-3">
                 <Stat label="Admin actions recorded" value={adminTotal.loading ? "…" : adminTotal.data?.pagination?.total ?? 0} hint="Moderation and evaluation changes" />
                 <Stat label="Sensitive access events" value={accessTotal.loading ? "…" : accessTotal.data?.pagination?.total ?? 0} hint="Agreements, cases, files, privacy requests" />
-                <Stat label="Record type" value="Append-only" hint="Entries are added, not edited, and hash-chained" />
+                <Stat label="Record type" value="Append-only" hint="Entries are added, not edited, by the app" />
             </div>
-            <ChainCheck />
             <Tabs
                 tabs={[
                     { value: "admin", label: "Admin actions" },
@@ -255,8 +195,8 @@ export default function AuditTrail() {
             />
             {tab === "admin" ? <AdminActions /> : <AccessLog />}
             <Disclaimer title="What this log is" className="mt-6">
-                These are database records written by the API. Each entry is hash-chained to the one before, so later edits or deletions show up in the tamper
-                check, but the chain can't prove an entry was true when written. Admins can see access events but can&apos;t open the private files they refer to.
+                These are database records written by the API. Hash-chained tamper evidence isn't implemented, so the log isn't cryptographically sealed. Admins
+                can see access events but can't open the private files they refer to.
             </Disclaimer>
         </div>
     );

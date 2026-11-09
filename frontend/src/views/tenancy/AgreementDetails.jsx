@@ -6,7 +6,6 @@ import { useParams } from "next/navigation";
 import { api, downloadAuthenticated, openPrivateFile, uploadFile } from "../../lib/api";
 import { date, dateTime, label, money } from "../../lib/format";
 import { useAgreement } from "./useAgreement";
-import IntegrityCheck from "./IntegrityCheck";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, StatusBadge, Tabs } from "../../components/ui";
 import NotFound from "../NotFound";
 
@@ -569,12 +568,7 @@ export default function AgreementDetails() {
                     {tab === "obligations" && <Obligations agreement={agreement} canAdd={isParticipant} canUpdate={isParticipant} action={action} />}
                     {tab === "payments" && <Payments agreement={agreement} canEdit={isParticipant} action={action} />}
                     {tab === "sharing" && <Sharing agreement={agreement} canEdit={isParticipant} action={action} />}
-                    {tab === "activity" && (
-                        <div className="space-y-6">
-                            <IntegrityCheck agreementId={agreement._id} />
-                            <Activity agreement={agreement} />
-                        </div>
-                    )}
+                    {tab === "activity" && <Activity agreement={agreement} />}
                 </div>
                 <aside className="space-y-4">
                     <Disclaimer title="Not legal advice">
