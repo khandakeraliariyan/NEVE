@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
-// An identity or property-ownership verification that an admin reviews from
-// private documents. Neve records the review outcome; it never decides
+// An identity, property-ownership or legal-reviewer credential verification
+// that an admin reviews from private documents. Neve records the review outcome; it never decides
 // verification automatically.
 const verificationRequestSchema = new mongoose.Schema(
     {
@@ -13,7 +13,7 @@ const verificationRequestSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ["identity", "ownership"],
+            enum: ["identity", "ownership", "credential"],
             required: true,
         },
         property: {
@@ -34,6 +34,9 @@ const verificationRequestSchema = new mongoose.Schema(
                 "utility_bill",
                 "holding_tax_receipt",
                 "management_authorisation",
+                "bar_enrolment_certificate",
+                "practising_certificate",
+                "other_credential",
                 "other",
             ],
             required: true,
@@ -46,6 +49,39 @@ const verificationRequestSchema = new mongoose.Schema(
             },
         },
         note: { type: String, trim: true, maxlength: 1000, default: "" },
+        // Identity requests: the document number and date of birth, encrypted.
+        // Cleared by the retention purge once the request has been closed for
+        // VERIFICATION_DOCUMENT_RETENTION_DAYS.
+        identityDetails: {
+            idLast4: { type: String, default: null },
+            idNumber: {
+                type: {
+                    _id: false,
+                    cipherText: String,
+                    iv: String,
+                    authTag: String,
+                    keyVersion: Number,
+                },
+                default: undefined,
+                select: false,
+            },
+            dateOfBirth: {
+                type: {
+                    _id: false,
+                    cipherText: String,
+                    iv: String,
+                    authTag: String,
+                    keyVersion: Number,
+                },
+                default: undefined,
+                select: false,
+            },
+        },
+        // Credential requests: what the reviewer claims, for the admin to check.
+        credentialDetails: {
+            barEnrolmentNumber: { type: String, trim: true, maxlength: 50, default: "" },
+            jurisdictions: { type: [String], default: [] },
+        },
         status: {
             type: String,
             enum: ["pending", "approved", "rejected", "cancelled"],

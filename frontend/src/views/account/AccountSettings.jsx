@@ -7,6 +7,7 @@ import { useApi } from "../../hooks/useApi";
 import { date, label } from "../../lib/format";
 import { homePathForRole, useAuth } from "../../context/AuthContext";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, PageHeader } from "../../components/ui";
+import { DeleteAccountCard, PasswordCard, PrivacyCard, ProfileDetailsCard, SessionsCard } from "./AccountPanels";
 
 const SWITCHABLE = {
     renter: { title: "Renter", text: "Search, save and request viewings for places to rent." },
@@ -55,7 +56,7 @@ function ProfileCard({ profile, setProfile }) {
                     <Field label="Display name">
                         <input required maxLength={100} className="field" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                     </Field>
-                    <Field label="Phone number" hint="Shared with landlords only when you request a viewing.">
+                    <Field label="Phone number" hint="Private. Never shown to other users.">
                         <input type="tel" maxLength={20} className="field" placeholder="+880 1XXX-XXXXXX" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
                     </Field>
                 </div>
@@ -273,16 +274,23 @@ export default function AccountSettings() {
 
     return (
         <div>
-            <PageHeader eyebrow="Account" title="Settings" description="Manage your profile, account type and personal data." />
+            <PageHeader eyebrow="Account" title="Settings" description="Manage your profile, privacy, sign-in and personal data." />
             <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
                 <div className="space-y-6">
                     <ProfileCard profile={profile} setProfile={setProfile} />
+                    <ProfileDetailsCard profile={profile} setProfile={setProfile} />
                     <AccountTypeCard profile={profile} setProfile={setProfile} />
+                    <SessionsCard />
                     <DocumentDeletionCard />
+                    {profile.role !== "admin" && <DeleteAccountCard />}
                 </div>
                 <div className="space-y-6">
+                    <PrivacyCard profile={profile} setProfile={setProfile} />
+                    <PasswordCard />
                     <ExportCard />
-                    <Disclaimer title="Signing in">Your email and password (or Google account) are managed by Firebase sign-in, not this page.</Disclaimer>
+                    <Disclaimer title="Signing in">
+                        Google accounts are managed by Google. If you sign in with email and password, you can change it here; we'll email you when it changes.
+                    </Disclaimer>
                 </div>
             </div>
         </div>

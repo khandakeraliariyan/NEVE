@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import { env } from "../config/env.js";
 import { createDownloadUrl } from "../services/fileUpload.service.js";
 import { isAdminSessionAllowed } from "../middleware/role.middleware.js";
+import { SESSION_REVOKED, isSessionRevoked } from "../services/sessions.service.js";
 
 export function buildProfilePhotoUrl(userId) {
     return `${env.NEVE_API_BASE_URL.replace(/\/$/, "")}/users/${userId}/photo`;
@@ -18,6 +19,10 @@ async function loadSignedInUser(req, res) {
     }
     if (!user.isActive) {
         res.status(403).json({ success: false, message: "Your account is inactive" });
+        return null;
+    }
+    if (isSessionRevoked(user, req.user)) {
+        res.status(401).json(SESSION_REVOKED);
         return null;
     }
     if (!isAdminSessionAllowed(user.role, req.user.signInProvider)) {
@@ -58,6 +63,8 @@ export async function setMyProfilePhoto(req, res, next) {
 
         user.profilePhoto = file._id;
         user.photoURL = buildProfilePhotoUrl(user._id);
+        user.photoSource = "upload";
+        user.photoSyncWithGoogle = false;
         await user.save();
 
         return res.status(200).json({ success: true, message: "Profile photo updated", user });
@@ -74,6 +81,9 @@ export async function removeMyProfilePhoto(req, res, next) {
 
         user.profilePhoto = null;
         user.photoURL = null;
+        user.photoSource = null;
+        // Otherwise the next Google sign-in would bring the photo back.
+        user.photoSyncWithGoogle = false;
         await user.save();
 
         return res.status(200).json({ success: true, message: "Profile photo removed", user });

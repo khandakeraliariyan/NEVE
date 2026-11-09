@@ -34,7 +34,13 @@ test("keeps the original verifiedAt for an unchanged phone number", () => {
 });
 
 test("validates identity and ownership submissions", () => {
-    assert.ok(validateVerificationSubmission({ type: "identity", documentType: "national_id", documents: [fileId] }).value);
+    const nid = { type: "identity", documentType: "national_id", documents: [fileId], idNumber: "1234 567 890", dateOfBirth: "1990-05-17" };
+    const valid = validateVerificationSubmission(nid);
+    assert.ok(valid.value);
+    assert.deepEqual(valid.identity, { idNumber: "1234567890", dateOfBirth: "1990-05-17" });
+    // A national ID or passport needs its number and the holder's date of birth.
+    assert.ok(validateVerificationSubmission({ type: "identity", documentType: "national_id", documents: [fileId] }).error);
+    assert.ok(validateVerificationSubmission({ ...nid, dateOfBirth: undefined }).error);
     assert.ok(validateVerificationSubmission({ type: "identity", documentType: "title_deed", documents: [fileId] }).error);
     assert.ok(validateVerificationSubmission({ type: "ownership", documentType: "title_deed", documents: [fileId] }).error);
     assert.equal(

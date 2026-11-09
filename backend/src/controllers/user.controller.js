@@ -1,7 +1,25 @@
+import mongoose from "mongoose";
+
 import User from "../models/User.js";
 import Property from "../models/Property.js";
+import VerificationRequest from "../models/VerificationRequest.js";
+import TenancyInvitation from "../models/TenancyInvitation.js";
+import { createNotification } from "../services/notification.service.js";
 import { buildUserLookupFilter } from "../services/userLookup.service.js";
 import { isAdminSessionAllowed } from "../middleware/role.middleware.js";
+import {
+    buildPublicProfile,
+    landlordPublicStats,
+    validateProfileFields,
+} from "../services/profile.service.js";
+import { SESSION_REVOKED, isSessionRevoked } from "../services/sessions.service.js";
+import { getSettings } from "../services/platformSettings.service.js";
+
+const LANDLORD_SIGNUPS_CLOSED = {
+    success: false,
+    code: "LANDLORD_SIGNUPS_CLOSED",
+    message: "New property owner accounts are paused right now. You can sign up as a renter.",
+};
 
 const ADMIN_SIGN_IN_REQUIRED = {
     success: false,
@@ -45,6 +63,36 @@ export async function lookupUsers(req, res, next) {
     }
 }
 
+// A new account may already have tenancy invitations waiting for its email.
+async function notifyPendingInvitations(user) {
+    if (!user.email) return;
+    try {
+        const invitations = await TenancyInvitation.find({
+            inviteeEmail: user.email.toLowerCase(),
+            status: "pending",
+            expiresAt: { $gt: new Date() },
+        })
+            .populate("landlord", "displayName")
+            .populate("property", "title")
+            .limit(10)
+            .lean();
+        await Promise.allSettled(
+            invitations.map((invitation) =>
+                createNotification({
+                    recipient: user._id,
+                    type: "tenancy_invitation_received",
+                    title: `${invitation.landlord?.displayName ?? "A landlord"} invited you to a tenancy record`,
+                    message: `You've been invited to keep the tenancy records for ${invitation.property?.title ?? "a property"} on Neve. Open the invitation to accept or decline.`,
+                    link: `/invitations/${invitation._id}`,
+                    relatedProperty: invitation.property?._id ?? null,
+                })
+            )
+        );
+    } catch (error) {
+        console.error("Pending invitation notice error:", error);
+    }
+}
+
 export async function createProfile(req, res, next) {
     try {
         const firebaseUid = req.user.uid;
@@ -82,13 +130,29 @@ export async function createProfile(req, res, next) {
                 message: "Role must be either renter or landlord",
             });
         }
+        if (requestedRole === "landlord" && !(await getSettings()).landlordSignupsOpen) {
+            return res.status(403).json(LANDLORD_SIGNUPS_CLOSED);
+        }
 
+        // Google sign-in brings the account's name, verified email and photo.
+        const googlePhoto =
+            req.user.signInProvider === "google.com" && typeof req.user.picture === "string"
+                ? req.user.picture
+                : null;
         const user = await User.create({
             firebaseUid,
             email: req.user.email,
             displayName,
             role: requestedRole,
+            ...(googlePhoto
+                ? { photoURL: googlePhoto, photoSource: "google", googlePhotoURL: googlePhoto }
+                : {}),
+            ...(req.user.emailVerified && req.user.email
+                ? { verification: { email: { verified: true, verifiedAt: new Date() } } }
+                : {}),
         });
+
+        await notifyPendingInvitations(user);
 
         return res.status(201).json({
             success: true,
@@ -134,6 +198,9 @@ export async function getMyProfile(req, res, next) {
         if (!isAdminSessionAllowed(user.role, req.user.signInProvider)) {
             return res.status(403).json(ADMIN_SIGN_IN_REQUIRED);
         }
+        if (isSessionRevoked(user, req.user)) {
+            return res.status(401).json(SESSION_REVOKED);
+        }
 
         return res.status(200).json({
             success: true,
@@ -161,9 +228,25 @@ export async function updateMyProfile(req, res, next) {
         if (!isAdminSessionAllowed(user.role, req.user.signInProvider)) {
             return res.status(403).json(ADMIN_SIGN_IN_REQUIRED);
         }
+        if (isSessionRevoked(user, req.user)) {
+            return res.status(401).json(SESSION_REVOKED);
+        }
+        if (user.isActive === false) {
+            return res.status(403).json({ success: false, message: "Your account is inactive" });
+        }
 
         const body = req.body ?? {};
-        const allowed = ["displayName", "phoneNumber", "role"];
+        const allowed = [
+            "displayName",
+            "phoneNumber",
+            "role",
+            "bio",
+            "renterProfile",
+            "landlordProfile",
+            "reviewerProfile",
+            "privacy",
+            "syncPhotoWithGoogle",
+        ];
         const unknown = Object.keys(body).filter((key) => !allowed.includes(key));
 
         if (unknown.length) {
@@ -197,6 +280,11 @@ export async function updateMyProfile(req, res, next) {
                 });
             }
             user.phoneNumber = phone || null;
+            // A different number than the verified one isn't verified.
+            const verifiedNumber = user.verification?.phone?.phoneNumber;
+            if (user.verification?.phone?.verified && verifiedNumber && verifiedNumber !== user.phoneNumber) {
+                user.set("verification.phone", { verified: false, phoneNumber: null, verifiedAt: null, method: null });
+            }
         }
 
         if (body.role !== undefined && body.role !== user.role) {
@@ -211,6 +299,9 @@ export async function updateMyProfile(req, res, next) {
                     success: false,
                     message: "Role must be either renter or landlord",
                 });
+            }
+            if (body.role === "landlord" && !(await getSettings()).landlordSignupsOpen) {
+                return res.status(403).json(LANDLORD_SIGNUPS_CLOSED);
             }
             if (user.role === "landlord") {
                 const publishedListings = await Property.countDocuments({
@@ -228,6 +319,40 @@ export async function updateMyProfile(req, res, next) {
             user.role = body.role;
         }
 
+        const { updates: profileUpdates, error: profileError } = validateProfileFields(body, user.role);
+        if (profileError) {
+            return res.status(400).json({ success: false, message: profileError });
+        }
+        const enrolmentChanged =
+            profileUpdates["profile.reviewer.barEnrolmentNumber"] !== undefined &&
+            profileUpdates["profile.reviewer.barEnrolmentNumber"] !== (user.profile?.reviewer?.barEnrolmentNumber ?? "");
+        for (const [path, value] of Object.entries(profileUpdates)) {
+            user.set(path, value);
+        }
+        // A new enrolment number needs checking again.
+        if (enrolmentChanged && ["pending", "verified"].includes(user.verification?.credential?.status)) {
+            user.set("verification.credential", { status: "unverified", verifiedAt: null });
+            await VerificationRequest.updateMany(
+                { user: user._id, type: "credential", status: "pending" },
+                { $set: { status: "cancelled", reviewNote: "Cancelled because the enrolment number changed." } }
+            );
+        }
+
+        if (body.syncPhotoWithGoogle === true) {
+            if (!user.googlePhotoURL) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Sign in with Google once so Neve has your Google photo.",
+                });
+            }
+            user.photoSyncWithGoogle = true;
+            user.photoURL = user.googlePhotoURL;
+            user.photoSource = "google";
+            user.profilePhoto = null;
+        } else if (body.syncPhotoWithGoogle === false) {
+            user.photoSyncWithGoogle = false;
+        }
+
         await user.save();
 
         return res.status(200).json({
@@ -235,6 +360,35 @@ export async function updateMyProfile(req, res, next) {
             message: "Profile updated",
             user,
         });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/users/:userId/public
+// What other users see: name, photo, role, bio, membership date and dated
+// verification badges; for landlords, active listings and response rate.
+// Never contact details, addresses, identity numbers or date of birth.
+export async function getPublicProfile(req, res, next) {
+    try {
+        const { userId } = req.params;
+        if (!mongoose.isValidObjectId(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid user ID." });
+        }
+        const user = await User.findOne({
+            _id: userId,
+            isActive: true,
+            deletedAt: null,
+            role: { $in: ["renter", "landlord", "legal_reviewer"] },
+        })
+            .select("displayName role photoURL createdAt verification privacy profile.bio profile.landlord.contactHours profile.reviewer.jurisdictions profile.reviewer.expertise")
+            .lean();
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Profile not found." });
+        }
+        const stats = user.role === "landlord" ? await landlordPublicStats(user._id) : null;
+        res.set("Cache-Control", "public, max-age=60");
+        return res.json({ success: true, data: buildPublicProfile(user, stats) });
     } catch (error) {
         next(error);
     }

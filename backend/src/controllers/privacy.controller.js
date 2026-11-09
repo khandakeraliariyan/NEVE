@@ -22,6 +22,11 @@ import User from "../models/User.js";
 import ViewingRequest from "../models/ViewingRequest.js";
 import { deleteStoredObject } from "../services/fileUpload.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
+import {
+    DELETION_CONFIRMATION,
+    deleteAccount,
+    deletionPreview,
+} from "../services/accountDeletion.service.js";
 
 const setPrivateResponse = (res) => res.set("Cache-Control", "private, no-store");
 
@@ -78,7 +83,7 @@ export async function exportMyData(req, res, next) {
         ] = await Promise.all([
             User.findById(actorId)
                 .select(
-                    "email displayName photoURL phoneNumber role favorites recentlyViewed createdAt updatedAt"
+                    "email displayName photoURL photoSource photoSyncWithGoogle phoneNumber role profile privacy identity.documentType identity.idLast4 identity.verifiedAt verification notificationPreferences favorites recentlyViewed createdAt updatedAt"
                 )
                 .lean(),
             RenterPreference.findOne({ renter: actorId }).lean(),
@@ -765,6 +770,53 @@ export async function listSensitiveAccessLogs(req, res, next) {
                 total,
                 totalPages: Math.ceil(total / limit),
             },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/privacy/account-deletion
+// What deleting the account removes, keeps, and when.
+export async function getAccountDeletionInfo(req, res, next) {
+    try {
+        res.set("Cache-Control", "private, no-store");
+        return res.json({ success: true, data: await deletionPreview(req.neveUser) });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// POST /api/v1/privacy/account-deletion  { confirm: "DELETE MY ACCOUNT" }
+// Anonymises the account and signs it out everywhere. Can't be undone.
+export async function deleteMyAccount(req, res, next) {
+    try {
+        if (req.neveUser.role === "admin") {
+            return res.status(403).json({ success: false, message: "Admin accounts are removed by another admin." });
+        }
+        if (req.body?.confirm !== DELETION_CONFIRMATION) {
+            return res.status(400).json({
+                success: false,
+                message: `Type "${DELETION_CONFIRMATION}" in confirm to delete your account.`,
+            });
+        }
+        const summary = await deleteAccount(req.neveUser);
+        await recordSensitiveAccess({
+            actor: req.neveUser._id,
+            action: "account_deleted",
+            resourceType: "user",
+            resourceId: req.neveUser._id,
+            outcome: "completed",
+            details: {
+                listingsRemoved: summary.listingsRemoved,
+                filesScheduledForDeletion: summary.filesScheduledForDeletion,
+            },
+            ipAddress: req.ip,
+        }).catch((error) => console.error("Record account deletion error:", error));
+        return res.json({
+            success: true,
+            message: "Your account has been deleted.",
+            data: summary,
         });
     } catch (error) {
         next(error);

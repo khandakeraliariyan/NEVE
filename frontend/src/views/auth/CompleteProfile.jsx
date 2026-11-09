@@ -1,4 +1,5 @@
 "use client";
+import { usePlatformInfo } from "../../components/Announcement";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,6 +19,8 @@ export default function CompleteProfile() {
     const router = useRouter();
     const [displayName, setDisplayName] = useState("");
     const [selectedRole, setSelectedRole] = useState(null);
+    const platform = usePlatformInfo();
+    const landlordClosed = platform?.landlordSignupsOpen === false;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
 
@@ -58,23 +61,25 @@ export default function CompleteProfile() {
                     <div className="grid gap-3 sm:grid-cols-2">
                         {ROLE_OPTIONS.map((option) => {
                             const checked = selectedRole === option.value;
+                            const closed = option.value === "landlord" && landlordClosed;
                             return (
                                 <label
                                     key={option.value}
-                                    className={`cursor-pointer rounded-xl border p-4 text-sm transition focus-within:ring-2 focus-within:ring-forest ${
-                                        checked ? "border-forest bg-sage ring-1 ring-forest" : "border-line bg-mist hover:border-forest/40"
-                                    }`}
+                                    className={`rounded-xl border p-4 text-sm transition focus-within:ring-2 focus-within:ring-forest ${
+                                        closed ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                                    } ${checked ? "border-forest bg-sage ring-1 ring-forest" : "border-line bg-mist hover:border-forest/40"}`}
                                 >
                                     <input
                                         type="radio"
                                         name="role"
                                         value={option.value}
                                         checked={checked}
+                                        disabled={closed}
                                         onChange={() => setSelectedRole(option.value)}
                                         className="sr-only"
                                     />
                                     <span className="block font-semibold text-ink">{option.title}</span>
-                                    <span className="mt-1 block text-muted">{option.text}</span>
+                                    <span className="mt-1 block text-muted">{closed ? "New property owner accounts are paused right now." : option.text}</span>
                                 </label>
                             );
                         })}
