@@ -38,7 +38,19 @@ export default function TenancyDashboard() {
                 eyebrow="Tenancy oversight"
                 title="Tenancy dashboard"
                 description="Your agreements, obligations, payments and maintenance in one place. Everything here is private to the people on each agreement."
-                actions={canCreate && !creating && <Button onClick={() => setCreating(true)}>+ New agreement</Button>}
+                actions={
+                    canCreate &&
+                    !creating && (
+                        <>
+                            {profile?.role === "landlord" && (
+                                <Button variant="secondary" onClick={() => router.push("/invitations?new=1")}>
+                                    Invite a renter
+                                </Button>
+                            )}
+                            <Button onClick={() => setCreating(true)}>+ New agreement</Button>
+                        </>
+                    )
+                }
             />
 
             {creating && (

@@ -33,6 +33,7 @@ const LANDLORD_NAV = [
             { to: "/dashboard", label: "Dashboard" },
             { to: "/listings", label: "My properties", end: true },
             { to: "/listings/new", label: "Create property" },
+            { to: "/listings/warnings", label: "Listing warnings" },
         ],
     },
     {
@@ -47,6 +48,16 @@ const TENANCY_NAV = [
     {
         title: "Tenancy",
         items: [{ to: "/agreements", label: "Tenancy dashboard", end: true }],
+    },
+];
+// Renters and landlords also see tenancy invitations.
+const PARTY_TENANCY_NAV = (invitationsLabel) => [
+    {
+        title: "Tenancy",
+        items: [
+            { to: "/agreements", label: "Tenancy dashboard", end: true },
+            { to: "/invitations", label: invitationsLabel },
+        ],
     },
 ];
 const REVIEWER_NAV = [
@@ -79,7 +90,8 @@ const ADMIN_NAV = [
         items: [
             { to: "/admin", label: "Platform health", end: true },
             { to: "/admin/audit-logs", label: "Audit trail" },
-            { to: "/admin/system", label: "Retention & backups" },
+            { to: "/admin/system", label: "System jobs & delivery" },
+            { to: "/admin/settings", label: "Platform settings" },
             { to: "/admin/ai-evaluations", label: "AI evaluations" },
         ],
     },
@@ -87,7 +99,7 @@ const ADMIN_NAV = [
 
 function accountNav(role) {
     const items = [{ to: "/notifications", label: "Notifications" }];
-    if (role === "renter" || role === "landlord") items.push({ to: "/verification", label: "Verification" });
+    if (["renter", "landlord", "legal_reviewer"].includes(role)) items.push({ to: "/verification", label: "Verification" });
     items.push({ to: "/settings", label: "Settings" });
     return [{ title: "Account", items }];
 }
@@ -99,9 +111,9 @@ export function workspaceNav(role) {
 function roleNav(role) {
     switch (role) {
         case "renter":
-            return [...RENTER_NAV, ...TENANCY_NAV];
+            return [...RENTER_NAV, ...PARTY_TENANCY_NAV("Invitations")];
         case "landlord":
-            return [...LANDLORD_NAV, ...TENANCY_NAV];
+            return [...LANDLORD_NAV, ...PARTY_TENANCY_NAV("Invite a renter")];
         case "legal_reviewer":
             return [...TENANCY_NAV, ...REVIEWER_NAV];
         case "admin":

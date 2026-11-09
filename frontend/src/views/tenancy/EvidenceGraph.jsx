@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, openPrivateFile, uploadFile } from "../../lib/api";
+import { api, downloadAuthenticated, openPrivateFile, uploadFile } from "../../lib/api";
 import { date, dateTime, label, money } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { useAgreement } from "./useAgreement";
@@ -216,6 +216,15 @@ export default function EvidenceGraph() {
         ...(analysis?.uncertainInterpretations ?? []).map((f) => ({ ...f, kind: "Uncertain" })),
     ];
 
+    async function downloadPdf() {
+        setReportError(null);
+        try {
+            await downloadAuthenticated(`/tenancy/agreements/${agreementId}/evidence-report?format=pdf`, `neve-dispute-report-${agreementId}.pdf`);
+        } catch (err) {
+            setReportError(err);
+        }
+    }
+
     async function downloadReport() {
         setReportError(null);
         try {
@@ -253,7 +262,8 @@ export default function EvidenceGraph() {
                                 </button>
                             ))}
                         </div>
-                        <Button onClick={downloadReport}>Download JSON report</Button>
+                        <Button onClick={downloadPdf}>Download PDF report</Button>
+                        <Button variant="outline" onClick={downloadReport}>Download JSON</Button>
                     </>
                 }
             />

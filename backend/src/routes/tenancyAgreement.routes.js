@@ -25,11 +25,26 @@ import {
     removeAgreementRecordLink,
     updateAgreementPayment,
     updateTenancyAgreementStatus,
+    attachAgreementDocument,
 } from "../controllers/tenancyAgreement.controller.js";
 import {
     extractAgreement,
     reviewAgreementClause,
 } from "../controllers/agreementExtraction.controller.js";
+import {
+    listClauseLegalSources,
+    listLegalSuggestions,
+    reviewLegalSuggestion,
+    runLegalSuggestions,
+} from "../controllers/legalSuggestion.controller.js";
+import {
+    acceptInvitation,
+    cancelInvitation,
+    createInvitation,
+    declineInvitation,
+    getInvitation,
+    listInvitations,
+} from "../controllers/tenancyInvitation.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { extractionLimiter } from "../middleware/rateLimit.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
@@ -70,6 +85,15 @@ router.use(
 );
 
 router.post("/agreements", allowRoles("renter", "landlord"), createTenancyAgreement);
+
+// Landlord invites a renter by email; the renter accepts to start the record.
+router.post("/invitations", allowRoles("landlord"), createInvitation);
+router.get("/invitations", allowRoles("renter", "landlord"), listInvitations);
+router.get("/invitations/:invitationId", allowRoles("renter", "landlord"), getInvitation);
+router.post("/invitations/:invitationId/accept", allowRoles("renter", "landlord"), acceptInvitation);
+router.post("/invitations/:invitationId/decline", allowRoles("renter", "landlord"), declineInvitation);
+router.post("/invitations/:invitationId/cancel", allowRoles("landlord"), cancelInvitation);
+router.patch("/agreements/:agreementId/document", allowRoles("renter", "landlord"), attachAgreementDocument);
 router.get("/agreements", listTenancyAgreements);
 router.get("/agreements/:agreementId/cases", listTenancyCases);
 router.post(
@@ -174,6 +198,28 @@ router.post(
     "/agreements/:agreementId/legal-links",
     allowRoles("renter", "landlord"),
     addAgreementLegalLink
+);
+// Approved legal sources for clauses: suggestions and hand-linking candidates.
+router.get(
+    "/agreements/:agreementId/legal-suggestions",
+    allowRoles("renter", "landlord", "legal_reviewer", "admin"),
+    listLegalSuggestions
+);
+router.post(
+    "/agreements/:agreementId/legal-suggestions",
+    allowRoles("renter", "landlord"),
+    extractionLimiter,
+    runLegalSuggestions
+);
+router.patch(
+    "/agreements/:agreementId/legal-suggestions/:suggestionId",
+    allowRoles("renter", "landlord"),
+    reviewLegalSuggestion
+);
+router.get(
+    "/agreements/:agreementId/clauses/:clauseId/legal-sources",
+    allowRoles("renter", "landlord", "legal_reviewer", "admin"),
+    listClauseLegalSources
 );
 router.post(
     "/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions",

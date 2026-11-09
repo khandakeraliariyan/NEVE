@@ -194,6 +194,22 @@ const extractionSchema = new mongoose.Schema(
             outputTokens: { type: Number, default: null },
         },
         latencyMs: { type: Number, default: null },
+        // How the document's text was read: per page, text or OCR, and how
+        // many personal identifiers were removed before analysis.
+        textSource: { type: mongoose.Schema.Types.Mixed, default: null },
+        // The masked text that was analysed, page by page.
+        documentText: {
+            type: [
+                new mongoose.Schema(
+                    {
+                        page: { type: Number, min: 1 },
+                        text: { type: String, maxlength: 50000, default: "" },
+                    },
+                    { _id: false }
+                ),
+            ],
+            default: [],
+        },
     },
     { _id: false }
 );
@@ -224,6 +240,8 @@ const obligationSchema = new mongoose.Schema(
             default: "open",
         },
         notes: { type: String, trim: true, maxlength: 1000, default: "" },
+        // The due date the "due soon" reminder was sent for.
+        dueReminderFor: { type: Date, default: null },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -340,10 +358,17 @@ const tenancyAgreementSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+        // The signed agreement document. Can be added later when the record
+        // was started from a landlord's invitation.
         documentFile: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "UploadedFile",
-            required: true,
+            default: null,
+        },
+        invitation: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TenancyInvitation",
+            default: null,
         },
         title: {
             type: String,
@@ -358,6 +383,8 @@ const tenancyAgreementSchema = new mongoose.Schema(
         },
         startAt: { type: Date, default: null },
         endAt: { type: Date, default: null },
+        // The end date the "lease ending" reminder was sent for.
+        leaseEndReminderFor: { type: Date, default: null },
         monthlyRentBdt: { type: Number, min: 0, default: null },
         depositBdt: { type: Number, min: 0, default: null },
         advanceRentBdt: { type: Number, min: 0, default: null },

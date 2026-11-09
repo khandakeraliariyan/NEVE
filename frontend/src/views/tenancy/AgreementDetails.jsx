@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, openPrivateFile, uploadFile } from "../../lib/api";
+import { api, downloadAuthenticated, openPrivateFile, uploadFile } from "../../lib/api";
 import { date, dateTime, label, money } from "../../lib/format";
 import { useAgreement } from "./useAgreement";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, StatusBadge, Tabs } from "../../components/ui";
@@ -58,6 +58,59 @@ function Party({ title, user, note }) {
     );
 }
 
+function ReportCard({ agreementId }) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    async function download() {
+        setBusy(true);
+        setError(null);
+        try {
+            await downloadAuthenticated(`/tenancy/agreements/${agreementId}/evidence-report?format=pdf`, `neve-dispute-report-${agreementId}.pdf`);
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+    return (
+        <Card>
+            <h2 className="mb-1 text-xl">Dispute report</h2>
+            <p className="mb-3 text-sm text-muted">
+                A PDF with the chronology, clauses and the legal sources they cite, payments, evidence, messages, conflicts, gaps and limitations, to take to a
+                mediator, lawyer or authority. It doesn't decide who is right.
+            </p>
+            <ErrorBox error={error} />
+            <Button variant="secondary" disabled={busy} onClick={download}>
+                {busy ? "Preparing PDF…" : "Download PDF report"}
+            </Button>
+        </Card>
+    );
+}
+
+function AttachDocument({ agreementId, action }) {
+    const [file, setFile] = useState(null);
+    return (
+        <form
+            className="mt-2 flex flex-wrap items-end gap-3 rounded-xl bg-mist p-4 text-sm"
+            onSubmit={async (event) => {
+                event.preventDefault();
+                if (!file) return;
+                await action.run(async () => {
+                    const fileId = await uploadFile(file, { purpose: "tenancy_evidence" });
+                    await api.patch(`/tenancy/agreements/${agreementId}/document`, { fileId });
+                });
+            }}
+        >
+            <Field label="Add the signed agreement" hint="PDF, a photo or a text file. Once added it can't be replaced.">
+                <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp,text/plain" className="field" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </Field>
+            <Button type="submit" disabled={!file || action.busy}>
+                {action.busy ? "Uploading…" : "Add document"}
+            </Button>
+        </form>
+    );
+}
+
 function Overview({ agreement, canEdit, action }) {
     const [status, setStatus] = useState(agreement.status);
     const id = agreement._id;
@@ -83,10 +136,14 @@ function Overview({ agreement, canEdit, action }) {
                         </Button>
                     </div>
                 ) : (
-                    <p className="text-sm text-muted">No document is attached.</p>
+                    <>
+                        <p className="text-sm text-muted">No document is attached yet.</p>
+                        {canEdit && <AttachDocument agreementId={id} action={action} />}
+                    </>
                 )}
                 <p className="mt-2 text-xs text-muted">Links are private and expire after a few minutes. Opening a file is recorded in the access log.</p>
             </Card>
+            <ReportCard agreementId={id} />
             {canEdit && (
                 <Card>
                     <h2 className="mb-3 text-xl">Agreement status</h2>
