@@ -150,7 +150,9 @@ app.use((error, req, res, next) => {
         message:
             statusCode < 500
                 ? error.message
-                : "Internal server error.",
+                : typeof error.publicMessage === "string"
+                    ? error.publicMessage
+                    : "Internal server error.",
     });
 });
 

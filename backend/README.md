@@ -183,7 +183,8 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `MAX_FLOOR_PLAN_SIZE_MB` | No | `10`; positive number | Floor-plan upload limit |
 | `ANTHROPIC_API_KEY` | For extraction | Optional | Enables agreement extraction; without it the extract endpoint returns 503 |
 | `AGREEMENT_EXTRACTION_MODEL` | No | `claude-opus-5-5` | Claude model used for agreement extraction |
-| `OVERPASS_API_URL` | No | `https://overpass-api.de/api/interpreter` | Overpass endpoint for nearby-place data |
+| `OVERPASS_API_URL` | No | `https://overpass-api.de/api/interpreter` | Overpass endpoint for nearby-place data. Give several, separated by commas, to try the next one when a server is down or slow. When none answers, the API returns 502 with a plain message, or the places saved earlier for that listing |
+| `OVERPASS_TIMEOUT_SECONDS` | No | `25`; 5 to 120 | How long to wait for each Overpass server |
 | `ROUTING_WALKING_URL` | No | `https://routing.openstreetmap.de/routed-foot` | OSRM-compatible service for walking routes and times |
 | `ROUTING_DRIVING_URL` | No | `https://routing.openstreetmap.de/routed-car` | OSRM-compatible service for driving routes and times |
 | `EMAIL_PROVIDER` | For email | Optional; `resend` or `sendgrid` | HTTP email API used for email notifications |

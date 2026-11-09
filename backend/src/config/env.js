@@ -40,10 +40,21 @@ const envSchema = z.object({
         .number()
         .positive()
         .default(10),
+    // One Overpass server, or several separated by commas: each is tried in
+    // turn when the one before it fails or is too slow.
     OVERPASS_API_URL: z
         .string()
-        .url()
-        .default("https://overpass-api.de/api/interpreter"),
+        .default("https://overpass-api.de/api/interpreter")
+        .refine(
+            (value) =>
+                value
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter(Boolean)
+                    .every((item) => URL.canParse(item)),
+            "OVERPASS_API_URL must be one URL or a comma-separated list of URLs."
+        ),
+    OVERPASS_TIMEOUT_SECONDS: z.coerce.number().int().min(5).max(120).default(25),
     // OSRM-compatible routing services for walking and driving times.
     ROUTING_WALKING_URL: z
         .string()

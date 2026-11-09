@@ -287,54 +287,64 @@ export function isNearbyCacheFresh(
     );
 }
 
-async function fetchNearbyElements({ latitude, longitude, radius }) {
-    let response;
+// Shown to people when no Overpass server could give nearby-place data.
+export const MAP_DATA_UNAVAILABLE =
+    "Nearby-place data from OpenStreetMap is unavailable right now. Please try again in a few minutes.";
 
+function overpassServers() {
+    return env.OVERPASS_API_URL.split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function providerUnavailable(failures) {
+    const error = new Error(
+        `Nearby places provider is unavailable (${failures.join("; ")}).`
+    );
+    error.status = 502;
+    error.publicMessage = MAP_DATA_UNAVAILABLE;
+    return error;
+}
+
+async function fetchFromServer(url, query, fetchImpl) {
+    let response;
     try {
-        response = await fetch(env.OVERPASS_API_URL, {
+        response = await fetchImpl(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
                 "User-Agent": "NeveRentalPlatform/1.0",
             },
-            body: new URLSearchParams({
-                data: buildOverpassQuery(latitude, longitude, radius),
-            }),
-            signal: AbortSignal.timeout(30000),
+            body: new URLSearchParams({ data: query }),
+            signal: AbortSignal.timeout(env.OVERPASS_TIMEOUT_SECONDS * 1000),
         });
     } catch (error) {
-        const providerError = new Error(
-            "Nearby places provider is unavailable."
-        );
-        providerError.status = 502;
-        providerError.cause = error;
-        throw providerError;
+        return { failure: error?.name === "TimeoutError" ? "timed out" : "unreachable" };
     }
-
     if (!response.ok) {
-        const providerError = new Error(
-            `Nearby places provider returned HTTP ${response.status}.`
-        );
-        providerError.status = 502;
-        throw providerError;
+        return { failure: `HTTP ${response.status}` };
     }
-
     try {
         const data = await response.json();
-
         if (!Array.isArray(data.elements)) {
-            throw new Error("Provider response is missing its elements list.");
+            return { failure: "response had no elements list" };
         }
-
-        return data.elements;
-    } catch (error) {
-        const providerError = new Error(
-            "Nearby places provider returned invalid data."
-        );
-        providerError.status = 502;
-        providerError.cause = error;
-        throw providerError;
+        return { elements: data.elements };
+    } catch {
+        return { failure: "invalid JSON" };
     }
+}
+
+// Asks each configured Overpass server in turn and returns the first answer.
+export async function fetchNearbyElements({ latitude, longitude, radius }, fetchImpl = fetch) {
+    const query = buildOverpassQuery(latitude, longitude, radius);
+    const failures = [];
+    for (const url of overpassServers()) {
+        const result = await fetchFromServer(url, query, fetchImpl);
+        if (result.elements) return result.elements;
+        failures.push(`${new URL(url).host}: ${result.failure}`);
+    }
+    throw providerUnavailable(failures);
 }
 
 export async function findNearbyPlaces({
@@ -389,11 +399,37 @@ export async function findNearbyPlaces({
         }
     }
 
-    const elements = await fetchNearbyElements({
-        latitude,
-        longitude,
-        radius,
-    });
+    let elements;
+    try {
+        elements = await fetchNearbyElements({
+            latitude,
+            longitude,
+            radius,
+        });
+    } catch (error) {
+        // Better older places than none: use the last saved result for this
+        // listing when it covers the same spot and radius, and say how old it is.
+        if (
+            cache &&
+            Array.isArray(cache.places) &&
+            cache.centerLatitude === latitude &&
+            cache.centerLongitude === longitude &&
+            cache.radiusMeters >= radius
+        ) {
+            return {
+                ...buildResult({
+                    places: cache.places,
+                    radius,
+                    category,
+                    fetchedAt: cache.fetchedAt,
+                    cached: true,
+                }),
+                stale: true,
+                notice: "OpenStreetMap couldn't be reached, so these are the places saved earlier for this listing.",
+            };
+        }
+        throw error;
+    }
     const places = mapOverpassElements(
         elements,
         latitude,
