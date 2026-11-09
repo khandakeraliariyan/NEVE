@@ -4,7 +4,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "../lib/firebase";
 import { api, ApiError, SESSION_REVOKED_EVENT } from "../lib/api";
-import { disablePush } from "../lib/push";
 import {
     ADMIN_SIGNED_OUT_EVENT,
     adminTokenExpiresAt,
@@ -131,8 +130,6 @@ export function AuthProvider({ children }) {
     }, []);
 
     const signOut = useCallback(async () => {
-        // Stop this browser receiving the account's push notifications.
-        await disablePush({ quiet: true }).catch(() => null);
         if (getAdminToken()) {
             clearAdminToken();
             setProfile(null);

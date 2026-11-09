@@ -16,17 +16,6 @@ start scripts pin port 5173 so this stays true.
 
 Production: `npm run build && npm start`.
 
-### Browser push notifications (optional)
-
-Set `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` and `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
-(Firebase console > Project settings > Cloud Messaging), and
-`PUSH_NOTIFICATIONS_ENABLED=true` on the backend. People then turn push on per
-browser under Notifications > Preferences. The service worker is
-`public/neve-push-sw.js`; it shows only the title and short text Neve sends and
-opens the notifications page when clicked. Signing out removes the browser's
-push token, so a shared computer stops getting the previous person's alerts.
-Push needs HTTPS, or `localhost` during development.
-
 ## Layout
 
 - `src/app/` – routes. Each `page.jsx` is a thin wrapper that sets the page title,
