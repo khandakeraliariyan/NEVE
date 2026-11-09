@@ -1,4 +1,5 @@
 "use client";
+import SystemHealth from "./SystemHealth";
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
@@ -57,7 +58,7 @@ export default function PlatformHealth() {
             <PageHeader
                 eyebrow="System governance"
                 title="Platform health & operations"
-                description="API availability, moderation queues and the latest administrative actions."
+                description="System health, email delivery, moderation queues and the latest administrative actions."
                 actions={
                     <Button variant="secondary" onClick={() => { health.check(); overview.reload(); audit.reload(); }}>
                         Refresh
@@ -88,6 +89,8 @@ export default function PlatformHealth() {
                     </ul>
                 </Card>
             </div>
+
+            <SystemHealth />
 
             <ErrorBox error={overview.error} onRetry={overview.reload} />
             <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

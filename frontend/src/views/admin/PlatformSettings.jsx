@@ -1,0 +1,278 @@
+"use client";
+
+import { useState } from "react";
+import { api } from "../../lib/api";
+import { dateTime, label } from "../../lib/format";
+import { useApi } from "../../hooks/useApi";
+import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, PageHeader, Tabs } from "../../components/ui";
+
+function initialForm(data) {
+    return {
+        announcementEnabled: data.announcement.enabled,
+        announcementText: data.announcement.text,
+        announcementTone: data.announcement.tone,
+        supportEmail: data.supportEmail,
+        emailFooter: data.emailFooter,
+        inquiryReminderHours: data.inquiryReminderHours,
+        invitationExpiryDays: data.invitationExpiryDays,
+        landlordSignupsOpen: data.landlordSignupsOpen,
+    };
+}
+
+function SettingsForm() {
+    const settings = useApi(() => api.get("/admin/settings"), []);
+    if (settings.loading && !settings.data) return <Loading />;
+    if (settings.error) return <ErrorBox error={settings.error} onRetry={settings.reload} />;
+    const data = settings.data?.data;
+    if (!data) return null;
+    return <SettingsFields key={data.updatedAt ?? "defaults"} data={data} onSaved={settings.reload} />;
+}
+
+function SettingsFields({ data, onSaved }) {
+    const [form, setForm] = useState(() => initialForm(data));
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const [saved, setSaved] = useState(false);
+    const set = (key) => (event) => {
+        setSaved(false);
+        setForm({ ...form, [key]: event.target.type === "checkbox" ? event.target.checked : event.target.value });
+    };
+
+    async function save(event) {
+        event.preventDefault();
+        setBusy(true);
+        setError(null);
+        setSaved(false);
+        try {
+            await api.patch("/admin/settings", {
+                announcement: { enabled: form.announcementEnabled, text: form.announcementText.trim(), tone: form.announcementTone },
+                supportEmail: form.supportEmail.trim(),
+                emailFooter: form.emailFooter.trim(),
+                inquiryReminderHours: Number(form.inquiryReminderHours),
+                invitationExpiryDays: Number(form.invitationExpiryDays),
+                landlordSignupsOpen: form.landlordSignupsOpen,
+            });
+            setSaved(true);
+            onSaved();
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <form onSubmit={save} className="space-y-6">
+            <Card className="space-y-4">
+                <h2 className="text-xl">Announcement</h2>
+                <p className="text-sm text-muted">A notice at the top of every page, for planned maintenance or important news. Changes show within a minute.</p>
+                <label className="flex items-center gap-3 text-sm">
+                    <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.announcementEnabled} onChange={set("announcementEnabled")} />
+                    Show the announcement
+                </label>
+                <Field label="Text" hint="Up to 300 characters.">
+                    <textarea maxLength={300} className="field min-h-16" value={form.announcementText} onChange={set("announcementText")} />
+                </Field>
+                <Field label="Style">
+                    <select className="field max-w-xs" value={form.announcementTone} onChange={set("announcementTone")}>
+                        <option value="info">Information</option>
+                        <option value="warning">Warning</option>
+                    </select>
+                </Field>
+            </Card>
+
+            <Card className="grid gap-4 md:grid-cols-2">
+                <h2 className="text-xl md:col-span-2">Email</h2>
+                <Field label="Support email" hint="Shown in email footers. Leave empty to hide.">
+                    <input type="email" className="field" value={form.supportEmail} onChange={set("supportEmail")} />
+                </Field>
+                <Field label="Footer line" hint='Added to every notification email, e.g. your company name and address.' className="md:col-span-2">
+                    <textarea maxLength={500} className="field min-h-16" value={form.emailFooter} onChange={set("emailFooter")} />
+                </Field>
+            </Card>
+
+            <Card className="grid gap-4 md:grid-cols-2">
+                <h2 className="text-xl md:col-span-2">Rules</h2>
+                <Field label="Remind landlords about unanswered inquiries after (hours)" hint="6 to 168.">
+                    <input type="number" min="6" max="168" required className="field" value={form.inquiryReminderHours} onChange={set("inquiryReminderHours")} />
+                </Field>
+                <Field label="Tenancy invitations stay open for (days)" hint="1 to 60.">
+                    <input type="number" min="1" max="60" required className="field" value={form.invitationExpiryDays} onChange={set("invitationExpiryDays")} />
+                </Field>
+                <label className="flex items-center gap-3 text-sm md:col-span-2">
+                    <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.landlordSignupsOpen} onChange={set("landlordSignupsOpen")} />
+                    New people can sign up as property owners
+                </label>
+            </Card>
+
+            <ErrorBox error={error} />
+            <div className="flex items-center gap-3">
+                <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Save settings"}</Button>
+                {saved && <span className="text-sm text-forest">Saved.</span>}
+                {data.updatedAt && <span className="text-xs text-muted">Last changed {dateTime(data.updatedAt)}</span>}
+            </div>
+        </form>
+    );
+}
+
+function TemplateEditor({ template, onChanged }) {
+    const [subject, setSubject] = useState(template.subject);
+    const [intro, setIntro] = useState(template.intro);
+    const [emailEnabled, setEmailEnabled] = useState(template.emailEnabled);
+    const [preview, setPreview] = useState(null);
+    const [busy, setBusy] = useState(null);
+    const [error, setError] = useState(null);
+
+    async function act(kind, fn) {
+        setBusy(kind);
+        setError(null);
+        try {
+            await fn();
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    return (
+        <div className="space-y-3 border-t border-line px-5 py-4 text-sm">
+            {!template.security && (
+                <label className="flex items-center gap-3">
+                    <input type="checkbox" className="h-4 w-4 accent-forest" checked={emailEnabled} onChange={(e) => setEmailEnabled(e.target.checked)} />
+                    Send this email (untick to keep it in-app only)
+                </label>
+            )}
+            <Field label="Subject" hint="Leave empty for the built-in subject. You can use {{title}} and {{name}}.">
+                <input maxLength={150} className="field" value={subject} onChange={(e) => setSubject(e.target.value)} />
+            </Field>
+            <Field label="Opening paragraph" hint="Shown after the greeting. The details, buttons and privacy rules stay as built in.">
+                <textarea maxLength={1000} className="field min-h-20" value={intro} onChange={(e) => setIntro(e.target.value)} />
+            </Field>
+            <ErrorBox error={error} />
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    className="px-4 py-1.5 text-xs"
+                    disabled={Boolean(busy)}
+                    onClick={() =>
+                        act("save", async () => {
+                            await api.put(`/admin/email-templates/${template.type}`, {
+                                subject: subject.trim(),
+                                intro: intro.trim(),
+                                ...(template.security ? {} : { emailEnabled }),
+                            });
+                            await onChanged(`Saved the ${label(template.type).toLowerCase()} email.`);
+                        })
+                    }
+                >
+                    Save
+                </Button>
+                <Button
+                    variant="outline"
+                    className="px-4 py-1.5 text-xs"
+                    disabled={Boolean(busy)}
+                    onClick={() =>
+                        act("preview", async () => {
+                            const payload = await api.post(`/admin/email-templates/${template.type}/preview`, { subject: subject.trim(), intro: intro.trim() });
+                            setPreview(payload.data);
+                        })
+                    }
+                >
+                    {busy === "preview" ? "Rendering…" : "Preview"}
+                </Button>
+                {template.customised && (
+                    <Button
+                        variant="ghost"
+                        className="px-4 py-1.5 text-xs"
+                        disabled={Boolean(busy)}
+                        onClick={() =>
+                            act("reset", async () => {
+                                await api.del(`/admin/email-templates/${template.type}`);
+                                await onChanged(`The ${label(template.type).toLowerCase()} email is back to the built-in version.`);
+                            })
+                        }
+                    >
+                        Reset to built-in
+                    </Button>
+                )}
+            </div>
+            {preview && (
+                <div className="space-y-2">
+                    <p className="text-xs text-muted">Subject: <span className="font-semibold text-ink">{preview.subject}</span> · sample data</p>
+                    <iframe title="Email preview" sandbox="" srcDoc={preview.html} className="h-[520px] w-full rounded-xl border border-line bg-white" />
+                </div>
+            )}
+        </div>
+    );
+}
+
+function EmailTemplates() {
+    const templates = useApi(() => api.get("/admin/email-templates"), []);
+    const [open, setOpen] = useState(null);
+    const [message, setMessage] = useState(null);
+    const list = templates.data?.data ?? [];
+
+    if (templates.loading) return <Loading />;
+    if (templates.error) return <ErrorBox error={templates.error} onRetry={templates.reload} />;
+
+    return (
+        <div className="space-y-4">
+            <p className="text-sm text-muted">
+                Change the subject or opening paragraph of an email, or stop sending one. Security alerts are always emailed. Emails never include contact
+                details, ID numbers or payment links, whatever you write here.
+            </p>
+            {message && <p className="rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{message}</p>}
+            <Card className="overflow-hidden p-0">
+                <ul className="divide-y divide-line">
+                    {list.map((template) => (
+                        <li key={template.type}>
+                            <button
+                                type="button"
+                                className="flex w-full flex-wrap items-center justify-between gap-2 px-5 py-3 text-left text-sm hover:bg-mist"
+                                onClick={() => setOpen(open === template.type ? null : template.type)}
+                            >
+                                <span className="font-medium text-ink">{template.type === "digest" ? "Daily digest" : label(template.type)}</span>
+                                <span className="flex gap-1">
+                                    {template.security && <Badge tone="dark">Security</Badge>}
+                                    {!template.emailEnabled && <Badge tone="gray">Email off</Badge>}
+                                    {template.customised && <Badge>Customised</Badge>}
+                                </span>
+                            </button>
+                            {open === template.type && (
+                                <TemplateEditor
+                                    key={`${template.type}-${template.updatedAt ?? "default"}`}
+                                    template={template}
+                                    onChanged={async (text) => {
+                                        setMessage(text);
+                                        await templates.reload();
+                                    }}
+                                />
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            </Card>
+        </div>
+    );
+}
+
+export default function PlatformSettings() {
+    const [tab, setTab] = useState("settings");
+    return (
+        <div>
+            <PageHeader eyebrow="System governance" title="Platform settings" description="Change how Neve behaves and what its emails say, without a new release. Every change is in the audit trail." />
+            <Tabs
+                tabs={[
+                    { value: "settings", label: "Settings" },
+                    { value: "templates", label: "Email templates" },
+                ]}
+                active={tab}
+                onChange={setTab}
+            />
+            {tab === "settings" ? <SettingsForm /> : <EmailTemplates />}
+            <Disclaimer className="mt-6" title="How changes apply">
+                Settings and templates take effect within about 30 seconds. Emails already queued keep the wording they were created with.
+            </Disclaimer>
+        </div>
+    );
+}

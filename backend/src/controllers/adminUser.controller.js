@@ -132,6 +132,12 @@ export async function changeAccountStatus(req, res, next) {
             return res.status(400).json({ success: false, message: "Invalid user ID." });
         }
         const target = await User.findById(userId);
+        if (target?.deletedAt) {
+            return res.status(409).json({
+                success: false,
+                message: "This account was deleted by its owner and can't be reactivated.",
+            });
+        }
         const { value, error, status } = validateAccountStatusChange({
             isActive: req.body?.isActive,
             reason: req.body?.reason,

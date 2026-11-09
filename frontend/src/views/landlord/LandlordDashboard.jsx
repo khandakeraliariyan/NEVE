@@ -32,6 +32,40 @@ function StatCard({ title, value, caption, to }) {
     );
 }
 
+// How quickly and how often the landlord answers inquiries (last 90 days).
+function ResponsivenessCard({ data }) {
+    const rate = data.responseRate;
+    return (
+        <Card className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+                <p className="eyebrow">Response rate</p>
+                <p className="mt-1 text-3xl font-semibold">{rate === null ? "—" : `${rate}%`}</p>
+                <p className="text-xs text-muted">
+                    {data.answered} of {data.inquiries} inquiries answered in {data.periodDays} days{rate === null ? " (shown after 3)" : ""}
+                </p>
+            </div>
+            <div>
+                <p className="eyebrow">Typical response</p>
+                <p className="mt-1 text-lg font-semibold">{data.typicalResponseTime ?? "Not enough replies yet"}</p>
+                <p className="text-xs text-muted">
+                    {data.answeredWithin24hRate === null ? "Median of your first replies" : `${data.answeredWithin24hRate}% answered within a day`}
+                </p>
+            </div>
+            <div>
+                <p className="eyebrow">Waiting for you</p>
+                <p className={`mt-1 text-3xl font-semibold ${data.overdue ? "text-rose-ink" : ""}`}>{data.waiting}</p>
+                <p className="text-xs text-muted">{data.overdue ? `${data.overdue} over a day old` : "None over a day old"}</p>
+            </div>
+            <div className="text-xs text-muted">
+                <p>Renters see your response rate and typical response time on your listings and public profile. Replying in Neve messages counts.</p>
+                {data.waiting > 0 && (
+                    <Link href="/inquiries" className="mt-2 inline-block text-forest underline">Answer waiting inquiries →</Link>
+                )}
+            </div>
+        </Card>
+    );
+}
+
 export default function LandlordDashboard() {
     const [status, setStatus] = useState("");
     const [range, setRange] = useState({ from: "", to: "" });
@@ -113,6 +147,7 @@ export default function LandlordDashboard() {
                 )}
             </Card>
             <ErrorBox error={performance.error} onRetry={performance.reload} />
+            {performance.data?.responsiveness && <ResponsivenessCard data={performance.data.responsiveness} />}
 
             <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
                 <section>

@@ -32,6 +32,8 @@ const adminAuditLogSchema = new mongoose.Schema(
                 "verification_request",
                 "system_job",
                 "legal_source",
+                "notification_delivery",
+                "platform_settings",
             ],
         },
         targetId: {

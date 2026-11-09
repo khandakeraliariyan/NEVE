@@ -1,4 +1,5 @@
 import express from "express";
+import { createStaffAccount, renewAdminSetupLink } from "../controllers/adminStaff.controller.js";
 
 import {
     changeAccountStatus,
@@ -14,6 +15,8 @@ router.use(authenticateUser);
 router.use(allowRoles("admin"));
 
 router.get("/", listUsers);
+router.post("/staff", createStaffAccount);
+router.post("/:userId/setup-link", renewAdminSetupLink);
 router.patch("/:userId/role", changeReviewerRole);
 router.patch("/:userId/status", changeAccountStatus);
 
