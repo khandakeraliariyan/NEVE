@@ -70,7 +70,9 @@ const REVIEWER_NAV = [
         title: "Active review",
         items: [
             { to: "/cases", label: "Case queue", end: true },
-            { to: "/legal-review", label: "Legal sources" },
+            { to: "/legal-review", label: "Legal sources", end: true },
+            { to: "/legal-review/ai-oversight", label: "AI oversight" },
+            { to: "/legal-review/ai-evaluations", label: "AI evaluations" },
         ],
     },
 ];

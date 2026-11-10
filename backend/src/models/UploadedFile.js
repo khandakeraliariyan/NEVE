@@ -25,6 +25,7 @@ const uploadedFileSchema = new mongoose.Schema(
                 "tenancy_evidence",
                 "profile_photo",
                 "verification_document",
+                "legal_source_document",
             ],
             required: true,
         },

@@ -12,7 +12,7 @@ export function validateLegalSourceInput(body, { partial = false } = {}) {
     if (!isObject(body)) return { error: "Request body must be an object." };
     const allowed = [
         "sourceKey", "jurisdiction", "sourceType", "title", "citation", "sourceUrl",
-        "language", "effectiveFrom", "changeSummary", "sections",
+        "language", "effectiveFrom", "changeSummary", "sections", "documentFileId",
     ];
     const unknown = Object.keys(body).filter((key) => !allowed.includes(key));
     if (unknown.length) return { error: `Unsupported fields: ${unknown.join(", ")}` };
@@ -82,23 +82,39 @@ export function validateLegalSourceInput(body, { partial = false } = {}) {
             });
         }
     }
+    if (body.documentFileId !== undefined) {
+        if (body.documentFileId !== null && !/^[a-f0-9]{24}$/i.test(String(body.documentFileId))) return { error: "documentFileId must be a file ID." };
+        value.documentFileId = body.documentFileId;
+    }
     if (partial && !Object.keys(value).length) return { error: "Nothing to update." };
     return { value };
 }
 
 // Allowed status moves: who may make them, and from where.
+// Admins and legal reviewers draft and submit; only legal reviewers decide.
+// Rejected sources are never part of the approved knowledge base.
 export const TRANSITIONS = {
-    submit: { from: ["draft"], to: "in_review", role: "admin" },
-    approve: { from: ["in_review"], to: "approved", role: "legal_reviewer" },
-    request_changes: { from: ["in_review"], to: "draft", role: "legal_reviewer" },
-    retire: { from: ["approved", "draft"], to: "retired", role: "admin" },
+    submit: { from: ["draft"], to: "in_review", roles: ["admin", "legal_reviewer"] },
+    approve: { from: ["in_review"], to: "approved", roles: ["legal_reviewer"] },
+    request_changes: { from: ["in_review"], to: "draft", roles: ["legal_reviewer"] },
+    reject: { from: ["in_review"], to: "rejected", roles: ["legal_reviewer"] },
+    retire: { from: ["approved", "draft"], to: "retired", roles: ["admin", "legal_reviewer"] },
+};
+
+export const TRANSITION_HISTORY = {
+    submit: "submitted",
+    approve: "approved",
+    request_changes: "changes_requested",
+    reject: "rejected",
+    retire: "retired",
 };
 
 export function checkTransition(source, action, actor) {
     const transition = TRANSITIONS[action];
     if (!transition) return { error: "Unknown action.", status: 400 };
-    if (actor.role !== transition.role) {
-        return { error: `Only a ${transition.role.replace("_", " ")} can ${action.replace("_", " ")} a legal source.`, status: 403 };
+    if (!transition.roles.includes(actor.role)) {
+        const who = transition.roles.map((role) => role.replace("_", " ")).join(" or ");
+        return { error: `Only a ${who} can ${action.replace("_", " ")} a legal source.`, status: 403 };
     }
     if (!transition.from.includes(source.status)) {
         return { error: `A ${source.status} legal source can't be moved with ${action}.`, status: 409 };
@@ -110,6 +126,13 @@ const STOP_WORDS = new Set([
     "the", "and", "for", "that", "with", "this", "shall", "will", "any", "are", "from",
     "has", "have", "not", "may", "such", "its", "his", "her", "their", "all", "per", "who",
 ]);
+
+export function validateFlagInput(body, reasons) {
+    if (!reasons.includes(body?.reason)) return { error: `reason must be one of: ${reasons.join(", ")}.` };
+    if (typeof body.note !== "string" || !body.note.trim() || body.note.length > 2000) return { error: "Explain the concern in note (up to 2000 characters)." };
+    if (body.sectionId !== undefined && body.sectionId !== null && !/^[a-f0-9]{24}$/i.test(String(body.sectionId))) return { error: "sectionId must be a section ID." };
+    return { value: { reason: body.reason, note: body.note.trim(), sectionId: body.sectionId ?? null } };
+}
 
 export function tokenize(value) {
     return String(value ?? "")

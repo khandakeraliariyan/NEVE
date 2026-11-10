@@ -41,6 +41,8 @@ export const NOTIFICATION_TYPES = [
     "listing_appeal_submitted",
     "listing_appeal_decided",
     "legal_source_submitted",
+    "legal_source_flagged",
+    "copilot_answer_reported",
     "verification_reviewed",
     "staff_role_changed",
     "account_status_changed",
@@ -105,7 +107,10 @@ export function defaultNotificationLink(notification) {
         case "obligation_overdue":
             return agreement ? `/agreements/${agreement}` : "/agreements";
         case "legal_source_submitted":
+        case "legal_source_flagged":
             return "/legal-review";
+        case "copilot_answer_reported":
+            return "/legal-review/ai-oversight";
         case "verification_reviewed":
             return "/verification";
         case "security_new_device":

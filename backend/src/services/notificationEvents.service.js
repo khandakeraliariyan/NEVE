@@ -277,6 +277,43 @@ export function notifyListingReported({ property, reason }) {
     });
 }
 
+export function notifyLegalSourceFlagged({ source, reason, actorId }) {
+    return safely("legal source flagged", async () => {
+        const [reviewers, admins] = await Promise.all([activeUserIds("legal_reviewer"), activeUserIds("admin")]);
+        const name = [source.title, source.citation].filter(Boolean).join(", ") || "A legal source";
+        return notifyAll(
+            [...reviewers, ...admins]
+                .filter((recipient) => String(recipient) !== String(actorId))
+                .map((recipient) => ({
+                    recipient,
+                    type: "legal_source_flagged",
+                    title: "A legal source was flagged",
+                    message: `${name} (version ${source.version ?? 1}) was flagged: ${String(reason).replace(/_/g, " ")}.`,
+                    link: "/legal-review",
+                })),
+            "legal source flagged"
+        );
+    });
+}
+
+export function notifyCopilotAnswerReported({ actorId }) {
+    return safely("copilot answer reported", async () => {
+        const reviewers = await activeUserIds("legal_reviewer");
+        return notifyAll(
+            reviewers
+                .filter((recipient) => String(recipient) !== String(actorId))
+                .map((recipient) => ({
+                    recipient,
+                    type: "copilot_answer_reported",
+                    title: "A Legal Copilot answer needs review",
+                    message: "Someone reported a Legal Copilot answer as wrong or misleading.",
+                    link: "/legal-review/ai-oversight",
+                })),
+            "copilot answer reported"
+        );
+    });
+}
+
 export function notifyLegalSourceSubmitted({ source, actorId }) {
     return safely("legal source submitted", async () => {
         const reviewers = await activeUserIds("legal_reviewer");

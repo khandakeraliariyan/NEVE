@@ -13,6 +13,10 @@ import {
     validateQuestion,
 } from "../services/legalCopilot.service.js";
 import { findAccessibleAgreement } from "../services/tenancyAgreement.service.js";
+import { notifyCopilotAnswerReported } from "../services/notificationEvents.service.js";
+import { maskPersonalIdentifiers } from "../services/piiMasking.service.js";
+
+export const REVIEW_VERDICTS = ["accurate", "unsupported_claim", "misleading", "wrong_citation", "applicability_issue", "outdated_source"];
 
 const validId = mongoose.isValidObjectId;
 const userId = (req) => req.neveUser._id;
@@ -188,6 +192,7 @@ export async function reportAnswer(req, res, next) {
         if (!message || message.role !== "assistant") return res.status(404).json({ success: false, message: "Answer not found." });
         message.report = { reason, reportedAt: new Date() };
         await conversation.save();
+        await notifyCopilotAnswerReported({ actorId: userId(req) });
         return res.json({ success: true, data: message, message: "Thanks. A legal reviewer will look at this answer." });
     } catch (error) {
         next(error);
@@ -214,6 +219,121 @@ export async function getCitedSection(req, res, next) {
                 source: { ...meta, sectionCount: sections.length },
                 section,
                 note: source.status === "retired" ? "A newer version of this source has been approved since this answer was written." : null,
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// --- Legal reviewer oversight ---------------------------------------------------
+
+// GET /api/v1/legal-review/copilot/reports?status=open|reviewed
+// Reported answers with the question that led to them. Reviewers see no
+// names, agreement or other messages, and personal identifiers are masked.
+export async function listReportedAnswers(req, res, next) {
+    try {
+        const reviewed = req.query.status === "reviewed";
+        const conversations = await CopilotConversation.find({
+            messages: { $elemMatch: { "report.reportedAt": { $ne: null }, "report.reviewedAt": reviewed ? { $ne: null } : null } },
+        })
+            .select("jurisdiction agreement messages")
+            .sort({ updatedAt: -1 })
+            .limit(100)
+            .lean();
+        const items = [];
+        for (const conversation of conversations) {
+            conversation.messages.forEach((message, index) => {
+                if (message.role !== "assistant" || !message.report?.reportedAt) return;
+                if (Boolean(message.report.reviewedAt) !== reviewed) return;
+                const question = [...conversation.messages.slice(0, index)].reverse().find((m) => m.role === "user");
+                items.push({
+                    conversationId: conversation._id,
+                    messageId: message._id,
+                    jurisdiction: conversation.jurisdiction,
+                    aboutAgreement: Boolean(conversation.agreement),
+                    question: maskPersonalIdentifiers(question?.content ?? "").text,
+                    answer: maskPersonalIdentifiers(message.content).text,
+                    citations: message.citations,
+                    clauseCount: message.clauseRefs?.length ?? 0,
+                    grounding: message.grounding,
+                    model: message.model,
+                    answeredAt: message.createdAt,
+                    report: { ...message.report, reason: maskPersonalIdentifiers(message.report.reason ?? "").text },
+                });
+            });
+        }
+        items.sort((a, b) => new Date(b.report.reportedAt) - new Date(a.report.reportedAt));
+        noStore(res);
+        return res.json({ success: true, data: items, verdicts: REVIEW_VERDICTS });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH /api/v1/legal-review/copilot/reports/:conversationId/:messageId  { verdict, note }
+export async function reviewReportedAnswer(req, res, next) {
+    try {
+        const { verdict } = req.body ?? {};
+        const note = typeof req.body?.note === "string" ? req.body.note.trim() : "";
+        if (!REVIEW_VERDICTS.includes(verdict)) return res.status(400).json({ success: false, message: `verdict must be one of: ${REVIEW_VERDICTS.join(", ")}.` });
+        if (note.length > 2000 || (verdict !== "accurate" && !note)) return res.status(400).json({ success: false, message: "Explain the problem in note (up to 2000 characters)." });
+        const { conversationId, messageId } = req.params;
+        if (!validId(conversationId) || !validId(messageId)) return res.status(400).json({ success: false, message: "Invalid ID." });
+        const conversation = await CopilotConversation.findById(conversationId);
+        const message = conversation?.messages.id(messageId);
+        if (!message?.report?.reportedAt) return res.status(404).json({ success: false, message: "Reported answer not found." });
+        Object.assign(message.report, { verdict, reviewNote: note, reviewedBy: userId(req), reviewedAt: new Date() });
+        await conversation.save();
+        return res.json({ success: true, data: message.report });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/legal-review/copilot/quality?days=30
+// Counts only: how answers were grounded, how many were reported, and the
+// reviewers' verdicts. No conversation content.
+export async function copilotQualitySummary(req, res, next) {
+    try {
+        const days = Math.min(365, Math.max(1, Number(req.query.days ?? 30) || 30));
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const rows = await CopilotConversation.aggregate([
+            { $unwind: "$messages" },
+            { $match: { "messages.role": "assistant", "messages.createdAt": { $gte: since } } },
+            {
+                $group: {
+                    _id: null,
+                    answers: { $sum: 1 },
+                    sourced: { $sum: { $cond: [{ $eq: ["$messages.grounding", "sourced"] }, 1, 0] } },
+                    partial: { $sum: { $cond: [{ $eq: ["$messages.grounding", "partial"] }, 1, 0] } },
+                    notCovered: { $sum: { $cond: [{ $eq: ["$messages.grounding", "not_covered"] }, 1, 0] } },
+                    keyword: { $sum: { $cond: [{ $eq: ["$messages.grounding", "keyword"] }, 1, 0] } },
+                    reported: { $sum: { $cond: [{ $ne: ["$messages.report.reportedAt", null] }, 1, 0] } },
+                    reviewed: { $sum: { $cond: [{ $ne: ["$messages.report.reviewedAt", null] }, 1, 0] } },
+                    withCitations: { $sum: { $cond: [{ $gt: [{ $size: { $ifNull: ["$messages.citations", []] } }, 0] }, 1, 0] } },
+                    avgLatencyMs: { $avg: "$messages.latencyMs" },
+                    inputTokens: { $sum: { $ifNull: ["$messages.usage.inputTokens", 0] } },
+                    outputTokens: { $sum: { $ifNull: ["$messages.usage.outputTokens", 0] } },
+                },
+            },
+        ]);
+        const verdictRows = await CopilotConversation.aggregate([
+            { $unwind: "$messages" },
+            { $match: { "messages.report.reviewedAt": { $gte: since } } },
+            { $group: { _id: "$messages.report.verdict", count: { $sum: 1 } } },
+        ]);
+        const base = rows[0] ?? { answers: 0, sourced: 0, partial: 0, notCovered: 0, keyword: 0, reported: 0, reviewed: 0, withCitations: 0, avgLatencyMs: null, inputTokens: 0, outputTokens: 0 };
+        delete base._id;
+        noStore(res);
+        return res.json({
+            success: true,
+            data: {
+                since,
+                days,
+                ...base,
+                avgLatencyMs: base.avgLatencyMs === null ? null : Math.round(base.avgLatencyMs),
+                verdicts: Object.fromEntries(verdictRows.map((row) => [row._id ?? "none", row.count])),
             },
         });
     } catch (error) {

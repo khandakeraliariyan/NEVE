@@ -9,10 +9,11 @@ import { allowRoles } from "../middleware/role.middleware.js";
 
 const router = express.Router();
 
-router.use(authenticateUser, allowRoles("admin"));
+router.use(authenticateUser);
 
-router.post("/runs", createAIEvaluationRun);
-router.get("/runs", listAIEvaluationRuns);
-router.get("/runs/:runId", getAIEvaluationRun);
+// Admins run evaluations; legal reviewers read them to review legal quality.
+router.post("/runs", allowRoles("admin"), createAIEvaluationRun);
+router.get("/runs", allowRoles("admin", "legal_reviewer"), listAIEvaluationRuns);
+router.get("/runs/:runId", allowRoles("admin", "legal_reviewer"), getAIEvaluationRun);
 
 export default router;

@@ -285,8 +285,11 @@ export const getFileAccessUrl = async (req, res) => {
                 req.neveUser.role
             )
             : null;
+        const isLegalStaff = ["admin", "legal_reviewer"].includes(req.neveUser.role);
         const allowed = file.purpose === "tenancy_evidence"
             ? isUploader || Boolean(agreement) || Boolean(sharedCase)
+            : file.purpose === "legal_source_document"
+                ? isUploader || isLegalStaff
             : isAdmin ||
                 isUploader ||
                 (propertyMediaFields[file.purpose] && isPropertyOwner);

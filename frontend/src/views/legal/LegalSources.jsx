@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "../../lib/api";
+import { api, openPrivateFile, uploadFile } from "../../lib/api";
 import { date, dateTime, label } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, PageHeader, Pagination, StatusBadge, Tabs } from "../../components/ui";
@@ -10,27 +10,36 @@ const PAGE_SIZE = 20;
 const SOURCE_TYPES = ["act", "ordinance", "rule", "regulation", "court_decision", "official_guidance", "other"];
 const TOPICS = ["rent", "deposit", "term", "notice", "maintenance", "utilities", "other"];
 
-// Admins draft, submit and retire; legal reviewers approve or send back.
+// Admins and legal reviewers draft and submit; legal reviewers approve,
+// send back, reject, flag and mark sources outdated.
 const MODES = {
     admin: {
         base: "/admin/legal-sources",
         transition: (id) => `/admin/legal-sources/${id}/status`,
-        statuses: ["all", "draft", "in_review", "approved", "retired"],
+        create: "/admin/legal-sources",
+        update: (id) => `/admin/legal-sources/${id}`,
+        resolveFlag: (id, flagId) => `/admin/legal-sources/${id}/flags/${flagId}`,
+        statuses: ["all", "draft", "in_review", "approved", "rejected", "retired", "flagged"],
         initial: "all",
     },
     reviewer: {
         base: "/legal-review/sources",
         transition: (id) => `/legal-review/sources/${id}`,
-        statuses: ["in_review", "approved", "all"],
+        create: "/legal-review/sources",
+        update: (id) => `/legal-review/sources/${id}/content`,
+        resolveFlag: (id, flagId) => `/legal-review/sources/${id}/flags/${flagId}`,
+        statuses: ["in_review", "approved", "draft", "flagged", "rejected", "retired", "all"],
         initial: "in_review",
     },
 };
+const FLAG_REASONS = ["questionable_authenticity", "outdated", "incorrect_reference", "wrong_jurisdiction", "misleading_text", "other"];
 
 const DONE_TEXT = {
     submit: "Submitted for review. Legal reviewers can now check it.",
     retire: "Source retired.",
     approve: "Source approved. It can now be cited in agreement explanations.",
-    request_changes: "Sent back to the admin with your notes.",
+    request_changes: "Sent back to the author with your notes.",
+    reject: "Source rejected. It won't be used anywhere in Neve.",
 };
 
 const EMPTY_SECTION ={ sectionNumber: "", heading: "", text: "", topics: [] };
@@ -53,8 +62,10 @@ function blankForm(from) {
 }
 
 // Create a source (or a new version of one), or edit a draft.
-function SourceForm({ initial, editing, onCancel, onSaved }) {
+function SourceForm({ initial, editing, mode, onCancel, onSaved }) {
+    const cfg = MODES[mode];
     const [form, setForm] = useState(initial);
+    const [documentFile, setDocumentFile] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
     const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -81,9 +92,10 @@ function SourceForm({ initial, editing, onCancel, onSaved }) {
             sections: form.sections.map((s) => ({ ...s, sectionNumber: s.sectionNumber.trim(), heading: s.heading.trim(), text: s.text.trim() })),
         };
         try {
+            if (documentFile) body.documentFileId = await uploadFile(documentFile, { purpose: "legal_source_document" });
             const payload = editing
-                ? await api.patch(`/admin/legal-sources/${editing}`, body)
-                : await api.post("/admin/legal-sources", { ...body, sourceKey: form.sourceKey.trim().toLowerCase() });
+                ? await api.patch(cfg.update(editing), body)
+                : await api.post(cfg.create, { ...body, sourceKey: form.sourceKey.trim().toLowerCase() });
             onSaved(payload.data);
         } catch (err) {
             setError(err);
@@ -122,6 +134,9 @@ function SourceForm({ initial, editing, onCancel, onSaved }) {
                     </Field>
                     <Field label="Language">
                         <input className="field" maxLength={40} value={form.language} onChange={(e) => set("language", e.target.value)} />
+                    </Field>
+                    <Field label="Official document (optional)" hint="PDF or text of the original, so reviewers can check authenticity" className="md:col-span-2">
+                        <input className="field" type="file" accept="application/pdf,text/plain" onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)} />
                     </Field>
                     <Field label="What changed in this version" className="md:col-span-2">
                         <textarea className="field min-h-16" maxLength={2000} value={form.changeSummary} onChange={(e) => set("changeSummary", e.target.value)} />
@@ -173,6 +188,87 @@ function SourceForm({ initial, editing, onCancel, onSaved }) {
     );
 }
 
+function Flags({ source, mode, onChanged }) {
+    const cfg = MODES[mode];
+    const [form, setForm] = useState({ reason: "outdated", sectionId: "", note: "" });
+    const [resolution, setResolution] = useState({});
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const flags = source.flags ?? [];
+    const sectionNumber = new Map((source.sections ?? []).map((s) => [String(s._id), s.sectionNumber]));
+
+    async function act(fn) {
+        setBusy(true);
+        setError(null);
+        try {
+            await fn();
+            await onChanged();
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div className="space-y-3 border-t border-line pt-4">
+            <p className="eyebrow">Flags ({flags.filter((f) => !f.resolvedAt).length} open)</p>
+            {flags.length === 0 && <p className="text-xs text-muted">No concerns raised.</p>}
+            <ul className="space-y-2">
+                {[...flags].reverse().map((f) => (
+                    <li key={f._id} className={`rounded-xl border px-3 py-2 ${f.resolvedAt ? "border-line opacity-70" : "border-amber"}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge tone={f.resolvedAt ? "gray" : "amber"}>{label(f.reason)}</Badge>
+                            {f.sectionId && <Badge tone="gray">§ {sectionNumber.get(String(f.sectionId)) ?? "?"}</Badge>}
+                            <span className="text-xs text-muted">{dateTime(f.createdAt)}</span>
+                        </div>
+                        <p className="mt-1">{f.note}</p>
+                        {f.resolvedAt ? (
+                            <p className="mt-1 text-xs text-muted">Resolved {dateTime(f.resolvedAt)}: {f.resolution}</p>
+                        ) : (
+                            <div className="mt-2 flex gap-2">
+                                <input className="field text-xs" maxLength={2000} placeholder="How was it handled?" value={resolution[f._id] ?? ""} onChange={(e) => setResolution({ ...resolution, [f._id]: e.target.value })} />
+                                <Button variant="secondary" className="px-3 py-1 text-xs" disabled={busy || !(resolution[f._id] ?? "").trim()} onClick={() => act(() => api.patch(cfg.resolveFlag(source._id, f._id), { resolution: resolution[f._id].trim() }))}>
+                                    Resolve
+                                </Button>
+                            </div>
+                        )}
+                    </li>
+                ))}
+            </ul>
+            {mode === "reviewer" && (
+                <div className="space-y-2 rounded-xl bg-mist p-3">
+                    <p className="text-xs font-semibold">Flag a concern</p>
+                    <div className="grid gap-2 md:grid-cols-2">
+                        <select className="field text-xs" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}>
+                            {FLAG_REASONS.map((r) => <option key={r} value={r}>{label(r)}</option>)}
+                        </select>
+                        <select className="field text-xs" value={form.sectionId} onChange={(e) => setForm({ ...form, sectionId: e.target.value })}>
+                            <option value="">Whole source</option>
+                            {(source.sections ?? []).map((s) => <option key={s._id} value={s._id}>§ {s.sectionNumber}</option>)}
+                        </select>
+                    </div>
+                    <textarea className="field min-h-14 text-xs" maxLength={2000} placeholder="What's wrong, and where can it be checked?" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+                    <Button
+                        variant="outline"
+                        className="px-3 py-1 text-xs"
+                        disabled={busy || !form.note.trim()}
+                        onClick={() =>
+                            act(async () => {
+                                await api.post(`/legal-review/sources/${source._id}/flags`, { reason: form.reason, note: form.note.trim(), sectionId: form.sectionId || null });
+                                setForm({ reason: "outdated", sectionId: "", note: "" });
+                            })
+                        }
+                    >
+                        Raise flag
+                    </Button>
+                </div>
+            )}
+            <ErrorBox error={error} />
+        </div>
+    );
+}
+
 function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
     const cfg = MODES[mode];
     const detail = useApi(() => api.get(`${cfg.base}/${id}`), [id]);
@@ -184,6 +280,8 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
     async function transition(action, confirmText) {
         if (confirmText && !window.confirm(confirmText)) return;
         if (action === "request_changes" && !note.trim()) return setError("Explain the changes needed.");
+        if (action === "reject" && !note.trim()) return setError("Explain why the source is rejected.");
+        if (action === "retire" && mode === "reviewer" && !note.trim()) return setError("Say why the source is outdated.");
         setBusy(true);
         setError(null);
         try {
@@ -199,7 +297,7 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
     }
 
     const actions = [];
-    if (s && mode === "admin") {
+    if (s && (mode === "admin" || mode === "reviewer")) {
         if (s.status === "draft") {
             actions.push(<Button key="edit" variant="outline" onClick={() => onEdit(s)}>Edit</Button>);
             actions.push(<Button key="submit" disabled={busy} onClick={() => transition("submit")}>Submit for review</Button>);
@@ -208,7 +306,7 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
         if (["approved", "draft"].includes(s.status)) {
             actions.push(
                 <Button key="retire" variant="danger" disabled={busy} onClick={() => transition("retire", "Retire this source? It will no longer be used for agreement explanations.")}>
-                    Retire
+                    {mode === "reviewer" && s.status === "approved" ? "Mark outdated" : "Retire"}
                 </Button>
             );
         }
@@ -216,6 +314,7 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
     if (s && mode === "reviewer" && s.status === "in_review") {
         actions.push(<Button key="approve" disabled={busy} onClick={() => transition("approve")}>Approve</Button>);
         actions.push(<Button key="changes" variant="outline" disabled={busy} onClick={() => transition("request_changes")}>Request changes</Button>);
+        actions.push(<Button key="reject" variant="danger" disabled={busy} onClick={() => transition("reject", "Reject this source? It will be excluded from the knowledge base.")}>Reject</Button>);
     }
 
     return (
@@ -241,6 +340,11 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
                         {s.reviewedAt && <Badge tone="gray">Reviewed {date(s.reviewedAt)}</Badge>}
                     </div>
                     {s.citation && <p><span className="text-muted">Citation:</span> {s.citation}</p>}
+                    {s.documentFile && (
+                        <button type="button" className="mr-3 text-forest underline" onClick={() => openPrivateFile(s.documentFile)}>
+                            Uploaded original document
+                        </button>
+                    )}
                     {s.sourceUrl && (
                         <a href={s.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-forest underline">Official text ↗</a>
                     )}
@@ -268,13 +372,15 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
 
                     {actions.length > 0 && (
                         <div className="space-y-3 border-t border-line pt-4">
-                            <Field label="Note (optional; required when requesting changes)">
+                            <Field label="Note (required to request changes, reject, or mark outdated)">
                                 <textarea className="field min-h-16" maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} />
                             </Field>
                             <ErrorBox error={error} />
                             <div className="flex flex-wrap gap-2">{actions}</div>
                         </div>
                     )}
+
+                    <Flags source={s} mode={mode} onChanged={detail.reload} />
 
                     {s.history?.length > 0 && (
                         <div>
@@ -303,7 +409,13 @@ export default function LegalSources({ mode = "admin" }) {
     const [form, setForm] = useState(null); // { initial, editing }
     const [message, setMessage] = useState(null);
     const list = useApi(
-        () => api.get(cfg.base, { status: status === "all" ? undefined : status, page, limit: PAGE_SIZE }),
+        () =>
+            api.get(cfg.base, {
+                status: status === "all" || status === "flagged" ? undefined : status,
+                flagged: status === "flagged" ? "true" : undefined,
+                page,
+                limit: PAGE_SIZE,
+            }),
         [status, page]
     );
     const items = list.data?.data ?? [];
@@ -316,9 +428,9 @@ export default function LegalSources({ mode = "admin" }) {
                 description={
                     mode === "admin"
                         ? "Draft official legal texts and send them to a legal reviewer. Only approved sources are used to explain agreement clauses."
-                        : "Check each section, version and effective date against the official text, then approve it or send it back with notes."
+                        : "Check each section, version and effective date against the official text, then approve it, send it back, or reject it. Flag questionable or outdated sources, and add new ones."
                 }
-                actions={mode === "admin" && !form && (
+                actions={!form && (
                     <Button onClick={() => { setForm({ initial: blankForm(), editing: null }); setSelected(null); setMessage(null); }}>New source</Button>
                 )}
             />
@@ -329,6 +441,7 @@ export default function LegalSources({ mode = "admin" }) {
                     key={form.editing ?? form.initial.sourceKey ?? "new"}
                     initial={form.initial}
                     editing={form.editing}
+                    mode={mode}
                     onCancel={() => setForm(null)}
                     onSaved={(saved) => {
                         setForm(null);
@@ -350,7 +463,7 @@ export default function LegalSources({ mode = "admin" }) {
                             <ErrorBox error={list.error} onRetry={list.reload} />
                             {!list.loading && !list.error && items.length === 0 && (
                                 <Empty title={mode === "reviewer" && status === "in_review" ? "Nothing waiting for review" : "No sources here"}>
-                                    {mode === "admin" ? "Create a source to start the legal-source pack." : "You'll be notified when an admin submits a source."}
+                                    {mode === "admin" ? "Create a source to start the legal-source pack." : "You'll be notified when a source is submitted or flagged."}
                                 </Empty>
                             )}
                             {items.length > 0 && (
@@ -399,7 +512,7 @@ export default function LegalSources({ mode = "admin" }) {
             <Disclaimer className="mt-6" title="Review rules">
                 {mode === "admin"
                     ? "A source can't be approved by the person who drafted it. Approved sources can't be edited; create a new version instead."
-                    : "You can't approve a source you drafted. Approved sources are labelled as reviewed, with your review date, wherever they are cited."}
+                    : "You can't approve a source you drafted; another reviewer must. Rejected and retired sources are never cited. Approved sources are labelled as reviewed, with your review date, wherever they are cited."}
             </Disclaimer>
         </div>
     );

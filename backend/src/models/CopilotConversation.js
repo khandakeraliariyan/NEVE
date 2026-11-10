@@ -69,6 +69,15 @@ const messageSchema = new mongoose.Schema(
         report: {
             reason: { type: String, maxlength: 1000, default: null },
             reportedAt: { type: Date, default: null },
+            // A legal reviewer's assessment of the reported answer.
+            verdict: {
+                type: String,
+                enum: ["accurate", "unsupported_claim", "misleading", "wrong_citation", "applicability_issue", "outdated_source", null],
+                default: null,
+            },
+            reviewNote: { type: String, maxlength: 2000, default: "" },
+            reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+            reviewedAt: { type: Date, default: null },
         },
         createdAt: { type: Date, default: Date.now },
     },
