@@ -52,6 +52,12 @@ import {
     getMyCompliance,
 } from "../controllers/compliance.controller.js";
 import {
+    downloadAnalysisReport,
+    getRiskAnalysis,
+    runRiskAnalysis,
+    updateRiskFinding,
+} from "../controllers/contractRisk.controller.js";
+import {
     acceptInvitation,
     cancelInvitation,
     createInvitation,
@@ -280,6 +286,28 @@ router.post("/agreements/:agreementId/documents/:documentId/versions", allowRole
 router.post("/agreements/:agreementId/documents/:documentId/respond", allowRoles("renter", "landlord"), respondToDocument);
 router.get("/agreements/:agreementId/documents/:documentId/versions/:version/access-url", getDocumentVersionUrl);
 
+// Contract risk analysis and the agreement analysis report.
+router.get(
+    "/agreements/:agreementId/risk-analysis",
+    allowRoles("renter", "landlord", "legal_reviewer"),
+    getRiskAnalysis
+);
+router.post(
+    "/agreements/:agreementId/risk-analysis",
+    allowRoles("renter", "landlord"),
+    extractionLimiter,
+    runRiskAnalysis
+);
+router.patch(
+    "/agreements/:agreementId/risk-analysis/findings/:findingId",
+    allowRoles("renter", "landlord", "legal_reviewer"),
+    updateRiskFinding
+);
+router.get(
+    "/agreements/:agreementId/analysis-report",
+    allowRoles("renter", "landlord", "legal_reviewer"),
+    downloadAnalysisReport
+);
 router.post(
     "/agreements/:agreementId/record-links",
     allowRoles("renter", "landlord"),
