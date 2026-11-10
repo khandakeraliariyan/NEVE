@@ -9,7 +9,8 @@
     "test": "node --test",
     "create-admin": "node scripts/createAdmin.js",
     "backup": "node scripts/backup.js",
-    "restore-backup": "node scripts/restoreBackup.js"
+    "restore-backup": "node scripts/restoreBackup.js",
+    "eval": "node eval/run.js"
   },
   "keywords": [],
   "type": "module",

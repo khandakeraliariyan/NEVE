@@ -33,7 +33,7 @@ important requirements are missing.
 | 4.11 | **Neve Evidence Graph** | **Implemented** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`, `requires`), record-to-record links (a clause `requires` an obligation, a payment `supports` an obligation), a per-record fact state (documented, disputed, uncertain, undocumented) where a `supports` link confirmed by both participants is a documented fact, Claude-suggested file links that count only after a participant accepts them, with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses, extracted-vs-recorded value mismatches, conflicting or mismatched payment amounts (rent per month, deposit and advance totals), and missing or decreasing move-in/move-out meter readings; JSON evidence report; SHA-256 hashes of uploaded files and a hash-linked agreement event history, with an integrity check; clause links to approved legal-source sections shown as legal-source nodes with their version and review status. | — |
 | 4.12 | **Neve Property Manager** | **Not implemented** | Landlords manage their own listings (create, edit, pause, delete), inquiries, viewings and listing analytics. | The `property_manager` role, access scoped to assigned properties and tenancies, and lease/obligation tracking for managers. |
 | 4.13 | **Neve Security, Privacy & Dispute Support** | **Implemented** | Role-based access; private-by-default tenancy files with signed URLs; case-specific evidence sharing with legal reviewers (the role that replaced mediators); sensitive-access log; personal-data export; document deletion requests; retention dates and legal holds; tamper-evident (SHA-256 hash-linked, append-only) admin audit and sensitive-access logs with an integrity check; scheduled retention purges; database backups to private object storage with restore; no public trust scores or AI verdicts. | — |
-| 4.14 | **Neve AI Reliability & Evaluation** | **Partial** | Admin API that scores submitted evaluation runs: precision, recall, F1, exact match, false-positive rate, OCR character error rate, failure rate, latency and cost, for model-backed and deterministic tasks. Extraction responses record model, token usage and latency. | A documented test set and runner that produce those results; separate OCR evaluation; regression tracking. |
+| 4.14 | **Neve AI Reliability & Evaluation** | **Mostly implemented** | Admin API that scores submitted evaluation runs: precision, recall, F1, exact match, false-positive rate, OCR character error rate, failure rate, latency and cost, for model-backed and deterministic tasks. Extraction responses record model, token usage and latency. | An OCR test set (OCR runs can still be submitted to the API). Test sets for evidence links and suspicious listings. |
 
 ### Users and roles (§3)
 
@@ -653,6 +653,31 @@ retention duration or automatically purge documents: a retention policy and
 admin review are required.
 
 ### AI reliability and evaluation
+
+#### Test sets and the evaluation runner
+
+`backend/eval/` holds documented, synthetic test sets and a runner that scores
+them with the same metrics as the admin AI evaluation page:
+
+| Test set | Task | What it checks | Runs |
+|---|---|---|---|
+| `datasets/missing_information.json` | `missing_information` | Contract-risk rule findings (missing clauses and terms, unclear payment and deposit terms, notice, one-sided wording, contradictions) on 9 agreements | Offline |
+| `datasets/legal_citation.json` | `legal_citation` | Which legal-source sections are found for 9 questions, from a synthetic source pack (not real law) | Offline; with `--live`, the sections Legal Copilot cites |
+| `datasets/agreement_extraction.json` | `agreement_extraction` | Dates, amounts and clause categories extracted from 3 agreements | `--live` only |
+
+```sh
+npm run eval                      # offline tasks
+npm run eval -- --live            # also model-backed tasks (calls the Claude API and costs money)
+npm run eval -- --task legal_citation --live
+npm run eval -- --check           # exit 1 when a score drops below eval/baseline.json
+npm run eval -- --save            # also store each run as an AI evaluation run (needs MongoDB and an admin)
+```
+
+Each run prints precision, recall, F1, exact match, latency and (for live
+runs) an estimated cost, lists the cases it got wrong, and writes the full
+result to `eval/results/` (not committed). `eval/baseline.json` holds the
+minimum scores for the offline tasks; `test/evalRegression.test.js` runs them
+as part of `npm test`, so a regression fails the test suite.
 
 The admin-only `POST /api/v1/admin/ai-evaluations/runs` endpoint records
 evaluation results for the model-backed tasks `ocr`, `agreement_extraction`,

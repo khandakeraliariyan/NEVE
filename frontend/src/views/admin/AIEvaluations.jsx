@@ -284,9 +284,9 @@ export default function AIEvaluations({ readOnly = false, basePath = "/admin/ai-
                 </section>
             </div>
 
-            <Disclaimer title="Neve doesn't run AI" className="mt-8">
-                These results were produced elsewhere and submitted here. Neve calculates metrics from the cases you submit; it doesn't run OCR or AI models on
-                user data.
+            <Disclaimer title="Where results come from" className="mt-8">
+                Runs come from Neve&apos;s own test sets (npm run eval -- --save in the backend) or are submitted from outside evaluations. Test sets use
+                synthetic data only; no user data is evaluated.
             </Disclaimer>
         </div>
     );

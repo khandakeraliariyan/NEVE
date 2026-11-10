@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 
 // The first six are model-backed tasks. The last four are deterministic
-// features measured by the regression suites in backend/eval.
+// features. backend/eval holds test sets and a runner (npm run eval) for
+// agreement_extraction, legal_citation and missing_information.
 export const AI_EVALUATION_TASKS = [
     "ocr",
     "agreement_extraction",
