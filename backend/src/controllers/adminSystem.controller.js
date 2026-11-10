@@ -84,7 +84,7 @@ export function runNotificationDigestNow(req, res, next) {
 }
 
 const DELIVERY_STATUSES = ["pending", "sending", "sent", "dead", "cancelled"];
-const DELIVERY_CHANNELS = ["email", "push"];
+const DELIVERY_CHANNELS = ["email"];
 
 // GET /api/v1/admin/system/notification-deliveries/summary
 // Counts by channel and status over the last 7 days.
@@ -123,7 +123,7 @@ export async function listNotificationDeliveries(req, res, next) {
             return res.status(400).json({ success: false, message: `status must be one of: ${DELIVERY_STATUSES.join(", ")}.` });
         }
         if (req.query.channel !== undefined && !DELIVERY_CHANNELS.includes(req.query.channel)) {
-            return res.status(400).json({ success: false, message: "channel must be email or push." });
+            return res.status(400).json({ success: false, message: "channel must be email." });
         }
         if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 100) {
             return res.status(400).json({ success: false, message: "Invalid pagination values." });

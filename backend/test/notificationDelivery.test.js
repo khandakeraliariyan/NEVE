@@ -18,8 +18,7 @@ const user = {
     email: "renter@example.com",
     displayName: "Rina",
     isActive: true,
-    notificationPreferences: { email: true, push: true, mutedTypes: [], emailMutedTypes: [] },
-    pushTokens: [{ token: "good-token" }, { token: "dead-token" }],
+    notificationPreferences: { email: true, mutedTypes: [], emailMutedTypes: [] },
 };
 const notification = {
     _id: "n1",
@@ -28,24 +27,22 @@ const notification = {
     title: "New message",
     message: "You have a message.",
 };
-const all = { email: true, push: true };
+const all = { email: true };
 const withPrefs = (prefs) => ({ ...user, notificationPreferences: { ...user.notificationPreferences, ...prefs } });
 
-test("chooses channels from preferences, mutes and tokens", () => {
-    assert.deepEqual(chooseChannels(user, notification.type, all), { email: true, push: true, digest: false });
+test("chooses channels from preferences and mutes", () => {
+    assert.deepEqual(chooseChannels(user, notification.type, all), { email: true, digest: false });
     assert.equal(chooseChannels(withPrefs({ email: false }), notification.type, all).email, false);
     assert.deepEqual(
         chooseChannels(withPrefs({ mutedTypes: [notification.type] }), notification.type, all),
-        { email: false, push: false, digest: false }
+        { email: false, digest: false }
     );
-    // Unsubscribing from one email type leaves push on.
     assert.deepEqual(
         chooseChannels(withPrefs({ emailMutedTypes: [notification.type] }), notification.type, all),
-        { email: false, push: true, digest: false }
+        { email: false, digest: false }
     );
-    assert.equal(chooseChannels({ ...user, pushTokens: [] }, notification.type, all).push, false);
     assert.equal(chooseChannels({ ...user, isActive: false }, notification.type, all).email, false);
-    assert.equal(chooseChannels(user, notification.type, { email: false, push: false }).email, false);
+    assert.equal(chooseChannels(user, notification.type, { email: false }).email, false);
 });
 
 test("security alerts ignore email preferences and mutes", () => {
@@ -58,7 +55,7 @@ test("daily digest holds non-urgent emails but not urgent ones", () => {
     const digestUser = withPrefs({ digest: "daily" });
     assert.deepEqual(
         chooseChannels(digestUser, "favorite_property_changed", all),
-        { email: false, push: true, digest: true }
+        { email: false, digest: true }
     );
     assert.equal(chooseChannels(digestUser, "inquiry_received", all).email, true);
     assert.equal(chooseChannels(digestUser, "security_password_changed", all).email, true);
@@ -143,32 +140,7 @@ test("backoff grows and stays capped", () => {
     assert.equal(nextRetryDelay(99), RETRY_DELAYS_MS.at(-1));
 });
 
-test("push removes dead tokens and fails when no device accepts", async () => {
-    const pulls = [];
-    const UserModel = {
-        findById: () => ({ select: () => ({ lean: async () => user }) }),
-        updateOne: async (filter, update) => pulls.push(update),
-    };
-    const ok = await runDeliveryJob(
-        { _id: "j1", channel: "push", attempts: 1, recipient: "u1", payload: { title: "t", body: "b", data: {} } },
-        {
-            ...noRecord,
-            DeliveryModel: deliveryModel(),
-            UserModel,
-            sendPush: async (payload, tokens) => ({ successCount: 1, failureCount: 1, invalidTokens: [tokens[1]] }),
-        }
-    );
-    assert.equal(ok, "sent");
-    assert.deepEqual(pulls[0], { $pull: { pushTokens: { token: { $in: ["dead-token"] } } } });
-
-    const none = await runDeliveryJob(
-        { _id: "j2", channel: "push", attempts: 1, recipient: "u1", payload: {} },
-        { ...noRecord, DeliveryModel: deliveryModel(), UserModel, sendPush: async () => ({ successCount: 0, failureCount: 2, invalidTokens: [] }) }
-    );
-    assert.equal(none, "retrying");
-});
-
-test("queueing creates one job per channel with idempotency keys, and duplicates are ignored", async () => {
+test("queueing creates an email job with an idempotency key, and duplicates are ignored", async () => {
     const UserModel = { findById: () => ({ select: () => ({ lean: async () => user }) }) };
     let firstCall = true;
     const DeliveryModel = {
@@ -187,9 +159,8 @@ test("queueing creates one job per channel with idempotency keys, and duplicates
     const reminder = { ...notification, type: "viewing_reminder", data: { propertyTitle: "Flat", scheduledAt: new Date() } };
 
     const first = await enqueueNotificationDelivery(reminder, deps);
-    assert.deepEqual(first.jobs.map((job) => job.channel).sort(), ["email", "push"]);
-    assert.equal(new Set(first.jobs.map((job) => job.idempotencyKey)).size, 2);
-    assert.ok(first.jobs.every((job) => job.idempotencyKey.startsWith("viewing_reminder:n1:u1:")));
+    assert.deepEqual(first.jobs.map((job) => job.channel), ["email"]);
+    assert.equal(first.jobs[0].idempotencyKey, "viewing_reminder:n1:u1:email");
 
     const again = await enqueueNotificationDelivery(reminder, deps);
     assert.deepEqual(again.jobs, []);

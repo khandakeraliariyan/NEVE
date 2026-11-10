@@ -189,11 +189,10 @@ const userSchema = new mongoose.Schema(
 
         notificationPreferences: {
             email: { type: Boolean, default: true },
-            push: { type: Boolean, default: true },
             // "daily": non-urgent emails are grouped into one daily email.
             digest: { type: String, enum: ["off", "daily"], default: "off" },
             lastDigestAt: { type: Date, default: null },
-            // Notification types the user doesn't want sent by email or push.
+            // Notification types the user doesn't want sent by email.
             // They still appear in the app.
             mutedTypes: { type: [String], default: [] },
             // Notification types the user doesn't want by email only (set by
@@ -224,20 +223,6 @@ const userSchema = new mongoose.Schema(
                 default: [],
                 select: false,
             },
-        },
-
-        // Firebase Cloud Messaging device tokens. Never returned by default.
-        pushTokens: {
-            type: [
-                {
-                    _id: false,
-                    token: { type: String, required: true, maxlength: 4096 },
-                    platform: { type: String, enum: ["web", "android", "ios"], default: "web" },
-                    lastSeenAt: { type: Date, default: Date.now },
-                },
-            ],
-            default: [],
-            select: false,
         },
 
         // Email and phone come from Firebase (verified sign-in email, phone

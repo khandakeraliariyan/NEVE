@@ -6,14 +6,14 @@ import { dateTime, label } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { Button, Card, Empty, ErrorBox, Loading, Pagination, StatusBadge } from "../../components/ui";
 
-const CHANNELS = ["email", "push"];
+const CHANNELS = ["email"];
 const STATUSES = [
     ["dead", "Failed (gave up)"],
     ["pending", "Waiting to retry"],
     ["sent", "Sent"],
 ];
 
-// Email and push delivery health, and the failed-delivery queue.
+// Email delivery health, and the failed-delivery queue.
 export default function NotificationDeliveries() {
     const summary = useApi(() => api.get("/admin/system/notification-deliveries/summary"), []);
     const [status, setStatus] = useState("dead");
@@ -46,7 +46,7 @@ export default function NotificationDeliveries() {
         <section className="mb-10">
             <h2 className="mb-1 text-2xl">Notification delivery</h2>
             <p className="mb-4 text-sm text-muted">
-                Emails and push notifications are retried 5 times over about 2.5 hours. Those that still fail, or that the provider refuses outright, land in the failed queue below.
+                Emails are retried 5 times over about 2.5 hours. Those that still fail, or that the provider refuses outright, land in the failed queue below.
             </p>
 
             {summary.loading && <Loading />}

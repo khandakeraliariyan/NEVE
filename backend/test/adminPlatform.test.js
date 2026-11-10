@@ -163,14 +163,14 @@ test("turning a type's email off stops its emails, but never security alerts", a
     assert.equal(emailAllowedByTemplate("inquiry_sent", { inquiry_sent: { emailEnabled: false } }), false);
     assert.equal(emailAllowedByTemplate("security_new_device", { security_new_device: { emailEnabled: false } }), true);
 
-    const user = { _id: "u1", email: "rina@example.com", displayName: "Rina", isActive: true, notificationPreferences: {}, pushTokens: [] };
+    const user = { _id: "u1", email: "rina@example.com", displayName: "Rina", isActive: true, notificationPreferences: {} };
     const inserted = [];
     const result = await enqueueNotificationDelivery(
         { _id: "n1", recipient: "u1", type: "inquiry_sent", title: "t", message: "m" },
         {
             UserModel: { findById: () => ({ select: () => ({ lean: async () => user }) }) },
             DeliveryModel: { insertMany: async (jobs) => { inserted.push(...jobs); return jobs; } },
-            channels: { email: true, push: false },
+            channels: { email: true },
             skipRecord: true,
             getSettings: async () => ({}),
             getTemplateOverrides: async () => ({ inquiry_sent: { emailEnabled: false } }),

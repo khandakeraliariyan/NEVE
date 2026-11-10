@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-// One email or push send, stored so it can be retried. Jobs that run out
+// One email send, stored so it can be retried. Jobs that run out
 // of attempts become "dead" (the dead-letter queue shown to admins).
 const notificationDeliverySchema = new mongoose.Schema(
     {
@@ -13,7 +13,7 @@ const notificationDeliverySchema = new mongoose.Schema(
         },
         recipient: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
         notificationType: { type: String, default: null },
-        channel: { type: String, enum: ["email", "push"], required: true },
+        channel: { type: String, enum: ["email"], required: true },
         // event + recipient + channel; a second job with the same key is
         // refused, so retries and re-runs never send twice.
         idempotencyKey: { type: String, required: true, unique: true, maxlength: 300 },
@@ -29,8 +29,7 @@ const notificationDeliverySchema = new mongoose.Schema(
         lockedUntil: { type: Date, default: null },
         lastError: { type: String, maxlength: 500, default: null },
         sentAt: { type: Date, default: null },
-        // Rendered message: { to, subject, text, html, headers } for email,
-        // { title, body, data } for push.
+        // Rendered email: { to, subject, text, html, headers }.
         payload: { type: mongoose.Schema.Types.Mixed, required: true, select: false },
         // Finished jobs are removed automatically after this date.
         purgeAt: { type: Date, default: null },

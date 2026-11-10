@@ -97,7 +97,7 @@ const notificationSchema = new mongoose.Schema(
             default: null,
         },
 
-        // Latest email and push results; null until delivery runs (or
+        // Latest email result; null until delivery runs (or
         // when no delivery channel is configured).
         delivery: {
             type: mongoose.Schema.Types.Mixed,

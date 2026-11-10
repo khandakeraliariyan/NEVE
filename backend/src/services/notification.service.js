@@ -1,6 +1,6 @@
 import Notification from "../models/Notification.js";
 
-// Creates one in-app notification (email and push follow from the
+// Creates one in-app notification (email follows from the
 // recipient's preferences). Returns null when `dedupeKey` shows it was
 // already created.
 export const createNotification = async ({

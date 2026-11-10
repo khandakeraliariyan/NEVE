@@ -56,7 +56,6 @@ function NotificationItem({ n, role, onRead }) {
 
 const CHANNELS = [
     ["email", "Email", "Sent to the address on your account."],
-    ["push", "Push", "Sent to browsers and devices you've allowed."],
 ];
 
 function Preferences() {
@@ -145,7 +144,7 @@ function Preferences() {
             <Card className="overflow-x-auto">
                 <h2 className="mb-1 text-xl">Event types</h2>
                 <p className="mb-4 text-sm text-muted">
-                    Untick "Email" to stop emails for one kind of update; untick "Any" to stop email and push for it. Everything still appears in this inbox.
+                    Untick "Email" to stop emails for one kind of update; untick "Any" to stop email for it. Everything still appears in this inbox.
                 </p>
                 <table className="w-full min-w-[420px] text-sm">
                     <thead>
@@ -276,8 +275,8 @@ export default function Notifications() {
                         </Card>
                     )}
                     <Pagination page={page} totalPages={list.data?.pagination?.totalPages} onChange={setPage} />
-                    <Disclaimer className="mt-6" title="About email and push">
-                        Neve retries email and push for a while if they fail. A delivery failure never stops the notification from appearing here.
+                    <Disclaimer className="mt-6" title="About email">
+                        Neve retries emails for a while if they fail. A delivery failure never stops the notification from appearing here.
                     </Disclaimer>
                 </>
             )}

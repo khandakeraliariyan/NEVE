@@ -123,7 +123,7 @@ export async function notifyRentersOfMatchingProperty(property) {
     }
 }
 
-// bulkWrite skips document hooks, so send email/push for the new alerts here.
+// bulkWrite skips document hooks, so send email for the new alerts here.
 async function queueUpsertedDeliveries(result) {
     if (!isDeliveryConfigured()) return;
     const ids = Object.values(result?.upsertedIds ?? {});

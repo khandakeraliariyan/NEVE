@@ -28,7 +28,7 @@ important requirements are missing.
 | 4.6 | **Neve Move-In & Move-Out Records** | **Implemented** | Room-by-room and meter-reading entries with photos, confirm/dispute by each party, append-only corrections, and move-in vs move-out comparison that reports differences without assigning fault. | — |
 | 4.7 | **Neve Maintenance & Repair** | **Implemented** | Requests with category, priority, description and private photos; statuses (submitted, acknowledged, in progress, awaiting renter, completed, disputed, cancelled); responsibility; assignment to the renter, the landlord or a named outside person; progress history; searchable repair records. | — |
 | 4.8 | **Neve Smart Choice — Explainable Matching** | **Implemented** | Deterministic matching on budget, location, bedrooms, property type, furnishing and amenities, with per-criterion scores, reasons, shortfalls and unknowns for missing listing data; preference-based alerts. | Matching is rule-based, not AI. Commute distance is straight-line. |
-| 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app, and by email and push when configured), and suspicious-message reporting. Payment processing is out of scope. | Inquiries have two separate status flows. |
+| 4.9 | **Neve Connect** | **Mostly implemented** | Private inquiry messaging, viewing requests and responses, availability updates, saved-search and matching-listing alerts (in-app, and by email when configured), and suspicious-message reporting. Payment processing is out of scope. | Inquiries have two separate status flows. |
 | 4.10 | **Neve Agreement & Trust** | **Mostly implemented** | Private agreement upload (PDF, image, text); on-server text reading with OCR for scans and photos (English and Bangla) and masking of ID numbers, phone numbers and emails before any AI call; Claude extraction of parties, dates, rent, deposit, clauses and obligations with verbatim source quotes and pages; plain-language clause summaries; participant confirm/reject of proposed clauses; obligations, payments and receipts; evidence reports; agreement sharing with a legal reviewer; versioned legal sources with sections that a legal reviewer approves; section search; automatic suggestions of approved legal-source sections for each clause (retrieval, then Claude choosing only from the retrieved sections), accepted or rejected by the parties; Claude-suggested balanced clause rewrites that cite only approved sections, with each party's response and reviewer assessments. | Rewrite suggestions don't edit the clause; the parties change it themselves. Agreements are still Bangladesh-only. |
 | 4.11 | **Neve Evidence Graph** | **Implemented** | Links between clauses, obligations, payments, messages and files (`supports`, `contradicts`, `relates_to`, `cites`, `context_only`, `unassessed`, `requires`), record-to-record links (a clause `requires` an obligation, a payment `supports` an obligation), a per-record fact state (documented, disputed, uncertain, undocumented) where a `supports` link confirmed by both participants is a documented fact, Claude-suggested file links that count only after a participant accepts them, with confidence and history; missing-information, conflict and uncertainty flags, including unreviewed extracted clauses, extracted-vs-recorded value mismatches, conflicting or mismatched payment amounts (rent per month, deposit and advance totals), and missing or decreasing move-in/move-out meter readings; JSON evidence report; SHA-256 hashes of uploaded files and a hash-linked agreement event history, with an integrity check; clause links to approved legal-source sections shown as legal-source nodes with their version and review status. | — |
 | 4.12 | **Neve Property Manager** | **Not implemented** | Landlords manage their own listings (create, edit, pause, delete), inquiries, viewings and listing analytics. | The `property_manager` role, access scoped to assigned properties and tenancies, and lease/obligation tracking for managers. |
@@ -190,7 +190,6 @@ The backend `.gitignore` excludes `.env`, `.env.*` (except `.env.example`),
 | `EMAIL_PROVIDER` | For email | Optional; `resend` or `sendgrid` | HTTP email API used for email notifications |
 | `EMAIL_API_KEY` | For email | Optional | API key for the email provider |
 | `EMAIL_FROM` | For email | Optional; email address | Sender address for notification emails |
-| `PUSH_NOTIFICATIONS_ENABLED` | No | `false`; `true` or `false` | Sends push notifications through Firebase Cloud Messaging with the existing service account |
 | `API_PUBLIC_URL` | For email | `http://localhost:<PORT>` | Public address of this API, used for unsubscribe links and listing photos in emails, e.g. `https://api.neve.app` |
 | `NOTIFICATION_LINK_SECRET` | No | Derived from `ADMIN_JWT_SECRET`; at least 32 characters | Signs unsubscribe links. Changing it breaks links in emails already sent |
 | `NOTIFICATION_TIME_ZONE` | No | `Asia/Dhaka` | Time zone for dates in notifications and for the digest hour |
@@ -361,11 +360,11 @@ the feature inventory previously proposed.
 | `/api/v1/tenancy` | `PATCH /maintenance-requests/:requestId/assignee` | Landlord assigns a repair to the renter, the landlord, or a named person outside Neve (`{ assignee: { userId } }`, `{ assignee: { name, phone?, organization? } }`, or `{ assignee: null }`); the change is added to the request history |
 | `/api/v1/properties` | `GET /:id/route?toLat=&toLng=&mode=walking\|driving&geometry=true` | Public walking or driving route from a published listing to a point: distance, estimated time, and an optional GeoJSON line |
 | `/api/v1/properties` | `GET /:id/travel-times?mode=&category=&limit=` | Public walking or driving time to the nearest mapped places (up to 25), optionally for one category |
-| `/api/v1/notifications` | `GET /preferences`, `PATCH /preferences`, `POST /push-tokens`, `DELETE /push-tokens` | Notification settings (`email`, `push`, `digest`, `mutedTypes`, `emailMutedTypes`) and Firebase Cloud Messaging device tokens for the signed-in user |
+| `/api/v1/notifications` | `GET /preferences`, `PATCH /preferences` | Notification settings (`email`, `digest`, `mutedTypes`, `emailMutedTypes`) for the signed-in user |
 | `/api/v1/notifications` | `GET /unsubscribe?token=`, `POST /unsubscribe?token=` | Public. The unsubscribe link in emails: the GET shows a confirmation button, the POST (also used by mail apps' one-click unsubscribe) turns the email off |
 | `/api/v1/property-images` | `GET /:propertyId/thumbnail` | Public. Redirects to the first photo of a published listing; used in emails |
-| `/api/v1/admin/system` | `GET /health` | Admin: database ping time, server uptime and memory, which services are set up (storage, email, push, AI, ID encryption, public API address, Bangla PDF font), background job results, and email delivery over 24 hours (sent, failed, waiting, failure rate, last success and last failure) |
-| `/api/v1/admin/system` | `GET /notification-deliveries/summary`, `GET /notification-deliveries?status=dead&channel=`, `POST /notification-deliveries/:deliveryId/retry`, `POST /notification-reminders`, `POST /notification-digest`, `POST /photo-hash-backfill` | Admin: email and push delivery counts, the failed-delivery (dead-letter) queue and retries, running the reminders or digest now, and hashing up to 200 older listing photos per run |
+| `/api/v1/admin/system` | `GET /health` | Admin: database ping time, server uptime and memory, which services are set up (storage, email, AI, ID encryption, public API address, Bangla PDF font), background job results, and email delivery over 24 hours (sent, failed, waiting, failure rate, last success and last failure) |
+| `/api/v1/admin/system` | `GET /notification-deliveries/summary`, `GET /notification-deliveries?status=dead&channel=`, `POST /notification-deliveries/:deliveryId/retry`, `POST /notification-reminders`, `POST /notification-digest`, `POST /photo-hash-backfill` | Admin: email delivery counts, the failed-delivery (dead-letter) queue and retries, running the reminders or digest now, and hashing up to 200 older listing photos per run |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links/:linkId/confirm` | Renter or landlord confirms an evidence link's relationship; a `supports` link confirmed by both is a documented fact. Changing the relationship clears confirmations |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/record-links`, `DELETE /agreements/:agreementId/record-links/:linkId` | Renter or landlord links two records in an agreement (`requires`, `supports`, `contradicts`, `relates_to`); an unmet `requires` link is flagged as missing information |
 | `/api/v1/tenancy` | `POST /agreements/:agreementId/evidence-links/suggest`, `PATCH /agreements/:agreementId/evidence-links/:linkId/review` | Claude reads one evidence file and proposes links to clauses, obligations and payments (`{ fileId }`); proposals are `proposed` until a participant sends `{ decision: "accept" \| "reject" }`. Needs `ANTHROPIC_API_KEY` |
@@ -395,7 +394,7 @@ Mongoose models currently defined in `src/models/`:
 | `CommunicationReport` | Participant-submitted suspicious-message reports and admin review state |
 | `ViewingRequest` | Requested property viewing, participants, date, and status (`requested`, `confirmed`, `declined`, `cancelled`, or `completed`) |
 | `Notification` | Recipient notifications, read state, links and email template data, deduplicated matching-listing alerts and reminders |
-| `NotificationDelivery` | One email or push send: status, attempts, next retry, last error (the retry and dead-letter queue) |
+| `NotificationDelivery` | One email send: status, attempts, next retry, last error (the retry and dead-letter queue) |
 | `PropertyReport` | Renter-submitted listing reports and administrative review |
 | `PropertyViewEvent` | Property-view event records |
 | `UploadedFile` | Private/public R2 object metadata, uploader, purpose, upload state, retention date, and legal-hold flag |
@@ -819,8 +818,8 @@ transitions to published, the backend sends an in-app notification to renters
 whose deterministic preference score is at least 70% and whose known rent is
 not outside their budget. Notifications are deduplicated per renter/property.
 The publish response includes `matchingAlerts.status` and delivery counts, or
-reports `failed` if notification delivery could not be completed. Email, push,
-and scheduled digests are not included.
+reports `failed` if notification delivery could not be completed. Email and
+scheduled digests are not included.
 
 Renters can save, update, list, and delete up to 20 named searches at
 `/api/v1/saved-searches`. Searches support text, city, area, property type,
@@ -918,12 +917,12 @@ when it is set, so scores for renters who don't use them are unchanged.
   two people per bedroom (or available spots for shared listings), whether
   house rules allow or forbid pets, and ground floor or a listed lift.
 
-### Notifications: in-app, email and push
+### Notifications: in-app and email
 
-Every event below creates an in-app notification. Email and push follow
-from the recipient's settings when those channels are configured
-(`EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM`;
-`PUSH_NOTIFICATIONS_ENABLED=true`). Neve doesn't send SMS. The catalogue is in
+Every event below creates an in-app notification. Email follows
+from the recipient's settings when it is configured
+(`EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM`). Neve doesn't send push
+notifications or SMS. The catalogue is in
 `src/services/notificationTypes.js`.
 
 | Event | Type | Recipient |
@@ -947,7 +946,7 @@ from the recipient's settings when those channels are configured
 | Verification decision, role or account change, case shares | existing types | The user concerned |
 | Sign-in from a new kind of device; password changed | `security_new_device`, `security_password_changed` | Account owner |
 
-**Delivery.** Each email and push is a stored job
+**Delivery.** Each email is a stored job
 (`NotificationDelivery`) with an idempotency key of event + notification +
 recipient + channel, so a job is never created twice and Resend also gets
 the key as `Idempotency-Key`. Jobs are tried straight away, then retried by
@@ -956,10 +955,10 @@ attempts. Permanent provider errors (most 4xx) and jobs out of attempts
 become `dead`: admins see them at
 `GET /api/v1/admin/system/notification-deliveries` and can retry them.
 Sent jobs are deleted after 30 days and dead ones after 90. Delivery never
-blocks or fails the original action; the latest result per channel is on
+blocks or fails the original action; the latest result is on
 the notification's `delivery` field.
 
-**Settings.** At `/api/v1/notifications/preferences` users turn email and push
+**Settings.** At `/api/v1/notifications/preferences` users turn email
 on or off, mute types everywhere (`mutedTypes`) or by email only
 (`emailMutedTypes`), and choose `digest: "daily"`. In-app notifications are
 always on. Security alerts are always emailed and can't be muted.
@@ -988,10 +987,6 @@ Firebase's `tokensValidAfterTime`, which moves when a password changes; the
 app should call `POST /api/v1/auth/password-changed` after a change so the
 email goes out at once. `npm run create-admin` alerts an admin whose password
 it resets.
-
-The app registers each device's FCM token at
-`POST /api/v1/notifications/push-tokens`, and tokens FCM reports as invalid
-are removed automatically.
 
 ### Platform settings, email templates and staff accounts
 

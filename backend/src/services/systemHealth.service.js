@@ -7,7 +7,7 @@ import NotificationDelivery from "../models/NotificationDelivery.js";
 import SystemJobRun from "../models/SystemJobRun.js";
 import { isExtractionConfigured } from "./agreementExtraction.service.js";
 import { isFieldEncryptionConfigured } from "./fieldEncryption.service.js";
-import { isEmailConfigured, isPushConfigured } from "./notificationDelivery.service.js";
+import { isEmailConfigured } from "./notificationDelivery.service.js";
 import { SYSTEM_JOBS } from "./systemJobs.service.js";
 
 // What an admin needs to see whether Neve is working: the database, the
@@ -73,7 +73,6 @@ async function checkServices() {
     return [
         service("File storage (R2)", storage, true, storage ? `Bucket ${env.R2_BUCKET_NAME}.` : "Uploads and downloads fail until R2 is set up."),
         service("Email", isEmailConfigured(), false, isEmailConfigured() ? `Sending with ${env.EMAIL_PROVIDER} from ${env.EMAIL_FROM}.` : "Notifications are in-app only."),
-        service("Push notifications", isPushConfigured(), false, isPushConfigured() ? "Firebase Cloud Messaging." : "Turned off."),
         service("AI (agreement reading)", isExtractionConfigured(), false, isExtractionConfigured() ? `Model ${env.AGREEMENT_EXTRACTION_MODEL}.` : "Extraction and AI suggestions are unavailable; legal sources fall back to keyword matching."),
         service("ID number encryption", isFieldEncryptionConfigured(), false, isFieldEncryptionConfigured() ? `Key version ${env.FIELD_ENCRYPTION_KEY_VERSION}.` : "Identity verification requests are refused."),
         service("Public API address", Boolean(env.API_PUBLIC_URL), false, env.API_PUBLIC_URL ? env.API_PUBLIC_URL : "Unsubscribe links and email photos point at localhost."),

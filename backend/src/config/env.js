@@ -72,11 +72,6 @@ const envSchema = z.object({
     EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).optional(),
     EMAIL_API_KEY: z.string().optional(),
     EMAIL_FROM: z.string().email().optional(),
-    // Push delivery through Firebase Cloud Messaging.
-    PUSH_NOTIFICATIONS_ENABLED: z
-        .enum(["true", "false"])
-        .default("false")
-        .transform((value) => value === "true"),
     // Public address of this API, used for unsubscribe links and listing
     // thumbnails in emails, e.g. https://api.neve.app
     API_PUBLIC_URL: z.string().url().optional(),

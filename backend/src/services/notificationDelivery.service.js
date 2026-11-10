@@ -8,7 +8,7 @@ import { renderDigestEmail, renderNotificationEmail } from "./notificationTempla
 import { DIGEST_TYPES, isSecurityType } from "./notificationTypes.js";
 import { emailAllowedByTemplate, getSettings, getTemplateOverrides } from "./platformSettings.service.js";
 
-// Sends in-app notifications out by email and push. Each send is a
+// Sends in-app notifications out by email. Each send is a
 // stored job: it is retried with backoff, never sent twice (idempotency key
 // per notification and channel) and moved to a dead-letter state after
 // MAX_ATTEMPTS. Delivery never blocks or fails the action that created the
@@ -20,12 +20,6 @@ export const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000
 const LOCK_MS = 2 * 60_000;
 const SENT_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const DEAD_RETENTION_MS = 90 * 24 * 60 * 60_000;
-
-const INVALID_TOKEN_CODES = new Set([
-    "messaging/registration-token-not-registered",
-    "messaging/invalid-registration-token",
-    "messaging/invalid-argument",
-]);
 
 // The Notification model imports this file, so it is looked up lazily.
 const NotificationModel = () => mongoose.model("Notification");
@@ -41,12 +35,8 @@ export function isEmailConfigured() {
     return Boolean(env.EMAIL_PROVIDER && env.EMAIL_API_KEY && env.EMAIL_FROM);
 }
 
-export function isPushConfigured() {
-    return env.PUSH_NOTIFICATIONS_ENABLED === true;
-}
-
 export function isDeliveryConfigured() {
-    return isEmailConfigured() || isPushConfigured();
+    return isEmailConfigured();
 }
 
 // Which channels this user gets this notification on. `digest` means the
@@ -54,20 +44,18 @@ export function isDeliveryConfigured() {
 export function chooseChannels(
     user,
     type,
-    { email = isEmailConfigured(), push = isPushConfigured() } = {}
+    { email = isEmailConfigured() } = {}
 ) {
-    const none = { email: false, push: false, digest: false };
+    const none = { email: false, digest: false };
     if (!user || user.isActive === false) return none;
 
     const preferences = user.notificationPreferences ?? {};
     const hasEmail = Boolean(user.email);
-    const hasPushTokens = Array.isArray(user.pushTokens) && user.pushTokens.length > 0;
 
     if (isSecurityType(type)) {
         // Security emails ignore preferences and mutes.
         return {
             email: email && hasEmail,
-            push: push && preferences.push !== false && hasPushTokens,
             digest: false,
         };
     }
@@ -80,7 +68,6 @@ export function chooseChannels(
 
     return {
         email: wantsEmail && !digest,
-        push: push && preferences.push !== false && hasPushTokens,
         digest,
     };
 }
@@ -151,31 +138,6 @@ export async function sendEmail({ to, subject, text, html, headers }, { idempote
     if (!response.ok) throw errorFromResponse("Email provider", response);
 }
 
-async function getMessaging() {
-    const [{ getMessaging: firebaseMessaging }, { firebaseApp }] = await Promise.all([
-        import("firebase-admin/messaging"),
-        import("../config/firebase.js"),
-    ]);
-    return firebaseMessaging(firebaseApp);
-}
-
-export async function sendPush({ title, body, data }, tokens, messaging = null) {
-    const client = messaging ?? (await getMessaging());
-    const response = await client.sendEachForMulticast({
-        tokens,
-        notification: { title, body: String(body).slice(0, 240) },
-        data,
-    });
-    const invalidTokens = response.responses
-        .map((result, index) => (!result.success && INVALID_TOKEN_CODES.has(result.error?.code) ? tokens[index] : null))
-        .filter(Boolean);
-    return {
-        successCount: response.successCount,
-        failureCount: response.failureCount,
-        invalidTokens,
-    };
-}
-
 // --- Queueing -----------------------------------------------------------------
 
 function jobsFor(notification, user, channels, emailOptions = {}) {
@@ -194,18 +156,6 @@ function jobsFor(notification, user, channels, emailOptions = {}) {
             channel: "email",
             idempotencyKey: `${notification.type}:${notification._id}:${user._id}:email`,
             payload: buildEmail(notification, user, emailOptions),
-        });
-    }
-    if (channels.push) {
-        jobs.push({
-            ...base,
-            channel: "push",
-            idempotencyKey: `${notification.type}:${notification._id}:${user._id}:push`,
-            payload: {
-                title: notification.title,
-                body: notification.message,
-                data: { notificationId: String(notification._id), type: String(notification.type) },
-            },
         });
     }
     return jobs;
@@ -229,7 +179,7 @@ async function insertJobs(jobs, DeliveryModel = NotificationDelivery) {
 export async function enqueueNotificationDelivery(notification, deps = {}) {
     const UserModel = deps.UserModel ?? User;
     const user = await UserModel.findById(notification.recipient)
-        .select("email displayName isActive notificationPreferences +pushTokens")
+        .select("email displayName isActive notificationPreferences")
         .lean();
     const channels = chooseChannels(user, notification.type, deps.channels);
     const [settings, overrides] = await Promise.all([
@@ -253,7 +203,6 @@ export async function enqueueNotificationDelivery(notification, deps = {}) {
     };
     const delivery = {
         email: { status: status("email"), at: now, error: null },
-        push: { status: status("push"), at: now, error: null },
     };
     if (!deps.skipRecord) {
         await (deps.NotificationModel ?? NotificationModel()).updateOne(
@@ -305,23 +254,11 @@ async function claim(filter, DeliveryModel) {
 }
 
 async function send(job, deps) {
-    if (job.channel === "email") {
-        await (deps.sendEmail ?? sendEmail)(job.payload, { idempotencyKey: job.idempotencyKey });
-        return null;
+    if (job.channel !== "email") {
+        throw new DeliveryError(`Unsupported delivery channel: ${job.channel}.`, { permanent: true });
     }
-    const UserModel = deps.UserModel ?? User;
-    const user = await UserModel.findById(job.recipient).select("+pushTokens").lean();
-    const tokens = (user?.pushTokens ?? []).map((entry) => entry.token);
-    if (!tokens.length) throw new DeliveryError("No registered devices.", { permanent: true });
-    const result = await (deps.sendPush ?? sendPush)(job.payload, tokens);
-    if (result.invalidTokens.length) {
-        await UserModel.updateOne(
-            { _id: job.recipient },
-            { $pull: { pushTokens: { token: { $in: result.invalidTokens } } } }
-        );
-    }
-    if (result.successCount === 0) throw new DeliveryError("No device accepted the push notification.");
-    return { successCount: result.successCount, failureCount: result.failureCount };
+    await (deps.sendEmail ?? sendEmail)(job.payload, { idempotencyKey: job.idempotencyKey });
+    return null;
 }
 
 async function recordOnNotification(job, status, error, deps) {

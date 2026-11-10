@@ -196,11 +196,10 @@ export async function deleteAccount(user, deps = {}) {
                 googlePhotoURL: null,
                 favorites: [],
                 recentlyViewed: [],
-                pushTokens: [],
                 passwordHash: null,
                 isActive: false,
                 deletedAt: now,
-                notificationPreferences: { email: false, push: false, digest: "off", mutedTypes: [], emailMutedTypes: [] },
+                notificationPreferences: { email: false, digest: "off", mutedTypes: [], emailMutedTypes: [] },
                 verification: {
                     email: { verified: false, verifiedAt: null },
                     phone: { verified: false, phoneNumber: null, verifiedAt: null, method: null },

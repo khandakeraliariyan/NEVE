@@ -9,8 +9,6 @@ import {
 import {
     confirmUnsubscribe,
     getNotificationPreferences,
-    registerPushToken,
-    removePushToken,
     showUnsubscribe,
     updateNotificationPreferences,
 } from "../controllers/notificationSettings.controller.js";
@@ -37,8 +35,6 @@ router.use(allowRoles(
 
 router.get("/preferences", getNotificationPreferences);
 router.patch("/preferences", updateNotificationPreferences);
-router.post("/push-tokens", registerPushToken);
-router.delete("/push-tokens", removePushToken);
 router.get("/unread-count", getUnreadCount);
 router.patch("/read-all", markAllNotificationsAsRead);
 router.get("/", getMyNotifications);
