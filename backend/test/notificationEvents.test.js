@@ -126,7 +126,8 @@ test("unsubscribe tokens verify and reject tampering", () => {
     const [payload, signature] = token.split(".");
     const forged = Buffer.from(JSON.stringify({ u: String(id()), s: "all", v: 1 })).toString("base64url");
     assert.equal(verifyUnsubscribeToken(`${forged}.${signature}`), null);
-    assert.equal(verifyUnsubscribeToken(`${payload}.x${signature.slice(1)}`), null);
+    const altered = (signature[0] === "x" ? "y" : "x") + signature.slice(1);
+    assert.equal(verifyUnsubscribeToken(`${payload}.${altered}`), null);
     assert.equal(verifyUnsubscribeToken("garbage"), null);
 });
 
