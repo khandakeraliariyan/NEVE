@@ -178,6 +178,47 @@ export async function sendObligationReminders(now = new Date(), deps = {}) {
     return sent;
 }
 
+// One notice to both parties when an open obligation passes its due date.
+export async function sendOverdueObligationNotices(now = new Date(), deps = {}) {
+    const AgreementModel = deps.AgreementModel ?? TenancyAgreement;
+    const notify = deps.createNotification ?? createNotification;
+    const agreements = await AgreementModel.find({
+        status: { $ne: "archived" },
+        obligations: { $elemMatch: { status: "open", dueAt: { $lt: now } } },
+    })
+        .select("title renter landlord obligations")
+        .limit(500)
+        .lean();
+
+    let sent = 0;
+    for (const agreement of agreements) {
+        for (const obligation of agreement.obligations) {
+            if (obligation.status !== "open" || !obligation.dueAt) continue;
+            const due = new Date(obligation.dueAt);
+            if (due >= now || sameTime(obligation.overdueNotifiedFor, due)) continue;
+            const claimed = await AgreementModel.updateOne(
+                { _id: agreement._id, obligations: { $elemMatch: { _id: obligation._id, dueAt: obligation.dueAt } } },
+                { $set: { "obligations.$.overdueNotifiedFor": obligation.dueAt } }
+            );
+            if (!claimed.modifiedCount) continue;
+            const description = previewText(obligation.description, 120);
+            for (const recipient of parties(agreement)) {
+                const created = await notify({
+                    recipient,
+                    type: "obligation_overdue",
+                    title: "An obligation is overdue",
+                    message: `"${description}" in ${agreement.title} was due on ${formatDateTime(due)} and isn't marked complete.`,
+                    link: "/compliance",
+                    relatedAgreement: agreement._id,
+                    dedupeKey: `obligation_overdue:${obligation._id}:${dayKey(due)}:${recipient}`,
+                });
+                if (created) sent += 1;
+            }
+        }
+    }
+    return sent;
+}
+
 export async function sendLeaseEndingReminders(now = new Date(), deps = {}) {
     const AgreementModel = deps.AgreementModel ?? TenancyAgreement;
     const notify = deps.createNotification ?? createNotification;
@@ -220,6 +261,7 @@ export async function runNotificationReminders({ now = new Date() } = {}, deps =
         ["inquiryReminders", sendInquiryReminders],
         ["viewingReminders", sendViewingReminders],
         ["obligationReminders", sendObligationReminders],
+        ["overdueObligationNotices", sendOverdueObligationNotices],
         ["leaseEndingReminders", sendLeaseEndingReminders],
     ]) {
         try {

@@ -56,6 +56,7 @@ const PARTY_TENANCY_NAV = (invitationsLabel) => [
         title: "Tenancy",
         items: [
             { to: "/agreements", label: "Tenancy dashboard", end: true },
+            { to: "/compliance", label: "Obligations & deadlines" },
             { to: "/invitations", label: invitationsLabel },
         ],
     },

@@ -39,6 +39,7 @@ import {
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
+import { completeObligation, validateObligationExtras } from "../services/compliance.service.js";
 import { actorLabel, notifyOtherParty } from "../services/notificationEvents.service.js";
 
 const userId = (req) => req.neveUser._id;
@@ -494,6 +495,14 @@ export async function addAgreementObligation(req, res, next) {
                 message: "Invalid obligation fields.",
             });
         }
+        const extras = validateObligationExtras({
+            category: req.body?.category,
+            recurrence: req.body?.recurrence,
+            dueAt: req.body?.recurrence ? dueAt : undefined,
+        });
+        if (extras.error) {
+            return res.status(400).json({ success: false, message: extras.error });
+        }
 
         let evidenceFile = null;
         if (evidenceFileId !== null) {
@@ -512,6 +521,8 @@ export async function addAgreementObligation(req, res, next) {
             responsibleParty,
             dueAt: dueAt ? new Date(dueAt) : null,
             amountBdt,
+            category: extras.value.category ?? "other",
+            recurrence: extras.value.recurrence ?? { frequency: "none", until: null },
             evidenceFile: evidenceFile?._id ?? null,
             notes: notes.trim(),
             createdBy: actor,
@@ -569,22 +580,53 @@ export async function updateAgreementObligation(req, res, next) {
             });
         }
 
-        const { status, notes } = req.body ?? {};
+        const { status, notes, completionNote = "", evidenceFileId = null } = req.body ?? {};
+        const extras = validateObligationExtras({
+            category: req.body?.category,
+            recurrence: req.body?.recurrence,
+            dueAt: req.body?.dueAt,
+        });
+        const changesExtras = ["category", "recurrence", "dueAt"].some((key) => req.body?.[key] !== undefined);
         if (
+            extras.error ||
             (status !== undefined &&
                 !["open", "completed", "disputed"].includes(status)) ||
             (notes !== undefined &&
                 (typeof notes !== "string" || notes.length > 1000)) ||
-            (status === undefined && notes === undefined)
+            typeof completionNote !== "string" ||
+            completionNote.length > 1000 ||
+            (status === undefined && notes === undefined && !changesExtras)
         ) {
             return res.status(400).json({
                 success: false,
-                message: "Provide a valid obligation status or notes.",
+                message: extras.error ?? "Provide a valid obligation status, notes, category, due date or recurrence.",
             });
         }
+        if (extras.value.recurrence?.frequency && extras.value.recurrence.frequency !== "none" && !(extras.value.dueAt ?? obligation.dueAt)) {
+            return res.status(400).json({ success: false, message: "A recurring obligation needs a due date." });
+        }
 
-        if (status !== undefined) {
+        let evidenceFile = null;
+        if (evidenceFileId !== null) {
+            evidenceFile = await findUploadedEvidence(evidenceFileId, userId(req));
+            if (!evidenceFile) {
+                return res.status(404).json({ success: false, message: "Uploaded evidence not found." });
+            }
+        }
+
+        Object.assign(obligation, extras.value);
+        let completion = null;
+        if (status === "completed" && obligation.status !== "completed") {
+            completion = completeObligation(obligation, {
+                actor: userId(req),
+                evidenceFile: evidenceFile?._id ?? null,
+                note: completionNote.trim(),
+            });
+        } else if (status !== undefined) {
             obligation.status = status;
+            if (evidenceFile) obligation.evidenceFile = evidenceFile._id;
+        } else if (evidenceFile) {
+            obligation.evidenceFile = evidenceFile._id;
         }
         if (notes !== undefined) {
             obligation.notes = notes.trim();
@@ -593,13 +635,13 @@ export async function updateAgreementObligation(req, res, next) {
         await saveAuditedChange(
             agreement,
             req,
-            "obligation_updated",
+            completion ? "obligation_completed" : "obligation_updated",
             "obligation",
             obligation._id
         );
 
         setPrivateResponse(res);
-        return res.json({ success: true, data: obligation });
+        return res.json({ success: true, data: obligation, completion });
     } catch (error) {
         next(error);
     }

@@ -38,6 +38,12 @@ import {
     runLegalSuggestions,
 } from "../controllers/legalSuggestion.controller.js";
 import {
+    acceptProposedObligation,
+    dismissProposedObligation,
+    getAgreementCompliance,
+    getMyCompliance,
+} from "../controllers/compliance.controller.js";
+import {
     acceptInvitation,
     cancelInvitation,
     createInvitation,
@@ -85,6 +91,20 @@ router.use(
 );
 
 router.post("/agreements", allowRoles("renter", "landlord"), createTenancyAgreement);
+
+// ComplianceOS: obligations across agreements, and reviewing proposed ones.
+router.get("/compliance", getMyCompliance);
+router.get("/agreements/:agreementId/compliance", getAgreementCompliance);
+router.post(
+    "/agreements/:agreementId/proposed-obligations/:proposalId/accept",
+    allowRoles("renter", "landlord"),
+    acceptProposedObligation
+);
+router.post(
+    "/agreements/:agreementId/proposed-obligations/:proposalId/dismiss",
+    allowRoles("renter", "landlord"),
+    dismissProposedObligation
+);
 
 // Landlord invites a renter by email; the renter accepts to start the record.
 router.post("/invitations", allowRoles("landlord"), createInvitation);

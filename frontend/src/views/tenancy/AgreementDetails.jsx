@@ -7,6 +7,7 @@ import { api, downloadAuthenticated, openPrivateFile, uploadFile } from "../../l
 import { date, dateTime, label, money } from "../../lib/format";
 import { useAgreement } from "./useAgreement";
 import IntegrityCheck from "./IntegrityCheck";
+import ObligationsPanel from "./ObligationsPanel";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, StatusBadge, Tabs } from "../../components/ui";
 import NotFound from "../NotFound";
 
@@ -160,120 +161,6 @@ function Overview({ agreement, canEdit, action }) {
                             Update status
                         </Button>
                     </div>
-                </Card>
-            )}
-        </div>
-    );
-}
-
-function Obligations({ agreement, canAdd, canUpdate, action }) {
-    const blank = { description: "", responsibleParty: "renter", dueAt: "", amountBdt: "", notes: "" };
-    const [form, setForm] = useState(blank);
-    const [file, setFile] = useState(null);
-    const id = agreement._id;
-    const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-
-    async function add(event) {
-        event.preventDefault();
-        const ok = await action.run(async () => {
-            const evidenceFileId = file ? await uploadFile(file, { purpose: "tenancy_evidence" }) : null;
-            await api.post(`/tenancy/agreements/${id}/obligations`, {
-                description: form.description.trim(),
-                responsibleParty: form.responsibleParty,
-                dueAt: form.dueAt ? new Date(form.dueAt).toISOString() : null,
-                amountBdt: form.amountBdt === "" ? null : Number(form.amountBdt),
-                notes: form.notes.trim(),
-                evidenceFileId,
-            });
-        });
-        if (ok) {
-            setForm(blank);
-            setFile(null);
-        }
-    }
-
-    const obligations = [...(agreement.obligations ?? [])].sort((a, b) => new Date(a.dueAt ?? 8.64e15) - new Date(b.dueAt ?? 8.64e15));
-    return (
-        <div className="space-y-6">
-            <Card>
-                <h2 className="mb-4 text-xl">Obligations & milestones</h2>
-                {obligations.length === 0 && <Empty title="No obligations recorded">Add rent dates, repairs or notice deadlines from the agreement.</Empty>}
-                <ol className="space-y-3">
-                    {obligations.map((o) => (
-                        <li key={o._id} className="flex gap-4 rounded-xl bg-mist p-4">
-                            <span className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-white ${o.status === "completed" ? "bg-forest" : o.status === "disputed" ? "bg-rose-ink" : "bg-moss/60"}`}>
-                                {o.status === "completed" ? "✓" : "•"}
-                            </span>
-                            <div className="flex-1 text-sm">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="font-semibold">{o.description}</p>
-                                    <StatusBadge status={o.status} />
-                                </div>
-                                <p className="text-xs text-muted">
-                                    {label(o.responsibleParty)} · {o.dueAt ? `due ${date(o.dueAt)}` : "no due date"}
-                                    {o.amountBdt !== null && o.amountBdt !== undefined ? ` · ${money(o.amountBdt)}` : ""}
-                                </p>
-                                {o.notes && <p className="mt-1 text-xs">{o.notes}</p>}
-                                <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                                    {o.evidenceFile && (
-                                        <button type="button" className="text-forest underline" onClick={() => openPrivateFile(o.evidenceFile._id ?? o.evidenceFile)}>
-                                            Evidence: {o.evidenceFile.originalName ?? "file"}
-                                        </button>
-                                    )}
-                                    {canUpdate &&
-                                        ["open", "completed", "disputed"]
-                                            .filter((s) => s !== o.status)
-                                            .map((s) => (
-                                                <button
-                                                    key={s}
-                                                    type="button"
-                                                    disabled={action.busy}
-                                                    className="text-forest underline"
-                                                    onClick={() => action.run(() => api.patch(`/tenancy/agreements/${id}/obligations/${o._id}`, { status: s }))}
-                                                >
-                                                    Mark {s}
-                                                </button>
-                                            ))}
-                                </div>
-                            </div>
-                        </li>
-                    ))}
-                </ol>
-            </Card>
-            {canAdd && (
-                <Card>
-                    <h2 className="mb-4 text-xl">Add obligation</h2>
-                    <form onSubmit={add} className="grid gap-4 text-sm md:grid-cols-2">
-                        <Field label="Description *" className="md:col-span-2">
-                            <input className="field" required maxLength={500} value={form.description} onChange={set("description")} />
-                        </Field>
-                        <Field label="Responsible party">
-                            <select className="field" value={form.responsibleParty} onChange={set("responsibleParty")}>
-                                {["renter", "landlord", "shared"].map((p) => (
-                                    <option key={p} value={p}>
-                                        {label(p)}
-                                    </option>
-                                ))}
-                            </select>
-                        </Field>
-                        <Field label="Due date">
-                            <input type="date" className="field" value={form.dueAt} onChange={set("dueAt")} />
-                        </Field>
-                        <Field label="Amount (৳)">
-                            <input type="number" min="0" className="field" value={form.amountBdt} onChange={set("amountBdt")} />
-                        </Field>
-                        <Field label="Evidence file (optional)">
-                            <input type="file" className="field" accept="application/pdf,image/jpeg,image/png,image/webp,text/plain" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-                        </Field>
-                        <Field label="Notes" className="md:col-span-2">
-                            <input className="field" maxLength={1000} value={form.notes} onChange={set("notes")} />
-                        </Field>
-                        <div className="md:col-span-2">
-                            <Button type="submit" disabled={action.busy}>
-                                Add obligation
-                            </Button>
-                        </div>
-                    </form>
                 </Card>
             )}
         </div>
@@ -566,7 +453,7 @@ export default function AgreementDetails() {
             <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
                 <div>
                     {tab === "overview" && <Overview agreement={agreement} canEdit={isParticipant} action={action} />}
-                    {tab === "obligations" && <Obligations agreement={agreement} canAdd={isParticipant} canUpdate={isParticipant} action={action} />}
+                    {tab === "obligations" && <ObligationsPanel agreement={agreement} canAdd={isParticipant} canUpdate={isParticipant} action={action} />}
                     {tab === "payments" && <Payments agreement={agreement} canEdit={isParticipant} action={action} />}
                     {tab === "sharing" && <Sharing agreement={agreement} canEdit={isParticipant} action={action} />}
                     {tab === "activity" && (

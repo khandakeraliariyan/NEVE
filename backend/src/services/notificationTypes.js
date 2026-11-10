@@ -29,6 +29,7 @@ export const NOTIFICATION_TYPES = [
     "agreement_analysis_complete",
     "lease_ending",
     "obligation_due",
+    "obligation_overdue",
     "tenancy_case_shared",
     "tenancy_case_review_activity",
     "tenancy_invitation_received",
@@ -97,6 +98,7 @@ export function defaultNotificationLink(notification) {
             return agreement ? `/agreements/${agreement}/evidence` : "/agreements";
         case "lease_ending":
         case "obligation_due":
+        case "obligation_overdue":
             return agreement ? `/agreements/${agreement}` : "/agreements";
         case "legal_source_submitted":
             return "/legal-review";
