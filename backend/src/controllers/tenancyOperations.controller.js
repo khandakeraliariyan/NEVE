@@ -17,6 +17,24 @@ import {
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
+import { actorLabel, notifyOtherParty } from "../services/notificationEvents.service.js";
+
+const STATUS_LABELS = {
+    submitted: "submitted",
+    acknowledged: "acknowledged",
+    in_progress: "in progress",
+    awaiting_renter: "waiting for the renter",
+    completed: "resolved",
+    disputed: "disputed",
+    cancelled: "cancelled",
+};
+
+function conditionEntryLabel(entry) {
+    if (entry.kind === "meter_reading") {
+        return `${entry.meterType ?? "meter"} reading`;
+    }
+    return [entry.room, entry.item].filter(Boolean).join(", ") || "an entry";
+}
 
 const isValidId = mongoose.isValidObjectId;
 const actorId = (req) => req.neveUser._id;
@@ -477,6 +495,15 @@ export async function reviewConditionEntry(req, res, next) {
             "condition_report",
             report._id
         );
+        const reportName = report.stage === "move_out" ? "move-out" : "move-in";
+        await notifyOtherParty({
+            agreement,
+            actorId: actorId(req),
+            type: "condition_entry_reviewed",
+            title: `A ${reportName} condition entry was ${decision}`,
+            message: `The ${actorLabel(agreement, actorId(req))} ${decision} "${conditionEntryLabel(entry)}" in the ${reportName} report${note.trim() ? `: "${note.trim().slice(0, 200)}"` : "."}`,
+            link: `/agreements/${agreement._id}/condition`,
+        });
         privateResponse(res);
         return res.json({ success: true, data: entry });
     } catch (error) {
@@ -678,6 +705,14 @@ export async function createMaintenanceRequest(req, res, next) {
             "maintenance_request",
             request._id
         );
+        await notifyOtherParty({
+            agreement,
+            actorId: actorId(req),
+            type: "maintenance_request_submitted",
+            title: `New ${priority === "urgent" ? "urgent " : ""}maintenance request: ${request.title}`,
+            message: `The ${actorLabel(agreement, actorId(req))} reported a ${category.replace(/_/g, " ")} problem: "${request.description.slice(0, 200)}"`,
+            link: `/agreements/${agreement._id}/maintenance`,
+        });
         privateResponse(res);
         return res.status(201).json({
             success: true,
@@ -921,6 +956,18 @@ export async function updateMaintenanceRequest(req, res, next) {
             "maintenance_request",
             request._id
         );
+        await notifyOtherParty({
+            agreement,
+            actorId: actorId(req),
+            type: "maintenance_request_updated",
+            title: status !== undefined
+                ? `Maintenance request ${STATUS_LABELS[status] ?? status}: ${request.title}`
+                : `Update on maintenance request: ${request.title}`,
+            message: message.trim()
+                ? `The ${actorLabel(agreement, actorId(req))} wrote: "${message.trim().slice(0, 200)}"`
+                : `The ${actorLabel(agreement, actorId(req))} updated this request.`,
+            link: `/agreements/${agreement._id}/maintenance`,
+        });
         privateResponse(res);
         return res.json({ success: true, data: request });
     } catch (error) {
@@ -991,6 +1038,14 @@ export async function assignMaintenanceRequest(req, res, next) {
             "maintenance_request",
             request._id
         );
+        await notifyOtherParty({
+            agreement,
+            actorId: actorId(req),
+            type: "maintenance_request_updated",
+            title: `Repair ${value ? "assigned" : "unassigned"}: ${request.title}`,
+            message: value ? `The landlord assigned this repair to ${label}.` : "The landlord removed the repair assignment.",
+            link: `/agreements/${agreement._id}/maintenance`,
+        });
         privateResponse(res);
         return res.json({ success: true, data: request });
     } catch (error) {

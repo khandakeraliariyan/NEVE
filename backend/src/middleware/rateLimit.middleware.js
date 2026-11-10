@@ -31,3 +31,5 @@ export const uploadLimiter = createLimiter(UPLOAD_RATE_LIMIT);
 
 // Each extraction is a paid model call on a whole document.
 export const extractionLimiter = createLimiter(10);
+// Legal Copilot questions are model calls too, but a conversation needs more.
+export const copilotLimiter = createLimiter(40);

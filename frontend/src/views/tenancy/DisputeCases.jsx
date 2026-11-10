@@ -9,6 +9,7 @@ import { useApi } from "../../hooks/useApi";
 import { useAgreement } from "./useAgreement";
 import { Badge, Button, ButtonLink, Card, Disclaimer, Empty, ErrorBox, Field, Loading, PageHeader, StatusBadge } from "../../components/ui";
 import NotFound from "../NotFound";
+import { CaseIssues, CaseStatementsPanel } from "./CaseStatements";
 
 const CASE_STATUSES = ["open", "resolved", "closed"];
 
@@ -140,6 +141,9 @@ function CaseDossier({ caseId, canManage }) {
             ...(e.removedAt ? [{ at: e.removedAt, text: `Removed ${e.file?.originalName ?? "file"}`, tone: "bg-amber-ink" }] : []),
         ])
         .concat([{ at: c.createdAt, text: `Case opened by ${c.createdBy?.displayName ?? "a participant"}`, tone: "bg-moss" }])
+        .concat((c.issues ?? []).map((i) => ({ at: i.addedAt, text: `Issue raised: ${i.title}`, tone: "bg-amber-ink" })))
+        .concat((c.statements ?? []).filter((s) => s.sharedAt).map((s) => ({ at: s.sharedAt, text: `${label(s.authorRole)} shared a statement${s.title ? `: ${s.title}` : ""}`, tone: "bg-forest" })))
+        .concat((c.reviewEntries ?? []).map((e) => ({ at: e.createdAt, text: `${label(e.authorRole)} posted a ${e.kind}`, tone: "bg-moss/60" })))
         .sort((a, b) => new Date(a.at) - new Date(b.at));
 
     async function setStatus(status) {
@@ -180,6 +184,9 @@ function CaseDossier({ caseId, canManage }) {
                     )}
                     <ErrorBox error={error} />
                 </Card>
+
+                <CaseIssues caseData={c} canEdit={canManage} onChanged={detail.reload} />
+                <CaseStatementsPanel caseData={c} canEdit={canManage} onChanged={detail.reload} />
 
                 <Card>
                     <p className="eyebrow mb-1">Record trail</p>

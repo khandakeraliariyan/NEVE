@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import mongoose from "mongoose";
+import { hashListingPhoto } from "../services/duplicatePhoto.service.js";
 
 import UploadedFile from "../models/UploadedFile.js";
 import Property from "../models/Property.js";
@@ -198,6 +199,8 @@ export const completeUpload = async (req, res) => {
             file.imageFingerprint = /^[a-f0-9]{32}$/i.test(etag)
                 ? etag.toLowerCase()
                 : null;
+            // Perceptual hash for near-duplicate photos; failure doesn't block the upload.
+            if (!(await hashListingPhoto(file))) file.perceptualHashFailed = true;
         }
 
         try {
@@ -282,8 +285,11 @@ export const getFileAccessUrl = async (req, res) => {
                 req.neveUser.role
             )
             : null;
+        const isLegalStaff = ["admin", "legal_reviewer"].includes(req.neveUser.role);
         const allowed = file.purpose === "tenancy_evidence"
             ? isUploader || Boolean(agreement) || Boolean(sharedCase)
+            : file.purpose === "legal_source_document"
+                ? isUploader || isLegalStaff
             : isAdmin ||
                 isUploader ||
                 (propertyMediaFields[file.purpose] && isPropertyOwner);

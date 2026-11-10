@@ -6,8 +6,11 @@ import {
     getLandlordViewingRequests,
     updateViewingRequest,
     completeViewingRequest,
-    cancelMyViewingRequest,
 } from "../controllers/viewing.controller.js";
+import {
+    cancelViewing,
+    rescheduleViewing,
+} from "../controllers/viewingChanges.controller.js";
 
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
@@ -19,7 +22,6 @@ import {
 
 import {
     getMyViewingRequests as getDedicatedMyViewingRequests,
-    cancelMyViewingRequest as cancelDedicatedMyViewingRequest,
 } from "../controllers/renterViewing.controller.js";
 
 const router = Router();
@@ -39,11 +41,12 @@ router.get(
     getMyViewingRequests
 );
 
+// Renter cancels a requested viewing, or a confirmed one before it happens.
 router.patch(
-    "/:id/cancel",
+    "/:viewingId/cancel",
     authenticateUser,
     allowRoles("renter"),
-    cancelMyViewingRequest
+    cancelViewing
 );
 
 router.get(
@@ -53,14 +56,22 @@ router.get(
     getDedicatedMyViewingRequests
 );
 
+
+// Either side moves a requested or confirmed viewing to a new time.
 router.patch(
-    "/:viewingId/cancel",
+    "/:viewingId/reschedule",
     authenticateUser,
-    allowRoles("renter"),
-    cancelDedicatedMyViewingRequest
+    allowRoles("renter", "landlord"),
+    rescheduleViewing
 );
 
 // Landlord routes
+router.patch(
+    "/:viewingId/landlord-cancel",
+    authenticateUser,
+    allowRoles("landlord"),
+    cancelViewing
+);
 router.get(
     "/landlord",
     authenticateUser,

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Inquiry from "../models/Inquiry.js";
 import Property from "../models/Property.js";
 import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
+import { markLandlordReplied, notifyInquiryReplied } from "../services/notificationEvents.service.js";
 
 // GET /api/v1/inquiries/landlord
 export const getLandlordInquiries = async (req, res, next) => {
@@ -153,6 +154,18 @@ export const respondToInquiry = async (req, res, next) => {
                 message: "This inquiry has already been updated. Refresh and try again.",
             });
         }
+
+        await markLandlordReplied(updatedInquiry._id);
+        await notifyInquiryReplied({
+            inquiry: updatedInquiry,
+            propertyTitle: updatedInquiry.property?.title,
+            replyText:
+                responseMessage.trim() ||
+                (status === "accepted"
+                    ? "The landlord accepted your inquiry."
+                    : "The landlord declined your inquiry."),
+            landlordName: req.neveUser.displayName,
+        });
 
         return res.status(200).json({
             success: true,

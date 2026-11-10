@@ -10,6 +10,9 @@ import {
     findCaseForUser,
     isEvidenceForAgreement,
     validateCaseReviewEntry,
+    validateIssueInput,
+    validateStatementInput,
+    visibleStatements,
 } from "../services/tenancyCase.service.js";
 
 const setPrivateResponse = (res) => res.set("Cache-Control", "private, no-store");
@@ -90,7 +93,7 @@ export async function listTenancyCases(req, res, next) {
         const filter = { agreement: agreement._id };
         const [cases, total] = await Promise.all([
             TenancyCase.find(filter)
-                .select("-sharedWith -reviewEntries.body")
+                .select("-sharedWith -reviewEntries.body -statements")
                 .populate("createdBy", "displayName role")
                 .populate(
                     "evidence.file",
@@ -159,7 +162,7 @@ export async function listSharedTenancyCases(req, res, next) {
 
         const [cases, total] = await Promise.all([
             TenancyCase.find(filter)
-                .select("-sharedWith -reviewEntries.body")
+                .select("-sharedWith -reviewEntries.body -statements")
                 .populate("createdBy", "displayName role")
                 .populate(
                     "evidence.file",
@@ -271,7 +274,10 @@ export async function getTenancyCase(req, res, next) {
             .populate("evidence.file", "originalName mimeType sizeBytes status")
             .populate("createdBy", "displayName role")
             .populate("reviewEntries.author", "displayName role")
+            .populate("statements.author", "displayName role")
+            .populate("issues.addedBy", "displayName role")
             .lean();
+        populated.statements = visibleStatements(populated.statements, req.neveUser._id, isSharedReviewer);
         await recordSensitiveAccess({
             actor: req.neveUser._id,
             action: "tenancy_case_viewed",
@@ -675,6 +681,150 @@ export async function addCaseReviewEntry(req, res, next) {
             },
             notificationStatus,
         });
+    } catch (error) {
+        next(error);
+    }
+}
+
+const partyRole = (agreement, userId) =>
+    String(agreement.renter) === String(userId) ? "renter" : String(agreement.landlord) === String(userId) ? "landlord" : null;
+
+async function getPartyCase(req, res) {
+    const result = await getCase(req, res);
+    if (!result) return null;
+    const role = result.agreement && partyRole(result.agreement, req.neveUser._id);
+    if (result.isSharedReviewer || !role) {
+        res.status(403).json({ success: false, message: "Only the renter or landlord can do this." });
+        return null;
+    }
+    if (result.tenancyCase.status === "closed") {
+        res.status(409).json({ success: false, message: "This case is closed." });
+        return null;
+    }
+    return { ...result, role };
+}
+
+async function notifyStatementShared(tenancyCase, agreement, authorId, role) {
+    try {
+        const other = role === "renter" ? agreement.landlord : agreement.renter;
+        const reviewers = (tenancyCase.sharedWith ?? []).filter((s) => s.revokedAt === null).map((s) => s.user);
+        await Promise.all(
+            [other, ...reviewers]
+                .filter((recipient) => recipient && String(recipient) !== String(authorId))
+                .map((recipient) =>
+                    createNotification({
+                        recipient,
+                        type: "tenancy_case_review_activity",
+                        title: `The ${role} shared a statement`,
+                        message: "Open the case to read it.",
+                        relatedCase: tenancyCase._id,
+                    })
+                )
+        );
+    } catch (error) {
+        console.error("Statement notification error:", error);
+    }
+}
+
+// POST /api/v1/tenancy/cases/:caseId/statements  { body, title?, share? }
+export async function addCaseStatement(req, res, next) {
+    try {
+        const result = await getPartyCase(req, res);
+        if (!result) return;
+        const { tenancyCase, agreement, role } = result;
+        const { value, share, error } = validateStatementInput(req.body);
+        if (error) return res.status(400).json({ success: false, message: error });
+        if (tenancyCase.statements.filter((s) => String(s.author) === String(req.neveUser._id)).length >= 20) {
+            return res.status(409).json({ success: false, message: "You can add at most 20 statements to a case." });
+        }
+        tenancyCase.statements.push({
+            ...value,
+            author: req.neveUser._id,
+            authorRole: role,
+            visibility: share ? "shared" : "private",
+            sharedAt: share ? new Date() : null,
+        });
+        await tenancyCase.save();
+        const statement = tenancyCase.statements.at(-1);
+        await recordSensitiveAccess({
+            actor: req.neveUser._id,
+            action: "case_statement_added",
+            resourceType: "case",
+            resourceId: tenancyCase._id,
+            agreement: tenancyCase.agreement,
+            details: { statementId: String(statement._id), shared: share },
+            outcome: "completed",
+            ipAddress: req.ip,
+        });
+        if (share) await notifyStatementShared(tenancyCase, agreement, req.neveUser._id, role);
+        setPrivateResponse(res);
+        return res.status(201).json({ success: true, data: statement });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH /api/v1/tenancy/cases/:caseId/statements/:statementId  { body?, title?, share? }
+export async function updateCaseStatement(req, res, next) {
+    try {
+        const result = await getPartyCase(req, res);
+        if (!result) return;
+        const { tenancyCase, agreement, role } = result;
+        const statement = mongoose.isValidObjectId(req.params.statementId) ? tenancyCase.statements.id(req.params.statementId) : null;
+        if (!statement || String(statement.author) !== String(req.neveUser._id)) {
+            return res.status(404).json({ success: false, message: "Statement not found." });
+        }
+        const { value, share, error } = validateStatementInput(req.body, { partial: true });
+        if (error) return res.status(400).json({ success: false, message: error });
+        if (value.body !== undefined && value.body !== statement.body) {
+            // Shared statements keep what the others already read.
+            if (statement.visibility === "shared") statement.previousVersions.push({ body: statement.body, replacedAt: new Date() });
+            statement.body = value.body;
+        }
+        if (value.title !== undefined) statement.title = value.title;
+        const newlyShared = share && statement.visibility !== "shared";
+        if (newlyShared) {
+            statement.visibility = "shared";
+            statement.sharedAt = new Date();
+        }
+        await tenancyCase.save();
+        if (newlyShared) await notifyStatementShared(tenancyCase, agreement, req.neveUser._id, role);
+        setPrivateResponse(res);
+        return res.json({ success: true, data: statement });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// POST /api/v1/tenancy/cases/:caseId/issues  { title, description?, amountBdt? }
+export async function addCaseIssue(req, res, next) {
+    try {
+        const result = await getPartyCase(req, res);
+        if (!result) return;
+        const { tenancyCase } = result;
+        const { value, error } = validateIssueInput(req.body);
+        if (error) return res.status(400).json({ success: false, message: error });
+        if (tenancyCase.issues.length >= 30) return res.status(409).json({ success: false, message: "A case can list at most 30 issues." });
+        tenancyCase.issues.push({ ...value, addedBy: req.neveUser._id });
+        await tenancyCase.save();
+        setPrivateResponse(res);
+        return res.status(201).json({ success: true, data: tenancyCase.issues.at(-1) });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// DELETE /api/v1/tenancy/cases/:caseId/issues/:issueId (the person who added it)
+export async function removeCaseIssue(req, res, next) {
+    try {
+        const result = await getPartyCase(req, res);
+        if (!result) return;
+        const { tenancyCase } = result;
+        const issue = mongoose.isValidObjectId(req.params.issueId) ? tenancyCase.issues.id(req.params.issueId) : null;
+        if (!issue || String(issue.addedBy) !== String(req.neveUser._id)) return res.status(404).json({ success: false, message: "Issue not found." });
+        issue.deleteOne();
+        await tenancyCase.save();
+        return res.json({ success: true, message: "Issue removed." });
     } catch (error) {
         next(error);
     }

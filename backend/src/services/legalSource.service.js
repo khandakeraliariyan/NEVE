@@ -12,7 +12,7 @@ export function validateLegalSourceInput(body, { partial = false } = {}) {
     if (!isObject(body)) return { error: "Request body must be an object." };
     const allowed = [
         "sourceKey", "jurisdiction", "sourceType", "title", "citation", "sourceUrl",
-        "language", "effectiveFrom", "changeSummary", "sections",
+        "language", "effectiveFrom", "changeSummary", "sections", "documentFileId",
     ];
     const unknown = Object.keys(body).filter((key) => !allowed.includes(key));
     if (unknown.length) return { error: `Unsupported fields: ${unknown.join(", ")}` };
@@ -82,23 +82,39 @@ export function validateLegalSourceInput(body, { partial = false } = {}) {
             });
         }
     }
+    if (body.documentFileId !== undefined) {
+        if (body.documentFileId !== null && !/^[a-f0-9]{24}$/i.test(String(body.documentFileId))) return { error: "documentFileId must be a file ID." };
+        value.documentFileId = body.documentFileId;
+    }
     if (partial && !Object.keys(value).length) return { error: "Nothing to update." };
     return { value };
 }
 
 // Allowed status moves: who may make them, and from where.
+// Admins and legal reviewers draft and submit; only legal reviewers decide.
+// Rejected sources are never part of the approved knowledge base.
 export const TRANSITIONS = {
-    submit: { from: ["draft"], to: "in_review", role: "admin" },
-    approve: { from: ["in_review"], to: "approved", role: "legal_reviewer" },
-    request_changes: { from: ["in_review"], to: "draft", role: "legal_reviewer" },
-    retire: { from: ["approved", "draft"], to: "retired", role: "admin" },
+    submit: { from: ["draft"], to: "in_review", roles: ["admin", "legal_reviewer"] },
+    approve: { from: ["in_review"], to: "approved", roles: ["legal_reviewer"] },
+    request_changes: { from: ["in_review"], to: "draft", roles: ["legal_reviewer"] },
+    reject: { from: ["in_review"], to: "rejected", roles: ["legal_reviewer"] },
+    retire: { from: ["approved", "draft"], to: "retired", roles: ["admin", "legal_reviewer"] },
+};
+
+export const TRANSITION_HISTORY = {
+    submit: "submitted",
+    approve: "approved",
+    request_changes: "changes_requested",
+    reject: "rejected",
+    retire: "retired",
 };
 
 export function checkTransition(source, action, actor) {
     const transition = TRANSITIONS[action];
     if (!transition) return { error: "Unknown action.", status: 400 };
-    if (actor.role !== transition.role) {
-        return { error: `Only a ${transition.role.replace("_", " ")} can ${action.replace("_", " ")} a legal source.`, status: 403 };
+    if (!transition.roles.includes(actor.role)) {
+        const who = transition.roles.map((role) => role.replace("_", " ")).join(" or ");
+        return { error: `Only a ${who} can ${action.replace("_", " ")} a legal source.`, status: 403 };
     }
     if (!transition.from.includes(source.status)) {
         return { error: `A ${source.status} legal source can't be moved with ${action}.`, status: 409 };
@@ -111,23 +127,68 @@ const STOP_WORDS = new Set([
     "has", "have", "not", "may", "such", "its", "his", "her", "their", "all", "per", "who",
 ]);
 
+export function validateFlagInput(body, reasons) {
+    if (!reasons.includes(body?.reason)) return { error: `reason must be one of: ${reasons.join(", ")}.` };
+    if (typeof body.note !== "string" || !body.note.trim() || body.note.length > 2000) return { error: "Explain the concern in note (up to 2000 characters)." };
+    if (body.sectionId !== undefined && body.sectionId !== null && !/^[a-f0-9]{24}$/i.test(String(body.sectionId))) return { error: "sectionId must be a section ID." };
+    return { value: { reason: body.reason, note: body.note.trim(), sectionId: body.sectionId ?? null } };
+}
+
+// A light English stemmer, so "increased", "increases" and "increase" match.
+// Bangla and other words are left as they are.
+export function stem(word) {
+    if (!/^[a-z]+$/.test(word) || word.length <= 4) return word;
+    for (const suffix of ["ments", "ment", "ings", "ing", "ies", "ied", "ed", "es", "s"]) {
+        if (word.endsWith(suffix) && word.length - suffix.length >= 3) {
+            const root = word.slice(0, -suffix.length);
+            return suffix === "ies" || suffix === "ied" ? `${root}y` : root;
+        }
+    }
+    return word;
+}
+
 export function tokenize(value) {
     return String(value ?? "")
         .toLowerCase()
         .split(/[^\p{L}\p{N}]+/u)
-        .filter((word) => word.length > 2 && !STOP_WORDS.has(word));
+        .filter((word) => word.length > 2 && !STOP_WORDS.has(word))
+        .map(stem);
+}
+
+// Everyday words that point at a clause topic, for questions that don't
+// say which topic they are about.
+const TOPIC_WORDS = {
+    rent: ["rent", "pay", "payment", "receipt", "increas", "raise", "late", "fine", "ভাড়া"],
+    deposit: ["deposit", "advance", "refund", "return", "back", "deduct", "অগ্রিম", "জামানত"],
+    term: ["term", "renew", "renewal", "expir", "lease", "length", "period"],
+    notice: ["notice", "leav", "vacat", "evict", "terminat", "move", "quit", "notify", "নোটিশ"],
+    maintenance: ["repair", "fix", "leak", "broken", "damag", "mainten", "plumb", "clean", "মেরামত"],
+    utilities: ["bill", "electric", "electricity", "gas", "water", "utility", "utiliti", "service", "charge"],
+};
+
+export function inferTopics(query) {
+    const words = tokenize(query);
+    return Object.entries(TOPIC_WORDS)
+        .filter(([, cues]) => words.some((word) => cues.some((cue) => word.startsWith(cue))))
+        .map(([topic]) => topic);
 }
 
 // Ranks approved sections by topic match and shared words with the query.
+// Without a category, topics are inferred from the query's wording and a
+// matching section gets a smaller boost. Heading words count double.
 export function searchSections(sources, { query = "", category = null, limit = 10 } = {}) {
     const terms = new Set(tokenize(query));
+    const inferred = category ? [] : inferTopics(query);
     const results = [];
     for (const source of sources) {
         for (const section of source.sections ?? []) {
             const words = tokenize(`${section.heading} ${section.text}`);
+            const headingWords = new Set(tokenize(section.heading));
             const shared = new Set(words.filter((word) => terms.has(word)));
+            const headingHits = [...headingWords].filter((word) => terms.has(word)).length;
             const topicMatch = category && (section.topics ?? []).includes(category);
-            const score = shared.size + (topicMatch ? 3 : 0);
+            const inferredHits = inferred.filter((topic) => (section.topics ?? []).includes(topic)).length;
+            const score = shared.size + headingHits + (topicMatch ? 3 : 0) + Math.min(inferredHits, 1) * 2;
             if (score <= 0) continue;
             results.push({
                 score,

@@ -25,10 +25,13 @@ import {
     requestEvidenceLinkSuggestions,
 } from "../services/evidenceLinkSuggestion.service.js";
 import { hashStoredObject, readStoredObject } from "../services/fileUpload.service.js";
+import { prepareDocumentForAi } from "../services/aiDocument.service.js";
+import { DocumentTextError } from "../services/documentText.service.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import { analyzeAgreementEvidence } from "../services/evidenceGraphAnalysis.service.js";
 import { buildAgreementEvidenceReport } from "../services/evidenceReport.service.js";
+import { renderEvidenceReportPdf } from "../services/reportPdf.service.js";
 import {
     appendAuditEvent,
     canManageAgreement,
@@ -36,6 +39,8 @@ import {
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
+import { completeObligation, validateObligationExtras } from "../services/compliance.service.js";
+import { actorLabel, notifyOtherParty } from "../services/notificationEvents.service.js";
 
 const userId = (req) => req.neveUser._id;
 const validId = mongoose.isValidObjectId;
@@ -490,6 +495,14 @@ export async function addAgreementObligation(req, res, next) {
                 message: "Invalid obligation fields.",
             });
         }
+        const extras = validateObligationExtras({
+            category: req.body?.category,
+            recurrence: req.body?.recurrence,
+            dueAt: req.body?.recurrence ? dueAt : undefined,
+        });
+        if (extras.error) {
+            return res.status(400).json({ success: false, message: extras.error });
+        }
 
         let evidenceFile = null;
         if (evidenceFileId !== null) {
@@ -508,6 +521,8 @@ export async function addAgreementObligation(req, res, next) {
             responsibleParty,
             dueAt: dueAt ? new Date(dueAt) : null,
             amountBdt,
+            category: extras.value.category ?? "other",
+            recurrence: extras.value.recurrence ?? { frequency: "none", until: null },
             evidenceFile: evidenceFile?._id ?? null,
             notes: notes.trim(),
             createdBy: actor,
@@ -565,22 +580,53 @@ export async function updateAgreementObligation(req, res, next) {
             });
         }
 
-        const { status, notes } = req.body ?? {};
+        const { status, notes, completionNote = "", evidenceFileId = null } = req.body ?? {};
+        const extras = validateObligationExtras({
+            category: req.body?.category,
+            recurrence: req.body?.recurrence,
+            dueAt: req.body?.dueAt,
+        });
+        const changesExtras = ["category", "recurrence", "dueAt"].some((key) => req.body?.[key] !== undefined);
         if (
+            extras.error ||
             (status !== undefined &&
                 !["open", "completed", "disputed"].includes(status)) ||
             (notes !== undefined &&
                 (typeof notes !== "string" || notes.length > 1000)) ||
-            (status === undefined && notes === undefined)
+            typeof completionNote !== "string" ||
+            completionNote.length > 1000 ||
+            (status === undefined && notes === undefined && !changesExtras)
         ) {
             return res.status(400).json({
                 success: false,
-                message: "Provide a valid obligation status or notes.",
+                message: extras.error ?? "Provide a valid obligation status, notes, category, due date or recurrence.",
             });
         }
+        if (extras.value.recurrence?.frequency && extras.value.recurrence.frequency !== "none" && !(extras.value.dueAt ?? obligation.dueAt)) {
+            return res.status(400).json({ success: false, message: "A recurring obligation needs a due date." });
+        }
 
-        if (status !== undefined) {
+        let evidenceFile = null;
+        if (evidenceFileId !== null) {
+            evidenceFile = await findUploadedEvidence(evidenceFileId, userId(req));
+            if (!evidenceFile) {
+                return res.status(404).json({ success: false, message: "Uploaded evidence not found." });
+            }
+        }
+
+        Object.assign(obligation, extras.value);
+        let completion = null;
+        if (status === "completed" && obligation.status !== "completed") {
+            completion = completeObligation(obligation, {
+                actor: userId(req),
+                evidenceFile: evidenceFile?._id ?? null,
+                note: completionNote.trim(),
+            });
+        } else if (status !== undefined) {
             obligation.status = status;
+            if (evidenceFile) obligation.evidenceFile = evidenceFile._id;
+        } else if (evidenceFile) {
+            obligation.evidenceFile = evidenceFile._id;
         }
         if (notes !== undefined) {
             obligation.notes = notes.trim();
@@ -589,13 +635,13 @@ export async function updateAgreementObligation(req, res, next) {
         await saveAuditedChange(
             agreement,
             req,
-            "obligation_updated",
+            completion ? "obligation_completed" : "obligation_updated",
             "obligation",
             obligation._id
         );
 
         setPrivateResponse(res);
-        return res.json({ success: true, data: obligation });
+        return res.json({ success: true, data: obligation, completion });
     } catch (error) {
         next(error);
     }
@@ -812,6 +858,14 @@ export async function addAgreementEvidenceLink(req, res, next) {
             targetId
         );
 
+        await notifyOtherParty({
+            agreement,
+            actorId: userId(req),
+            type: "evidence_link_proposed",
+            title: "New evidence link to review",
+            message: `The ${actorLabel(agreement, userId(req))} linked a file to a ${targetType} as "${relationship.replace(/_/g, " ")}". Confirm or dispute it in the Evidence Graph.`,
+            link: `/agreements/${agreement._id}/evidence`,
+        });
         setPrivateResponse(res);
         return res.status(201).json({ success: true, data: link });
     } catch (error) {
@@ -872,6 +926,7 @@ export async function updateAgreementEvidenceLink(req, res, next) {
             });
         }
 
+        const nowContradicts = relationship === "contradicts" && link.relationship !== "contradicts";
         if (link.relationship !== relationship) {
             link.confirmations = [];
         }
@@ -898,6 +953,16 @@ export async function updateAgreementEvidenceLink(req, res, next) {
             link.targetType,
             link.targetId
         );
+        if (nowContradicts) {
+            await notifyOtherParty({
+                agreement,
+                actorId: userId(req),
+                type: "evidence_link_disputed",
+                title: "An evidence link was disputed",
+                message: `The ${actorLabel(agreement, userId(req))} marked a file as contradicting a ${link.targetType}${explanation.trim() ? `: "${explanation.trim().slice(0, 200)}"` : "."}`,
+                link: `/agreements/${agreement._id}/evidence`,
+            });
+        }
 
         setPrivateResponse(res);
         return res.json({ success: true, data: link });
@@ -1081,7 +1146,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 title: agreement.title,
                 status: agreement.status,
                 jurisdiction: agreement.jurisdiction,
-                documentFileId: String(agreement.documentFile),
+                documentFileId: agreement.documentFile ? String(agreement.documentFile) : null,
                 startAt: agreement.startAt,
                 endAt: agreement.endAt,
                 monthlyRentBdt: agreement.monthlyRentBdt,
@@ -1151,12 +1216,14 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             })),
         ];
         const edges = [
-            {
-                id: `document-${agreement._id}`,
-                from: String(agreement._id),
-                to: String(agreement.documentFile),
-                relationship: "cites",
-            },
+            ...(agreement.documentFile
+                ? [{
+                    id: `document-${agreement._id}`,
+                    from: String(agreement._id),
+                    to: String(agreement.documentFile),
+                    relationship: "cites",
+                }]
+                : []),
             ...agreement.obligations
                 .filter((obligation) => obligation.evidenceFile)
                 .map((obligation) => ({
@@ -1254,14 +1321,24 @@ export async function getAgreementEvidenceGraph(req, res, next) {
     }
 }
 
+// GET /api/v1/tenancy/agreements/:agreementId/evidence-report[?format=pdf]
+// The dispute report as JSON, or as a PDF to take to a mediator or lawyer.
 export async function getAgreementEvidenceReport(req, res, next) {
     try {
+        const format = req.query.format ?? "json";
+        if (!["json", "pdf"].includes(format)) {
+            return res.status(400).json({ success: false, message: "format must be json or pdf." });
+        }
         const agreement = await getAccessibleAgreement(req, res);
         if (!agreement) {
             return;
         }
 
-        await saveAuditedChange(agreement, req, "evidence_report_generated");
+        await saveAuditedChange(
+            agreement,
+            req,
+            format === "pdf" ? "evidence_report_pdf_generated" : "evidence_report_generated"
+        );
         const [recordLinks, conditionReports] = await Promise.all([
             TenancyRecordLink.find({ agreement: agreement._id }).sort({ createdAt: 1 }).lean(),
             ConditionReport.find({ agreement: agreement._id })
@@ -1311,6 +1388,47 @@ export async function getAgreementEvidenceReport(req, res, next) {
             messageCount,
             messageLimit: 500,
         });
+
+        if (format === "pdf") {
+            const legalLinks = recordLinks.filter((link) => link.toType === "legal_section");
+            const [property, people, sources] = await Promise.all([
+                Property.findById(agreement.property).setOptions({ includeDeleted: true }).select("title").lean(),
+                User.find({ _id: { $in: [agreement.renter, agreement.landlord].filter(Boolean) } }).select("displayName").lean(),
+                legalLinks.length
+                    ? LegalSource.find({ _id: { $in: legalLinks.map((link) => link.legalSource).filter(Boolean) } })
+                        .select("title citation version reviewedAt sections._id sections.sectionNumber sections.heading")
+                        .lean()
+                    : [],
+            ]);
+            const nameOf = (id) => people.find((person) => String(person._id) === String(id))?.displayName ?? null;
+            const legalCitations = legalLinks.flatMap((link) => {
+                const source = sources.find((item) => String(item._id) === String(link.legalSource));
+                const section = source?.sections?.find((item) => String(item._id) === String(link.toId));
+                return source && section
+                    ? [{
+                        clauseId: String(link.fromId),
+                        title: source.title,
+                        citation: source.citation,
+                        version: source.version,
+                        reviewedAt: source.reviewedAt,
+                        sectionNumber: section.sectionNumber,
+                        heading: section.heading,
+                        relationship: link.relationship,
+                    }]
+                    : [];
+            });
+            const pdf = renderEvidenceReportPdf(report, {
+                propertyTitle: property?.title ?? null,
+                renterName: nameOf(agreement.renter),
+                landlordName: nameOf(agreement.landlord),
+                legalCitations,
+            });
+            setPrivateResponse(res);
+            res.set("Content-Type", "application/pdf");
+            res.set("Content-Disposition", `attachment; filename="neve-dispute-report-${agreement._id}.pdf"`);
+            res.set("Content-Length", String(pdf.length));
+            return res.end(pdf);
+        }
 
         setPrivateResponse(res);
         res.set(
@@ -1493,7 +1611,16 @@ export async function suggestAgreementEvidenceLinks(req, res, next) {
             .select("targetType targetId")
             .lean();
         const bytes = await readStoredObject(file.storageKey);
-        const result = await requestEvidenceLinkSuggestions({ agreement, mimeType: file.mimeType, bytes });
+        let prepared;
+        try {
+            prepared = await prepareDocumentForAi({ mimeType: file.mimeType, bytes });
+        } catch (readError) {
+            if (readError instanceof DocumentTextError) {
+                return res.status(readError.status).json({ success: false, message: readError.publicMessage });
+            }
+            throw readError;
+        }
+        const result = await requestEvidenceLinkSuggestions({ agreement, documentText: prepared.text });
         const normalized = normalizeSuggestions(result.suggestions, agreement, existing);
 
         const created = [];
@@ -1520,6 +1647,16 @@ export async function suggestAgreementEvidenceLinks(req, res, next) {
             }
         }
         await saveAuditedChange(agreement, req, "evidence_links_suggested", "file", file._id);
+        if (created.length) {
+            await notifyOtherParty({
+                agreement,
+                actorId: userId(req),
+                type: "evidence_link_proposed",
+                title: `${created.length} suggested evidence link${created.length === 1 ? "" : "s"} to review`,
+                message: "Neve suggested links between an uploaded file and this agreement. They don't count until a participant accepts them.",
+                link: `/agreements/${agreement._id}/evidence`,
+            });
+        }
 
         setPrivateResponse(res);
         return res.status(201).json({
@@ -1585,6 +1722,16 @@ export async function reviewSuggestedEvidenceLink(req, res, next) {
             link.targetType,
             link.targetId
         );
+        if (decision === "reject") {
+            await notifyOtherParty({
+                agreement,
+                actorId: userId(req),
+                type: "evidence_link_disputed",
+                title: "A suggested evidence link was rejected",
+                message: `The ${actorLabel(agreement, userId(req))} rejected a suggested link to a ${link.targetType}.`,
+                link: `/agreements/${agreement._id}/evidence`,
+            });
+        }
         setPrivateResponse(res);
         return res.json({ success: true, data: link });
     } catch (error) {
@@ -1854,6 +2001,30 @@ export async function assessClauseRewrite(req, res, next) {
         await saveAuditedChange(agreement, req, "clause_rewrite_assessed", "clause", clause._id);
         setPrivateResponse(res);
         return res.json({ success: true, data: suggestion });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH /api/v1/tenancy/agreements/:agreementId/document  { fileId }
+// Adds the signed agreement document to a record started without one (for
+// example from a landlord's invitation). An existing document is never
+// replaced, so earlier analysis and links keep pointing at the same file.
+export async function attachAgreementDocument(req, res, next) {
+    try {
+        const agreement = await getParticipantAgreement(req, res);
+        if (!agreement) return;
+        if (agreement.documentFile) {
+            return res.status(409).json({ success: false, message: "This record already has its agreement document." });
+        }
+        const { fileId } = req.body ?? {};
+        if (!validId(fileId)) return res.status(400).json({ success: false, message: "A valid fileId is required." });
+        const file = await findUploadedEvidence(fileId, userId(req));
+        if (!file) return res.status(404).json({ success: false, message: "Uploaded agreement document not found." });
+        agreement.documentFile = file._id;
+        await saveAuditedChange(agreement, req, "agreement_document_attached", "file", file._id);
+        setPrivateResponse(res);
+        return res.json({ success: true, message: "Agreement document added.", data: { documentFile: file._id } });
     } catch (error) {
         next(error);
     }

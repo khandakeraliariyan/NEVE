@@ -3,10 +3,13 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, openPrivateFile, uploadFile } from "../../lib/api";
+import { api, downloadAuthenticated, openPrivateFile, uploadFile } from "../../lib/api";
 import { date, dateTime, label, money } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { useAgreement } from "./useAgreement";
+import { ConfirmLink, EvidenceSuggestions } from "./EvidenceSuggestions";
+import RecordLinks from "./RecordLinks";
+import { useAuth } from "../../context/AuthContext";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, PageHeader } from "../../components/ui";
 import NotFound from "../NotFound";
 
@@ -18,6 +21,7 @@ const TYPES = {
     file: { title: "Files", color: "#8c847d" },
     inquiry_message: { title: "Messages", color: "#8a6a8c" },
     event: { title: "Events", color: "#c9bdb1" },
+    legal_section: { title: "Legal sections", color: "#5f7a63" },
 };
 const RELATIONSHIPS = ["supports", "contradicts", "relates_to", "cites", "context_only", "unassessed"];
 const TARGET_TYPES = { agreement: "agreement", clause: "clause", obligation: "obligation", payment: "payment_record", message: "inquiry_message" };
@@ -38,6 +42,8 @@ function nodeLabel(node) {
             return node.name ?? "File";
         case "inquiry_message":
             return node.body?.slice(0, 40) ?? "Message";
+        case "legal_section":
+            return `${node.title ?? "Legal source"} s. ${node.sectionNumber}`;
         default:
             return label(node.action);
     }
@@ -195,6 +201,7 @@ function EditLink({ agreementId, edge, onDone }) {
 export default function EvidenceGraph() {
     const { agreementId } = useParams();
     const { agreement, isParticipant } = useAgreement(agreementId);
+    const { profile } = useAuth();
     const graph = useApi(() => api.get(`/tenancy/agreements/${agreementId}/evidence-graph`), [agreementId]);
     const [hidden, setHidden] = useState(["event", "inquiry_message"]);
     const [selectedId, setSelectedId] = useState(null);
@@ -215,6 +222,15 @@ export default function EvidenceGraph() {
         ...(analysis?.potentialConflicts ?? []).map((f) => ({ ...f, kind: "Conflict" })),
         ...(analysis?.uncertainInterpretations ?? []).map((f) => ({ ...f, kind: "Uncertain" })),
     ];
+
+    async function downloadPdf() {
+        setReportError(null);
+        try {
+            await downloadAuthenticated(`/tenancy/agreements/${agreementId}/evidence-report?format=pdf`, `neve-dispute-report-${agreementId}.pdf`);
+        } catch (err) {
+            setReportError(err);
+        }
+    }
 
     async function downloadReport() {
         setReportError(null);
@@ -253,7 +269,8 @@ export default function EvidenceGraph() {
                                 </button>
                             ))}
                         </div>
-                        <Button onClick={downloadReport}>Download JSON report</Button>
+                        <Button onClick={downloadPdf}>Download PDF report</Button>
+                        <Button variant="outline" onClick={downloadReport}>Download JSON</Button>
                     </>
                 }
             />
@@ -296,7 +313,8 @@ export default function EvidenceGraph() {
                                             y2={positions[e.to].y}
                                             stroke={e.relationship === "contradicts" ? "#9b2b2b" : e.relationship === "supports" ? "#4c7a57" : "#d4ccc2"}
                                             strokeWidth={selected && (e.from === selected.id || e.to === selected.id) ? 3 : 1.5}
-                                            strokeDasharray={e.relationship === "unassessed" ? "5 4" : undefined}
+                                            strokeDasharray={e.relationship === "unassessed" || e.reviewStatus === "proposed" ? "5 4" : undefined}
+                                            strokeOpacity={e.reviewStatus === "proposed" ? 0.5 : 1}
                                         />
                                     ))}
                                 {visibleNodes
@@ -319,7 +337,9 @@ export default function EvidenceGraph() {
                                     );
                                 })}
                             </svg>
-                            <p className="px-3 pb-2 text-xs text-muted">Click a node to inspect it. Green lines support, red lines contradict, dashed lines are unassessed.</p>
+                            <p className="px-3 pb-2 text-xs text-muted">
+                                Click a node to inspect it. Green lines support, red lines contradict, dashed lines are unassessed or AI suggestions waiting for review.
+                            </p>
                         </Card>
                     )}
 
@@ -367,6 +387,22 @@ export default function EvidenceGraph() {
                                 <p className="text-3xl font-semibold">{analysis?.uncertainInterpretations?.length ?? 0}</p>
                             </Card>
                         </div>
+                    )}
+
+                    {graph.data && (
+                        <RecordLinks
+                            agreementId={agreementId}
+                            nodes={nodes}
+                            edges={edges}
+                            describe={nodeLabel}
+                            me={profile?._id}
+                            isParticipant={isParticipant}
+                            onChanged={graph.reload}
+                        />
+                    )}
+
+                    {graph.data && isParticipant && (
+                        <EvidenceSuggestions agreementId={agreementId} nodes={nodes} edges={edges} describe={nodeLabel} onChanged={graph.reload} />
                     )}
 
                     {graph.data && isParticipant && (
@@ -420,8 +456,10 @@ export default function EvidenceGraph() {
                                                     <p className="mt-1 text-xs text-muted">User confidence {Math.round(e.confidence * 100)}%</p>
                                                 </div>
                                             )}
+                                            {e.reviewStatus === "proposed" && <p className="mt-1 text-xs text-ink">AI suggestion waiting for review: accept or reject it in the AI link suggestions panel.</p>}
                                             {e.explanation && <p className="mt-1 text-xs text-muted">{e.explanation}</p>}
-                                            {e.linkedBy && isParticipant && <EditLink agreementId={agreementId} edge={e} onDone={graph.reload} />}
+                                            {isParticipant && <ConfirmLink agreement={agreement} agreementId={agreementId} edge={e} me={profile?._id} onChanged={graph.reload} />}
+                                            {e.linkedBy && isParticipant && e.reviewStatus !== "proposed" && <EditLink agreementId={agreementId} edge={e} onDone={graph.reload} />}
                                         </div>
                                     );
                                 })}

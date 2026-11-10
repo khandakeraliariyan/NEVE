@@ -5,6 +5,7 @@ import {
     getMyProfile,
     updateMyProfile,
     lookupUsers,
+    getPublicProfile,
 } from "../controllers/user.controller.js";
 
 import {
@@ -13,6 +14,12 @@ import {
     setMyProfilePhoto,
 } from "../controllers/profilePhoto.controller.js";
 
+import {
+    getMyLoginHistory,
+    getMySessions,
+    revokeMyOtherSessions,
+    revokeMySession,
+} from "../controllers/sessions.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
@@ -36,6 +43,12 @@ router.get("/me", authenticateUser, getMyProfile);
 router.patch("/me", authenticateUser, updateMyProfile);
 router.put("/me/photo", authenticateUser, setMyProfilePhoto);
 router.delete("/me/photo", authenticateUser, removeMyProfilePhoto);
+
+const anyRole = allowRoles("renter", "landlord", "legal_reviewer", "admin");
+router.get("/me/sessions", authenticateUser, anyRole, getMySessions);
+router.post("/me/sessions/revoke-others", authenticateUser, anyRole, revokeMyOtherSessions);
+router.delete("/me/sessions/:sessionId", authenticateUser, anyRole, revokeMySession);
+router.get("/me/login-history", authenticateUser, anyRole, getMyLoginHistory);
 
 router.get(
     "/lookup",
@@ -96,5 +109,6 @@ router.delete(
 // Public, so other users' photos can be shown; registered last so it never
 // shadows a /me route.
 router.get("/:userId/photo", getProfilePhoto);
+router.get("/:userId/public", getPublicProfile);
 
 export default router;

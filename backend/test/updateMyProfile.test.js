@@ -3,6 +3,8 @@ import test, { afterEach, mock } from "node:test";
 
 import User from "../src/models/User.js";
 import Property from "../src/models/Property.js";
+import PlatformSetting from "../src/models/PlatformSetting.js";
+import { clearSettingsCache } from "../src/services/platformSettings.service.js";
 import { updateMyProfile } from "../src/controllers/user.controller.js";
 
 afterEach(() => mock.restoreAll());
@@ -49,11 +51,24 @@ test("rejects invalid phone numbers and unknown fields", async () => {
 });
 
 test("renter can switch to landlord", async () => {
+    clearSettingsCache();
+    mock.method(PlatformSetting, "findById", () => ({ lean: async () => null }));
     const user = fakeUser({ role: "renter" });
     const res = await call(user, { role: "landlord" });
 
     assert.equal(res.statusCode, 200);
     assert.equal(user.role, "landlord");
+});
+
+test("switching to landlord is refused while landlord sign-ups are paused", async () => {
+    clearSettingsCache();
+    mock.method(PlatformSetting, "findById", () => ({ lean: async () => ({ landlordSignupsOpen: false }) }));
+    const user = fakeUser({ role: "renter" });
+    const res = await call(user, { role: "landlord" });
+
+    assert.equal(res.statusCode, 403);
+    assert.equal(user.role, "renter");
+    clearSettingsCache();
 });
 
 test("landlord with published listings cannot switch to renter", async () => {

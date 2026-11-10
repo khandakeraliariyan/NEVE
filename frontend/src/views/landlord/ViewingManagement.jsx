@@ -5,6 +5,33 @@ import { api } from "../../lib/api";
 import { dateTime, money, relativeTime } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { Button, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, Pagination, StatusBadge } from "../../components/ui";
+import ViewingActions, { ViewingChangeNote, isUpcoming } from "../../components/ViewingActions";
+
+// A confirmed viewing whose time has passed can be marked as done.
+function CompletePanel({ viewing, onDone }) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    async function complete() {
+        setBusy(true);
+        setError(null);
+        try {
+            await api.patch(`/viewings/${viewing._id}/complete`, {});
+            onDone("Viewing marked as completed.");
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+    return (
+        <div className="space-y-2">
+            <ErrorBox error={error} />
+            <Button variant="secondary" className="w-full" disabled={busy} onClick={complete}>
+                {busy ? "Saving…" : "Mark as completed"}
+            </Button>
+        </div>
+    );
+}
 
 const PAGE_SIZE = 20;
 const STATUSES = [
@@ -71,6 +98,7 @@ export default function ViewingManagement() {
     const [page, setPage] = useState(1);
     const [propertyFilter, setPropertyFilter] = useState("");
     const [selectedId, setSelectedId] = useState(null);
+    const [notice, setNotice] = useState(null);
     const viewings = useApi(() => api.get("/viewings/landlord", { status, page, limit: PAGE_SIZE }), [status, page]);
 
     const list = viewings.data?.data ?? [];
@@ -80,12 +108,17 @@ export default function ViewingManagement() {
         .sort((a, b) => new Date(a.requestedDate) - new Date(b.requestedDate));
     const selected = visible.find((v) => v._id === selectedId) ?? visible.find((v) => v.status === "requested") ?? visible[0];
 
+    function changed(message) {
+        setNotice(message);
+        viewings.reload();
+    }
+
     return (
         <div>
             <PageHeader
                 eyebrow="Inspections & appointments"
                 title="Viewing management"
-                description="Confirm or decline viewing requests for the listings you manage. Only requests still awaiting a response can be answered."
+                description="Confirm, decline, move or cancel viewings for the listings you manage. The renter is told about every change."
                 actions={
                     properties.length > 1 && (
                         <select className="field w-auto" value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)}>
@@ -120,6 +153,7 @@ export default function ViewingManagement() {
             <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
                 <section>
                     <h2 className="mb-3 text-2xl">Inspection schedule</h2>
+                    {notice && <p className="mb-4 rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{notice}</p>}
                     {viewings.loading && <Loading text="Loading viewings…" />}
                     <ErrorBox error={viewings.error} onRetry={viewings.reload} />
                     {!viewings.loading && !viewings.error && visible.length === 0 && <Empty title="No viewings here">Viewing requests from renters will appear here.</Empty>}
@@ -186,10 +220,12 @@ export default function ViewingManagement() {
                                     <p>{selected.landlordNote}</p>
                                 </div>
                             )}
-                            {selected.status === "requested" ? (
-                                <RespondPanel viewing={selected} onDone={viewings.reload} />
-                            ) : (
-                                <p className="text-xs text-muted">This request has already been answered.</p>
+                            <ViewingChangeNote viewing={selected} />
+                            {selected.status === "requested" && <RespondPanel viewing={selected} onDone={() => changed("Response sent to the renter.")} />}
+                            <ViewingActions key={selected._id} viewing={selected} side="landlord" onChanged={changed} />
+                            {selected.status === "confirmed" && !isUpcoming(selected) && <CompletePanel viewing={selected} onDone={changed} />}
+                            {["declined", "cancelled", "completed"].includes(selected.status) && (
+                                <p className="text-xs text-muted">This viewing is closed.</p>
                             )}
                         </Card>
                     )}

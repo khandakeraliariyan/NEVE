@@ -25,6 +25,7 @@ const uploadedFileSchema = new mongoose.Schema(
                 "tenancy_evidence",
                 "profile_photo",
                 "verification_document",
+                "legal_source_document",
             ],
             required: true,
         },
@@ -76,6 +77,19 @@ const uploadedFileSchema = new mongoose.Schema(
             type: String,
             match: /^[a-f0-9]{32}$/,
             index: { sparse: true },
+        },
+
+        // Perceptual hash of a listing photo (64 bits as hex), for spotting
+        // the same picture after resizing or recompression.
+        perceptualHash: {
+            type: String,
+            match: /^[a-f0-9]{16}$/,
+            default: null,
+        },
+        // Set when the photo couldn't be decoded, so the backfill skips it.
+        perceptualHashFailed: {
+            type: Boolean,
+            default: false,
         },
 
         status: {

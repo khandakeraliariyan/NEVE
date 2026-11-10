@@ -13,7 +13,8 @@ import { allowRoles } from "../middleware/role.middleware.js";
 const router = express.Router();
 
 router.use(authenticateUser);
-router.use(allowRoles("renter", "landlord"));
+// Legal reviewers use the same routes for credential checks.
+router.use(allowRoles("renter", "landlord", "legal_reviewer"));
 
 router.get("/me", getMyVerification);
 router.post("/contact/sync", syncContactVerification);

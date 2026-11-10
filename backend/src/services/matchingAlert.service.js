@@ -123,7 +123,7 @@ export async function notifyRentersOfMatchingProperty(property) {
     }
 }
 
-// bulkWrite skips document hooks, so send email/push for the new alerts here.
+// bulkWrite skips document hooks, so send email for the new alerts here.
 async function queueUpsertedDeliveries(result) {
     if (!isDeliveryConfigured()) return;
     const ids = Object.values(result?.upsertedIds ?? {});
@@ -131,7 +131,7 @@ async function queueUpsertedDeliveries(result) {
     try {
         const created = await Notification.find({ _id: { $in: ids } });
         for (const notification of created) {
-            queueNotificationDelivery(notification, Notification);
+            queueNotificationDelivery(notification);
         }
     } catch (error) {
         console.error("Queue matching alert delivery error:", error);

@@ -102,7 +102,7 @@ test("shared case list hides removed evidence and logs each case", async (t) => 
     );
 
     assert.equal(nextError, undefined);
-    assert.equal(selected, "-sharedWith -reviewEntries.body");
+    assert.equal(selected, "-sharedWith -reviewEntries.body -statements");
     assert.equal(res.headers["Cache-Control"], "private, no-store");
     assert.equal(res.body.pagination.total, 1);
     assert.deepEqual(
@@ -152,4 +152,30 @@ test("case share notification validates and links to the case", async (t) => {
 
     assert.equal(saved.relatedCase, relatedCase);
     assert.equal(new Notification(saved).validateSync(), undefined);
+});
+
+import {
+    validateIssueInput,
+    validateStatementInput,
+    visibleStatements,
+} from "../src/services/tenancyCase.service.js";
+
+test("statements: own private ones and shared ones are visible; reviewers see shared only", () => {
+    const me = "u1";
+    const statements = [
+        { author: "u1", visibility: "private", body: "mine" },
+        { author: "u2", visibility: "private", body: "theirs, private" },
+        { author: "u2", visibility: "shared", body: "theirs, shared" },
+    ];
+    assert.deepEqual(visibleStatements(statements, me, false).map((s) => s.body), ["mine", "theirs, shared"]);
+    assert.deepEqual(visibleStatements(statements, me, true).map((s) => s.body), ["theirs, shared"]);
+});
+
+test("statement and issue input is validated", () => {
+    assert.deepEqual(validateStatementInput({ body: " What happened ", share: true }), { value: { body: "What happened" }, share: true });
+    assert.ok(validateStatementInput({ body: "" }).error);
+    assert.ok(validateStatementInput({ share: false }, { partial: true }).error);
+    assert.equal(validateStatementInput({ share: true }, { partial: true }).share, true);
+    assert.deepEqual(validateIssueInput({ title: "Deposit not returned", amountBdt: 50000 }).value, { title: "Deposit not returned", description: "", amountBdt: 50000 });
+    assert.ok(validateIssueInput({ title: "x", amountBdt: -1 }).error);
 });

@@ -13,6 +13,7 @@ import {
     reviewPropertyClaim,
 } from "../controllers/evidenceGraph.controller.js";
 
+import { decideListingAppeal } from "../controllers/listingAppeal.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
@@ -28,6 +29,7 @@ router.patch(
 );
 
 router.patch("/warnings/:warningId/status", updateWarningStatus);
+router.patch("/warnings/:warningId/appeal", decideListingAppeal);
 router.patch(
     "/warnings/:warningId/public-visibility",
     updateWarningPublicSummary

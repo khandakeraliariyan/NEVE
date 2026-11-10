@@ -46,6 +46,21 @@ test("the review workflow allows only the right person at the right step", () =>
     assert.equal(checkTransition({ status: "approved" }, "retire", admin).value.to, "retired");
     assert.equal(checkTransition({ status: "retired" }, "submit", admin).status, 409);
     assert.equal(checkTransition({ status: "draft" }, "publish", admin).status, 400);
+    // Reviewers can draft and submit too, and reject or retire sources.
+    assert.equal(checkTransition({ status: "draft" }, "submit", reviewer).value.to, "in_review");
+    assert.equal(checkTransition({ status: "in_review" }, "reject", reviewer).value.to, "rejected");
+    assert.equal(checkTransition({ status: "in_review" }, "reject", admin).status, 403);
+    assert.equal(checkTransition({ status: "rejected" }, "approve", reviewer).status, 409);
+    assert.equal(checkTransition({ status: "approved" }, "retire", reviewer).value.to, "retired");
+});
+
+test("flags need a known reason and a note", async () => {
+    const { validateFlagInput } = await import("../src/services/legalSource.service.js");
+    const { FLAG_REASONS } = await import("../src/models/LegalSource.js");
+    assert.deepEqual(validateFlagInput({ reason: "outdated", note: " Amended in 2024 " }, FLAG_REASONS).value, { reason: "outdated", note: "Amended in 2024", sectionId: null });
+    assert.ok(validateFlagInput({ reason: "bad", note: "x" }, FLAG_REASONS).error);
+    assert.ok(validateFlagInput({ reason: "outdated", note: "" }, FLAG_REASONS).error);
+    assert.ok(validateFlagInput({ reason: "outdated", note: "x", sectionId: "nope" }, FLAG_REASONS).error);
 });
 
 test("one approved version per source is enforced by an index", () => {

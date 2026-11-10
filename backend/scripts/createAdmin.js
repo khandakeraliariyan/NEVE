@@ -13,6 +13,8 @@ import mongoose from "mongoose";
 import { connectDatabase } from "../src/config/database.js";
 import User from "../src/models/User.js";
 import { hashPassword, MIN_ADMIN_PASSWORD_LENGTH } from "../src/services/adminAuth.service.js";
+import { enqueueNotificationDelivery } from "../src/services/notificationDelivery.service.js";
+import { notifyPasswordChanged } from "../src/services/securityAlerts.service.js";
 
 function argValue(name) {
     const index = process.argv.indexOf(`--${name}`);
@@ -57,6 +59,9 @@ async function main() {
         existing.passwordHash = passwordHash;
         existing.passwordChangedAt = new Date();
         await existing.save();
+        // Queue the security email; the running API's delivery worker sends it.
+        const notification = await notifyPasswordChanged(existing, existing.passwordChangedAt);
+        if (notification) await enqueueNotificationDelivery(notification).catch(() => {});
         console.log(`${email} is an active admin with the new password.`);
     } else {
         await User.create({

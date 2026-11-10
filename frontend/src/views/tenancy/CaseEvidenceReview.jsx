@@ -9,6 +9,7 @@ import { useApi } from "../../hooks/useApi";
 import { useAuth } from "../../context/AuthContext";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Loading, StatusBadge } from "../../components/ui";
 import NotFound from "../NotFound";
+import { CaseIssues, CaseStatementsPanel } from "./CaseStatements";
 
 function kindOf(file) {
     const type = file?.mimeType ?? "";
@@ -316,6 +317,10 @@ export default function CaseEvidenceReview() {
                         Files are shown as the parties uploaded them. Neve doesn't verify, score or rule on evidence. A reviewer's opinion is their own independent view, not a ruling by Neve.
                     </Disclaimer>
                 </aside>
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                <CaseIssues caseData={c} canEdit={canManage} onChanged={detail.reload} />
+                <CaseStatementsPanel caseData={c} canEdit={canManage} onChanged={detail.reload} />
             </div>
             <ReviewDiscussion
                 caseId={c._id}

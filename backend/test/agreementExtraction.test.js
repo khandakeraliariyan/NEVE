@@ -9,7 +9,6 @@ const {
     AgreementExtractionSchema,
     ExtractionError,
     applyExtractionToAgreement,
-    buildDocumentBlock,
     normalizeExtraction,
     requestAgreementExtraction,
 } = await import("../src/services/agreementExtraction.service.js");
@@ -145,24 +144,10 @@ test("valid ISO dates become Date values", () => {
     assert.equal(normalized.facts.startAt.value.toISOString(), "2026-01-01T00:00:00.000Z");
 });
 
-test("document blocks match the file type", () => {
-    const bytes = Buffer.from("hello");
-    assert.equal(buildDocumentBlock("application/pdf", bytes).source.type, "base64");
-    assert.equal(buildDocumentBlock("application/pdf", bytes).type, "document");
-    assert.deepEqual(buildDocumentBlock("text/plain", bytes).source, {
-        type: "text",
-        media_type: "text/plain",
-        data: "hello",
-    });
-    assert.equal(buildDocumentBlock("image/png", bytes).type, "image");
-    assert.throws(() => buildDocumentBlock("video/mp4", bytes), ExtractionError);
-});
-
-test("extraction request sends the document with schema output and fallbacks", async () => {
+test("extraction request sends only the masked text, with schema output and fallbacks", async () => {
     const captured = {};
     const result = await requestAgreementExtraction({
-        mimeType: "text/plain",
-        bytes: Buffer.from(AGREEMENT_TEXT),
+        documentText: `--- Page 1 ---\n${AGREEMENT_TEXT}`,
         model: "claude-opus-5-5",
         client: fakeClient(
             {
@@ -180,7 +165,11 @@ test("extraction request sends the document with schema output and fallbacks", a
     assert.deepEqual(captured.params.betas, ["server-side-fallback-2026-07-01"]);
     assert.ok(captured.params.output_config.format);
     assert.match(captured.params.system, /untrusted/);
-    assert.equal(captured.params.messages[0].content[0].type, "document");
+    assert.match(captured.params.system, /\[NID removed\]/);
+    const block = captured.params.messages[0].content[0];
+    assert.equal(block.type, "document");
+    assert.equal(block.source.type, "text");
+    assert.match(block.source.data, /^--- Page 1 ---/);
     assert.equal(result.usage.inputTokens, 900);
     assert.equal(result.extraction.clauses.length, 2);
 });
@@ -194,8 +183,7 @@ test("refusals, truncation, and unparsed output are reported as errors", async (
     ]) {
         await assert.rejects(
             requestAgreementExtraction({
-                mimeType: "text/plain",
-                bytes: Buffer.from("x"),
+                documentText: "x",
                 client: fakeClient(response),
             }),
             ExtractionError

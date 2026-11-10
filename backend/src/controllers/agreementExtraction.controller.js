@@ -9,11 +9,20 @@ import {
     requestAgreementExtraction,
 } from "../services/agreementExtraction.service.js";
 import { readStoredObject } from "../services/fileUpload.service.js";
+import {
+    prepareDocumentForAi,
+    readingLimitations,
+    storedDocumentText,
+    textSourceSummary,
+} from "../services/aiDocument.service.js";
+import { DocumentTextError } from "../services/documentText.service.js";
+import { suggestLegalSourcesInBackground } from "../services/legalSuggestion.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
 import {
     appendAuditEvent,
     findParticipantAgreement,
 } from "../services/tenancyAgreement.service.js";
+import { createNotification } from "../services/notification.service.js";
 
 const EXTRACTION_DISCLAIMER =
     "Clauses and values were extracted automatically and are proposals until a participant confirms them. Summaries describe the text only; they are not legal advice and have not been legally reviewed.";
@@ -102,15 +111,12 @@ export async function extractAgreement(req, res, next) {
         }
 
         const bytes = await readStoredObject(file.storageKey);
-        const result = await requestAgreementExtraction({
-            mimeType: file.mimeType,
-            bytes,
-        });
+        // Read (OCR if needed) and mask on our server; only masked text is sent.
+        const prepared = await prepareDocumentForAi({ mimeType: file.mimeType, bytes });
+        const result = await requestAgreementExtraction({ documentText: prepared.text });
 
-        const normalized = normalizeExtraction(result.extraction, {
-            sourceText:
-                file.mimeType === "text/plain" ? bytes.toString("utf8") : null,
-        });
+        const normalized = normalizeExtraction(result.extraction, { sourceText: prepared.text });
+        normalized.limitations = [...new Set([...readingLimitations(prepared), ...normalized.limitations])].slice(0, 30);
 
         const proposed = applyExtractionToAgreement(agreement, normalized, {
             actor: req.neveUser._id,
@@ -118,6 +124,8 @@ export async function extractAgreement(req, res, next) {
             sourceFile: file._id,
             usage: result.usage,
             latencyMs: result.latencyMs,
+            textSource: textSourceSummary(prepared),
+            documentText: storedDocumentText(prepared),
         });
 
         appendAuditEvent(agreement, req.neveUser._id, "agreement_extracted");
@@ -126,18 +134,40 @@ export async function extractAgreement(req, res, next) {
             fileId: String(file._id),
             model: result.model,
             proposedClauses: proposed.length,
+            ocrUsed: prepared.ocrUsed,
+            identifiersMasked: prepared.maskedTotal,
         });
+
+        // Look for approved legal sources for the new clauses, after replying.
+        suggestLegalSourcesInBackground(agreement._id, req.neveUser._id);
+
+        try {
+            await createNotification({
+                recipient: agreement.createdBy ?? req.neveUser._id,
+                type: "agreement_analysis_complete",
+                title: `Agreement analysis complete: ${agreement.title}`,
+                message: `${proposed.length} clause${proposed.length === 1 ? " was" : "s were"} found. Each one is a proposal until you review it against the document.`,
+                link: `/agreements/${agreement._id}/clauses`,
+                relatedAgreement: agreement._id,
+                relatedProperty: agreement.property,
+            });
+        } catch (notifyError) {
+            console.error("Agreement analysis notification error:", notifyError);
+        }
 
         setPrivateResponse(res);
         return res.status(200).json({
             success: true,
             message: EXTRACTION_DISCLAIMER,
             data: {
-                extraction: agreement.extraction,
+                extraction: { ...agreement.extraction.toObject?.() ?? agreement.extraction, documentText: undefined },
                 proposedClauses: proposed,
             },
         });
     } catch (error) {
+        if (error instanceof DocumentTextError) {
+            error = new ExtractionError(error.message, error.status, { publicMessage: error.publicMessage });
+        }
         if (error instanceof ExtractionError && agreement) {
             agreement.extraction = {
                 ...(agreement.extraction?.toObject?.() ?? {}),

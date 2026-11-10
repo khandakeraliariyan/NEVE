@@ -1,5 +1,7 @@
 import express from "express";
 import {
+    deleteMyAccount,
+    getAccountDeletionInfo,
     exportMyData,
     listMyDeletableDocuments,
     listMyDocumentDeletionRequests,
@@ -21,6 +23,8 @@ router.use(
 );
 
 router.get("/export", exportMyData);
+router.get("/account-deletion", getAccountDeletionInfo);
+router.post("/account-deletion", deleteMyAccount);
 router.get("/documents", listMyDeletableDocuments);
 router.get("/documents/deletion-requests", listMyDocumentDeletionRequests);
 router.post("/documents/:fileId/deletion-requests", requestDocumentDeletion);

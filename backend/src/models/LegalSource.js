@@ -7,7 +7,8 @@ import { CLAUSE_CATEGORIES } from "../services/agreementExtraction.service.js";
 // versions for a jurisdiction form its legal-source pack. Approving a new
 // version retires the previous approved version of the same source.
 
-export const LEGAL_SOURCE_STATUSES = ["draft", "in_review", "approved", "retired"];
+export const LEGAL_SOURCE_STATUSES = ["draft", "in_review", "approved", "rejected", "retired"];
+export const FLAG_REASONS = ["questionable_authenticity", "outdated", "incorrect_reference", "wrong_jurisdiction", "misleading_text", "other"];
 export const LEGAL_SOURCE_TYPES = ["act", "ordinance", "rule", "regulation", "court_decision", "official_guidance", "other"];
 
 const sectionSchema = new mongoose.Schema(
@@ -29,7 +30,7 @@ const reviewEventSchema = new mongoose.Schema(
         actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         action: {
             type: String,
-            enum: ["created", "edited", "submitted", "approved", "changes_requested", "retired"],
+            enum: ["created", "edited", "submitted", "approved", "changes_requested", "rejected", "retired", "flagged", "flag_resolved"],
             required: true,
         },
         note: { type: String, trim: true, maxlength: 2000, default: "" },
@@ -74,6 +75,26 @@ const legalSourceSchema = new mongoose.Schema(
         reviewedAt: { type: Date, default: null },
         reviewNote: { type: String, trim: true, maxlength: 2000, default: "" },
         retiredAt: { type: Date, default: null },
+        rejectedAt: { type: Date, default: null },
+        // The uploaded original (PDF or text), for checking authenticity.
+        documentFile: { type: mongoose.Schema.Types.ObjectId, ref: "UploadedFile", default: null },
+        // Concerns raised by legal reviewers: questionable, outdated or
+        // incorrect sources and section references.
+        flags: {
+            type: [
+                {
+                    raisedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                    reason: { type: String, enum: FLAG_REASONS, required: true },
+                    sectionId: { type: mongoose.Schema.Types.ObjectId, default: null },
+                    note: { type: String, trim: true, maxlength: 2000, required: true },
+                    createdAt: { type: Date, default: Date.now },
+                    resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+                    resolvedAt: { type: Date, default: null },
+                    resolution: { type: String, trim: true, maxlength: 2000, default: "" },
+                },
+            ],
+            default: [],
+        },
         history: { type: [reviewEventSchema], default: [] },
     },
     { timestamps: true, versionKey: false }

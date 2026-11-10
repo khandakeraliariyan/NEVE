@@ -4,11 +4,14 @@ import test from "node:test";
 process.env.CLIENT_URL ||= "http://localhost:3000";
 process.env.MONGODB_URI ||= "mongodb://localhost/neve-test";
 process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||= "test-service-account.json";
+process.env.OVERPASS_API_URL = "https://first.example/api/interpreter, https://second.example/api/interpreter";
 
 const {
     calculateDistanceMeters,
     categorizePlace,
+    fetchNearbyElements,
     findNearbyPlaces,
+    MAP_DATA_UNAVAILABLE,
     isNearbyCacheFresh,
     normalizeNeighborhoodPlace,
 } = await import("../src/services/neighborhood.service.js");
@@ -98,5 +101,32 @@ test("nearby searches reject invalid coordinates, radius, and category", async (
             category: "unlisted",
         }),
         { status: 400 }
+    );
+});
+
+test("nearby places try the next Overpass server when one fails", async () => {
+    const asked = [];
+    const fakeFetch = async (url) => {
+        asked.push(new URL(url).host);
+        if (url.includes("first")) return new Response("busy", { status: 504 });
+        return new Response(JSON.stringify({ elements: [{ id: 1 }] }), { status: 200 });
+    };
+    const elements = await fetchNearbyElements({ latitude: 23.78, longitude: 90.4, radius: 500 }, fakeFetch);
+    assert.deepEqual(elements, [{ id: 1 }]);
+    assert.deepEqual(asked, ["first.example", "second.example"]);
+});
+
+test("when every Overpass server fails the error has a plain public message", async () => {
+    const fakeFetch = async () => {
+        throw new TypeError("fetch failed");
+    };
+    await assert.rejects(
+        fetchNearbyElements({ latitude: 23.78, longitude: 90.4, radius: 500 }, fakeFetch),
+        (error) => {
+            assert.equal(error.status, 502);
+            assert.equal(error.publicMessage, MAP_DATA_UNAVAILABLE);
+            assert.match(error.message, /first\.example: unreachable; second\.example: unreachable/);
+            return true;
+        }
     );
 });

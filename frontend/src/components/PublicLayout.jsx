@@ -1,4 +1,5 @@
 "use client";
+import Announcement from "./Announcement";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -79,7 +80,10 @@ export default function PublicLayout({ children }) {
             </header>
 
             {/* Leaves room for the overlaid navbar (20px padding + 44px row + 20px). */}
-            <main className="flex-1 pt-[84px]">{children}</main>
+            <main className="flex-1 pt-[84px]">
+                <Announcement className="mx-3 mt-3 md:mx-6" />
+                {children}
+            </main>
 
             <footer className="relative mx-3 mb-3 mt-20 overflow-hidden rounded-3xl bg-night text-white md:mx-6 md:mb-6">
                 <div className="glow glow-drift -right-24 -top-32 h-80 w-[28rem] bg-taupe/40" aria-hidden="true" />
@@ -115,6 +119,7 @@ export default function PublicLayout({ children }) {
                             <ul className="space-y-2 text-white/75">
                                 <li><Link href="/sign-in" className="link-sweep hover:text-white">Sign in</Link></li>
                                 <li><Link href="/sign-up" className="link-sweep hover:text-white">Create an account</Link></li>
+                                <li><Link href="/privacy" className="link-sweep hover:text-white">Privacy policy</Link></li>
                             </ul>
                         </div>
                         <div className="text-xs leading-relaxed text-white/50">

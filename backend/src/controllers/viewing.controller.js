@@ -75,6 +75,7 @@ export async function createViewingRequest(req, res, next) {
                 type: "viewing_request_received",
                 title: "New viewing request",
                 message: `A renter has requested to view ${property.title}.`,
+                link: "/listings/viewings",
                 relatedProperty: property._id,
                 relatedViewingRequest: viewing._id,
             });
@@ -202,6 +203,23 @@ export async function updateViewingRequest(req, res, next) {
 
         await viewing.save();
 
+        try {
+            const confirmed = status === "confirmed";
+            await createNotification({
+                recipient: viewing.renter,
+                type: confirmed ? "viewing_request_confirmed" : "viewing_request_declined",
+                title: confirmed ? "Viewing request confirmed" : "Viewing request declined",
+                message: confirmed
+                    ? "Your property viewing request has been confirmed."
+                    : "Your property viewing request has been declined.",
+                link: "/viewings",
+                relatedProperty: viewing.property,
+                relatedViewingRequest: viewing._id,
+            });
+        } catch (error) {
+            console.error("Failed to create renter notification:", error);
+        }
+
         return res.status(200).json({
             success: true,
             message: `Viewing request ${status}`,
@@ -212,48 +230,6 @@ export async function updateViewingRequest(req, res, next) {
     }
 }
 
-export async function cancelMyViewingRequest(req, res, next) {
-    try {
-        const { id } = req.params;
-
-        if (!mongoose.isValidObjectId(id)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid viewing request ID",
-            });
-        }
-
-        const viewing = await ViewingRequest.findOneAndUpdate(
-            {
-                _id: id,
-                renter: req.neveUser._id,
-                status: "requested",
-            },
-            {
-                $set: { status: "cancelled" },
-            },
-            {
-                new: true,
-                runValidators: true,
-            }
-        );
-
-        if (!viewing) {
-            return res.status(404).json({
-                success: false,
-                message: "Pending viewing request not found",
-            });
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: "Viewing request cancelled",
-            viewing,
-        });
-    } catch (error) {
-        next(error);
-    }
-}
 // PATCH /api/v1/viewings/:viewingId/complete  { landlordNote?: string }
 // The landlord (or a manager of the property) marks a confirmed viewing as
 // completed once its time has passed.

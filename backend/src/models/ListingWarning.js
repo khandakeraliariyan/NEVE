@@ -20,6 +20,7 @@ const listingWarningSchema = new mongoose.Schema(
                 "missing_description",
                 "missing_rent",
                 "missing_location",
+                "duplicate_photo",
             ],
             required: true,
         },
@@ -69,10 +70,44 @@ const listingWarningSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+
+        // The landlord's appeal or correction, and the admin's decision.
+        appeal: {
+            status: {
+                type: String,
+                enum: ["none", "pending", "accepted", "rejected"],
+                default: "none",
+            },
+            text: { type: String, trim: true, maxlength: 2000, default: "" },
+            evidenceFiles: {
+                type: [{ type: mongoose.Schema.Types.ObjectId, ref: "UploadedFile" }],
+                default: [],
+            },
+            submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+            submittedAt: { type: Date, default: null },
+            decisionNote: { type: String, trim: true, maxlength: 1000, default: "" },
+            decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+            decidedAt: { type: Date, default: null },
+            // Earlier appeals on the same warning.
+            history: {
+                type: [
+                    {
+                        _id: false,
+                        text: String,
+                        submittedAt: Date,
+                        status: String,
+                        decisionNote: String,
+                        decidedAt: Date,
+                    },
+                ],
+                default: [],
+            },
+        },
     },
     { timestamps: true }
 );
 
 listingWarningSchema.index({ property: 1, type: 1, status: 1 });
+listingWarningSchema.index({ "appeal.status": 1, "appeal.submittedAt": 1 });
 
 export default mongoose.model("ListingWarning", listingWarningSchema);

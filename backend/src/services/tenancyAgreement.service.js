@@ -4,6 +4,7 @@ import TenancyAgreement from "../models/TenancyAgreement.js";
 import ConditionReport from "../models/ConditionReport.js";
 import MaintenanceRequest from "../models/MaintenanceRequest.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
+import TenancyDocument from "../models/TenancyDocument.js";
 
 export function isAgreementParticipant(agreement, userId) {
     const id = String(userId);
@@ -136,6 +137,13 @@ export async function findAgreementForEvidenceFile(
             userId,
             userRole
         );
+        if (agreement) return agreement;
+    }
+
+    const vaultDocument = await TenancyDocument.findOne({ "versions.file": fileId }).select("agreement owner visibility");
+    if (vaultDocument) {
+        if (vaultDocument.visibility !== "shared" && String(vaultDocument.owner) !== String(userId)) return null;
+        const agreement = await findAccessibleAgreement(vaultDocument.agreement, userId, userRole);
         if (agreement) return agreement;
     }
 

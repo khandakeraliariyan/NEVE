@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
+import { maskPersonalIdentifiers } from "./piiMasking.service.js";
 
 import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
@@ -73,7 +74,7 @@ export async function requestClauseRewrite({
                             type: "text",
                             text:
                                 `Jurisdiction: ${jurisdiction}\n\n` +
-                                `Clause (${clause.category}${clause.heading ? `, "${clause.heading}"` : ""}):\n${clause.text}\n\n` +
+                                `Clause (${clause.category}${clause.heading ? `, "${clause.heading}"` : ""}):\n${maskPersonalIdentifiers(clause.text).text}\n\n` +
                                 `Approved legal-source sections:\n${sections.length ? describeSections(sections) : "(none found for this clause)"}\n\n` +
                                 "Suggest a balanced version of this clause.",
                         },

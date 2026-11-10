@@ -7,15 +7,41 @@ import VerificationRequest from "../models/VerificationRequest.js";
 import { firebaseAuth } from "../config/firebase.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
 import { createDownloadUrl } from "../services/fileUpload.service.js";
+import {
+    decryptField,
+    encryptField,
+    identityAad,
+    isFieldEncryptionConfigured,
+    maskIdNumber,
+} from "../services/fieldEncryption.service.js";
 import { createNotification } from "../services/notification.service.js";
 import { canManageProperty } from "../services/propertyAccess.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
 import {
+    VERIFICATION_ROLES,
+    VERIFICATION_TYPES,
     buildContactVerification,
     publicVerificationSummary,
     validateVerificationReview,
     validateVerificationSubmission,
 } from "../services/verification.service.js";
+
+const TYPE_LABELS = {
+    identity: "identity",
+    ownership: "property ownership",
+    credential: "professional credentials",
+};
+
+// The owner's view of their verified identity document: masked number only.
+export function maskedIdentity(user) {
+    const identity = user?.identity ?? {};
+    if (!identity.idLast4 && !identity.documentType) return null;
+    return {
+        documentType: identity.documentType,
+        maskedNumber: maskIdNumber(identity.idLast4),
+        verifiedAt: identity.verifiedAt ?? null,
+    };
+}
 
 const REQUEST_FIELDS =
     "type property documentType documents note status reviewedAt reviewNote createdAt updatedAt";
@@ -38,6 +64,7 @@ export async function getMyVerification(req, res, next) {
             data: {
                 verification: req.neveUser.verification,
                 summary: publicVerificationSummary(req.neveUser),
+                identityDocument: maskedIdentity(req.neveUser),
             },
         });
     } catch (error) {
@@ -70,27 +97,61 @@ export async function syncContactVerification(req, res, next) {
 }
 
 // POST /api/v1/verification/requests
-// { type: "identity"|"ownership", documentType, documents: [fileId], propertyId?, note? }
+// { type: "identity"|"ownership"|"credential", documentType, documents: [fileId],
+//   propertyId? (ownership), idNumber? + dateOfBirth (identity), note? }
 export async function submitVerificationRequest(req, res, next) {
     try {
-        const { value, error } = validateVerificationSubmission(req.body);
+        const { value, identity, error } = validateVerificationSubmission(req.body);
         if (error) {
             return res.status(400).json({ success: false, message: error });
         }
         const user = req.neveUser;
+        if (!VERIFICATION_ROLES[value.type].includes(user.role)) {
+            return res.status(403).json({
+                success: false,
+                message: {
+                    identity: "Only renters and landlords verify their identity here.",
+                    ownership: "Only landlords can verify property ownership.",
+                    credential: "Only legal reviewers verify professional credentials.",
+                }[value.type],
+            });
+        }
 
         let property = null;
+        const extra = {};
         if (value.type === "identity") {
             if (user.verification?.identity?.status === "verified") {
                 return res.status(409).json({ success: false, message: "Your identity is already verified." });
             }
-        } else {
-            if (user.role !== "landlord") {
-                return res.status(403).json({
+            if (!isFieldEncryptionConfigured()) {
+                return res.status(503).json({
                     success: false,
-                    message: "Only landlords can verify property ownership.",
+                    message: "Identity verification isn't available yet: secure storage for ID numbers is not configured.",
                 });
             }
+            extra.identityDetails = {
+                idLast4: identity.idNumber ? identity.idNumber.slice(-4) : null,
+                idNumber: identity.idNumber
+                    ? encryptField(identity.idNumber, identityAad(user._id, "idNumber"))
+                    : undefined,
+                dateOfBirth: encryptField(identity.dateOfBirth, identityAad(user._id, "dateOfBirth")),
+            };
+        } else if (value.type === "credential") {
+            if (user.verification?.credential?.status === "verified") {
+                return res.status(409).json({ success: false, message: "Your credentials are already verified." });
+            }
+            const reviewer = user.profile?.reviewer ?? {};
+            if (!reviewer.barEnrolmentNumber) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Add your Bar Council enrolment number to your profile first.",
+                });
+            }
+            extra.credentialDetails = {
+                barEnrolmentNumber: reviewer.barEnrolmentNumber,
+                jurisdictions: reviewer.jurisdictions ?? [],
+            };
+        } else {
             property = await Property.findOne({ _id: value.property, status: { $ne: "deleted" } });
             if (!property || !(await canManageProperty(property, user._id))) {
                 return res.status(404).json({ success: false, message: "Property not found." });
@@ -118,7 +179,7 @@ export async function submitVerificationRequest(req, res, next) {
 
         let request;
         try {
-            request = await VerificationRequest.create({ ...value, user: user._id });
+            request = await VerificationRequest.create({ ...value, ...extra, user: user._id });
         } catch (createError) {
             if (createError?.code === 11000) {
                 return res.status(409).json({
@@ -129,15 +190,23 @@ export async function submitVerificationRequest(req, res, next) {
             throw createError;
         }
 
-        if (value.type === "identity") {
-            user.set("verification.identity.status", "pending");
-            await user.save();
-        } else {
+        if (value.type === "ownership") {
             property.set("ownershipVerification.status", "pending");
             await property.save();
+        } else {
+            user.set(`verification.${value.type}.status`, "pending");
+            await user.save();
         }
 
-        return res.status(201).json({ success: true, data: request });
+        // Never echo the encrypted values back.
+        const data = request.toObject();
+        if (data.identityDetails) {
+            data.identityDetails = {
+                maskedNumber: maskIdNumber(data.identityDetails.idLast4),
+                dateOfBirthProvided: true,
+            };
+        }
+        return res.status(201).json({ success: true, data });
     } catch (error) {
         next(error);
     }
@@ -159,10 +228,11 @@ export async function listMyVerificationRequests(req, res, next) {
 }
 
 async function resetPendingStatus(request) {
-    if (request.type === "identity") {
+    if (request.type !== "ownership") {
+        const path = `verification.${request.type}.status`;
         await User.updateOne(
-            { _id: request.user, "verification.identity.status": "pending" },
-            { $set: { "verification.identity.status": "unverified" } }
+            { _id: request.user, [path]: "pending" },
+            { $set: { [path]: "unverified" } }
         );
     } else {
         await Property.updateOne(
@@ -211,7 +281,7 @@ export async function adminListVerificationRequests(req, res, next) {
         }
         if (status !== "all") filter.status = status;
         if (req.query.type !== undefined) {
-            if (!["identity", "ownership"].includes(req.query.type)) {
+            if (!VERIFICATION_TYPES.includes(req.query.type)) {
                 return res.status(400).json({ success: false, message: "Invalid type filter." });
             }
             filter.type = req.query.type;
@@ -248,7 +318,8 @@ export async function adminGetVerificationRequest(req, res, next) {
             return res.status(400).json({ success: false, message: "Invalid request ID." });
         }
         const request = await VerificationRequest.findById(requestId)
-            .populate("user", "displayName email phoneNumber role verification createdAt")
+            .select("+identityDetails.idNumber +identityDetails.dateOfBirth")
+            .populate("user", "displayName email phoneNumber role verification profile.reviewer createdAt")
             .populate("property", "title address landlord ownershipVerification")
             .populate("documents", "originalName mimeType sizeBytes storageKey status purpose")
             .lean();
@@ -269,17 +340,42 @@ export async function adminGetVerificationRequest(req, res, next) {
                 }))
         );
 
+        // The admin sees the full number and date of birth to compare with
+        // the documents; the view is logged.
+        let identityDetails = null;
+        if (request.identityDetails) {
+            const ownerId = request.user?._id ?? request.user;
+            const read = (field) => {
+                try {
+                    return decryptField(request.identityDetails[field], identityAad(ownerId, field));
+                } catch (decryptError) {
+                    console.error(`Decrypt ${field} error:`, decryptError.message);
+                    return null;
+                }
+            };
+            identityDetails = {
+                idNumber: read("idNumber"),
+                dateOfBirth: read("dateOfBirth"),
+                maskedNumber: maskIdNumber(request.identityDetails.idLast4),
+            };
+        }
+
         await recordSensitiveAccess({
             actor: req.neveUser._id,
             action: "verification_documents_viewed",
             resourceType: "verification_request",
             resourceId: request._id,
-            details: { type: request.type, documentCount: documents.length },
+            details: {
+                type: request.type,
+                documentCount: documents.length,
+                identityNumberViewed: Boolean(identityDetails?.idNumber),
+                dateOfBirthViewed: Boolean(identityDetails?.dateOfBirth),
+            },
             ipAddress: req.ip,
         });
 
         res.set("Cache-Control", "private, no-store");
-        return res.json({ success: true, data: { ...request, documents } });
+        return res.json({ success: true, data: { ...request, identityDetails, documents } });
     } catch (error) {
         if (error.status === 503) {
             return res.status(503).json({ success: false, message: "File storage is not configured." });
@@ -331,12 +427,35 @@ export async function adminReviewVerificationRequest(req, res, next) {
             verifiedAt: approved ? now : null,
         };
         if (request.type === "identity") {
+            const set = {
+                "verification.identity.status": verifiedState.status,
+                "verification.identity.verifiedAt": verifiedState.verifiedAt,
+            };
+            if (approved) {
+                // Keep the verified document's encrypted number and date of
+                // birth on the profile (same owner, so the same encryption binding).
+                const details = await VerificationRequest.findById(request._id)
+                    .select("documentType identityDetails.idLast4 +identityDetails.idNumber +identityDetails.dateOfBirth")
+                    .lean();
+                Object.assign(set, {
+                    "identity.documentType": details?.documentType ?? request.documentType,
+                    "identity.idLast4": details?.identityDetails?.idLast4 ?? null,
+                    "identity.idNumber": details?.identityDetails?.idNumber ?? null,
+                    "identity.dateOfBirth": details?.identityDetails?.dateOfBirth ?? null,
+                    "identity.verifiedAt": now,
+                });
+            }
             await User.updateOne(
                 { _id: request.user, "verification.identity.status": { $ne: "verified" } },
+                { $set: set }
+            );
+        } else if (request.type === "credential") {
+            await User.updateOne(
+                { _id: request.user, "verification.credential.status": { $ne: "verified" } },
                 {
                     $set: {
-                        "verification.identity.status": verifiedState.status,
-                        "verification.identity.verifiedAt": verifiedState.verifiedAt,
+                        "verification.credential.status": verifiedState.status,
+                        "verification.credential.verifiedAt": verifiedState.verifiedAt,
                     },
                 }
             );
@@ -366,7 +485,7 @@ export async function adminReviewVerificationRequest(req, res, next) {
 
         let notificationStatus = "created";
         try {
-            const label = request.type === "identity" ? "identity" : "property ownership";
+            const label = TYPE_LABELS[request.type];
             await createNotification({
                 recipient: request.user,
                 type: "verification_reviewed",
@@ -376,6 +495,7 @@ export async function adminReviewVerificationRequest(req, res, next) {
                 message: approved
                     ? `An admin reviewed your documents and verified your ${label}.`
                     : value.reviewNote,
+                link: "/verification",
                 relatedProperty: request.property ?? null,
             });
         } catch (notifyError) {

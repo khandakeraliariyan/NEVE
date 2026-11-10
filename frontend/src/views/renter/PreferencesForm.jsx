@@ -125,7 +125,7 @@ export default function PreferencesForm({ initial, onSave, onCancel }) {
                 <span>
                     <span className="font-semibold">In-app alerts for new matches</span>
                     <span className="block text-xs text-muted">
-                        You'll get a notification when a newly published listing scores at least 70% and isn't over your budget. There are no email or push alerts.
+                        You'll get a notification when a newly published listing scores at least 70% and isn't over your budget. There are no email alerts.
                     </span>
                 </span>
             </label>

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { queueNotificationDelivery } from "../services/notificationDelivery.service.js";
+import { NOTIFICATION_TYPES } from "../services/notificationTypes.js";
 
 const notificationSchema = new mongoose.Schema(
     {
@@ -12,20 +13,7 @@ const notificationSchema = new mongoose.Schema(
 
         type: {
             type: String,
-            enum: [
-                "viewing_request_received",
-                "viewing_request_confirmed",
-                "viewing_request_declined",
-                "viewing_request_approved",
-                "viewing_request_rejected",
-                "inquiry_message_received",
-                "matching_listing_available",
-                "tenancy_case_shared",
-                "tenancy_case_review_activity",
-                "staff_role_changed",
-                "account_status_changed",
-                "verification_reviewed",
-            ],
+            enum: NOTIFICATION_TYPES,
             required: true,
         },
 
@@ -41,6 +29,22 @@ const notificationSchema = new mongoose.Schema(
             required: true,
             trim: true,
             maxlength: 1000,
+        },
+
+        // Path in the web app, e.g. "/inquiries". Falls back to a default
+        // for the notification type.
+        link: {
+            type: String,
+            trim: true,
+            maxlength: 300,
+            default: null,
+        },
+
+        // Extra, allow-listed details used by email templates (property
+        // title, message preview...). Never contact details or identity data.
+        data: {
+            type: mongoose.Schema.Types.Mixed,
+            default: null,
         },
 
         relatedProperty: {
@@ -64,6 +68,18 @@ const notificationSchema = new mongoose.Schema(
             ref: "TenancyCase",
             default: null,
         },
+        relatedAgreement: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TenancyAgreement",
+            default: null,
+        },
+
+        // Stops scheduled reminders from being created twice.
+        dedupeKey: {
+            type: String,
+            default: undefined,
+            maxlength: 200,
+        },
 
         isRead: {
             type: Boolean,
@@ -75,8 +91,14 @@ const notificationSchema = new mongoose.Schema(
             default: null,
         },
 
-        // Email and push results; null until delivery runs (or when no
-        // delivery channel is configured).
+        // Set when the notification went out in a daily digest email.
+        digestedAt: {
+            type: Date,
+            default: null,
+        },
+
+        // Latest email result; null until delivery runs (or
+        // when no delivery channel is configured).
         delivery: {
             type: mongoose.Schema.Types.Mixed,
             default: null,
@@ -93,6 +115,10 @@ notificationSchema.index(
         partialFilterExpression: { type: "matching_listing_available" },
     }
 );
+notificationSchema.index(
+    { dedupeKey: 1 },
+    { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } }
+);
 
 notificationSchema.pre("save", function markNew() {
     this.$locals.wasNew = this.isNew;
@@ -100,7 +126,7 @@ notificationSchema.pre("save", function markNew() {
 
 notificationSchema.post("save", function deliverNew(doc) {
     if (doc.$locals.wasNew) {
-        queueNotificationDelivery(doc, doc.constructor);
+        queueNotificationDelivery(doc);
     }
 });
 

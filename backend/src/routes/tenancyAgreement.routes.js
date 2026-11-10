@@ -25,14 +25,49 @@ import {
     removeAgreementRecordLink,
     updateAgreementPayment,
     updateTenancyAgreementStatus,
+    attachAgreementDocument,
 } from "../controllers/tenancyAgreement.controller.js";
 import {
     extractAgreement,
     reviewAgreementClause,
 } from "../controllers/agreementExtraction.controller.js";
+import {
+    listClauseLegalSources,
+    listLegalSuggestions,
+    reviewLegalSuggestion,
+    runLegalSuggestions,
+} from "../controllers/legalSuggestion.controller.js";
+import {
+    addDocumentVersion,
+    createDocument,
+    getDocumentVersionUrl,
+    listDocuments,
+    respondToDocument,
+    updateDocument,
+} from "../controllers/tenancyDocument.controller.js";
+import {
+    acceptProposedObligation,
+    dismissProposedObligation,
+    getAgreementCompliance,
+    getMyCompliance,
+} from "../controllers/compliance.controller.js";
+import {
+    downloadAnalysisReport,
+    getRiskAnalysis,
+    runRiskAnalysis,
+    updateRiskFinding,
+} from "../controllers/contractRisk.controller.js";
+import {
+    acceptInvitation,
+    cancelInvitation,
+    createInvitation,
+    declineInvitation,
+    getInvitation,
+    listInvitations,
+} from "../controllers/tenancyInvitation.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { extractionLimiter } from "../middleware/rateLimit.middleware.js";
-import { allowRoles } from "../middleware/role.middleware.js";
+import { allowRoles, requirePermission } from "../middleware/role.middleware.js";
 import {
     addConditionEntry,
     correctConditionEntry,
@@ -56,6 +91,10 @@ import {
     shareTenancyCase,
     updateTenancyCaseStatus,
     addCaseReviewEntry,
+    addCaseIssue,
+    addCaseStatement,
+    removeCaseIssue,
+    updateCaseStatement,
 } from "../controllers/tenancyCase.controller.js";
 
 const router = express.Router();
@@ -70,6 +109,34 @@ router.use(
 );
 
 router.post("/agreements", allowRoles("renter", "landlord"), createTenancyAgreement);
+
+// ComplianceOS: obligations across agreements, and reviewing proposed ones.
+router.get("/compliance", getMyCompliance);
+router.get("/agreements/:agreementId/compliance", getAgreementCompliance);
+router.post(
+    "/agreements/:agreementId/proposed-obligations/:proposalId/accept",
+    allowRoles("renter", "landlord"),
+    acceptProposedObligation
+);
+router.post(
+    "/agreements/:agreementId/proposed-obligations/:proposalId/dismiss",
+    allowRoles("renter", "landlord"),
+    dismissProposedObligation
+);
+
+// Landlord invites a renter by email; the renter accepts to start the record.
+router.post(
+    "/invitations",
+    allowRoles("landlord"),
+    requirePermission((settings) => settings.rolePermissions.landlordsCanInviteRenters !== false, "Tenancy invitations are turned off."),
+    createInvitation
+);
+router.get("/invitations", allowRoles("renter", "landlord"), listInvitations);
+router.get("/invitations/:invitationId", allowRoles("renter", "landlord"), getInvitation);
+router.post("/invitations/:invitationId/accept", allowRoles("renter", "landlord"), acceptInvitation);
+router.post("/invitations/:invitationId/decline", allowRoles("renter", "landlord"), declineInvitation);
+router.post("/invitations/:invitationId/cancel", allowRoles("landlord"), cancelInvitation);
+router.patch("/agreements/:agreementId/document", allowRoles("renter", "landlord"), attachAgreementDocument);
 router.get("/agreements", listTenancyAgreements);
 router.get("/agreements/:agreementId/cases", listTenancyCases);
 router.post(
@@ -97,6 +164,10 @@ router.delete(
 );
 // Reviewers and parties both post; the controller limits which kinds each may use.
 router.post("/cases/:caseId/review-entries", addCaseReviewEntry);
+router.post("/cases/:caseId/statements", allowRoles("renter", "landlord"), addCaseStatement);
+router.patch("/cases/:caseId/statements/:statementId", allowRoles("renter", "landlord"), updateCaseStatement);
+router.post("/cases/:caseId/issues", allowRoles("renter", "landlord"), addCaseIssue);
+router.delete("/cases/:caseId/issues/:issueId", allowRoles("renter", "landlord"), removeCaseIssue);
 router.patch(
     "/cases/:caseId/status",
     allowRoles("renter", "landlord"),
@@ -175,6 +246,28 @@ router.post(
     allowRoles("renter", "landlord"),
     addAgreementLegalLink
 );
+// Approved legal sources for clauses: suggestions and hand-linking candidates.
+router.get(
+    "/agreements/:agreementId/legal-suggestions",
+    allowRoles("renter", "landlord", "legal_reviewer", "admin"),
+    listLegalSuggestions
+);
+router.post(
+    "/agreements/:agreementId/legal-suggestions",
+    allowRoles("renter", "landlord"),
+    extractionLimiter,
+    runLegalSuggestions
+);
+router.patch(
+    "/agreements/:agreementId/legal-suggestions/:suggestionId",
+    allowRoles("renter", "landlord"),
+    reviewLegalSuggestion
+);
+router.get(
+    "/agreements/:agreementId/clauses/:clauseId/legal-sources",
+    allowRoles("renter", "landlord", "legal_reviewer", "admin"),
+    listClauseLegalSources
+);
 router.post(
     "/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions",
     allowRoles("renter", "landlord"),
@@ -189,6 +282,36 @@ router.patch(
     "/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions/:suggestionId/assessment",
     allowRoles("legal_reviewer"),
     assessClauseRewrite
+);
+// Evidence vault: categorised documents with versions, amendments and notices.
+router.get("/agreements/:agreementId/documents", listDocuments);
+router.post("/agreements/:agreementId/documents", allowRoles("renter", "landlord"), createDocument);
+router.patch("/agreements/:agreementId/documents/:documentId", allowRoles("renter", "landlord"), updateDocument);
+router.post("/agreements/:agreementId/documents/:documentId/versions", allowRoles("renter", "landlord"), addDocumentVersion);
+router.post("/agreements/:agreementId/documents/:documentId/respond", allowRoles("renter", "landlord"), respondToDocument);
+router.get("/agreements/:agreementId/documents/:documentId/versions/:version/access-url", getDocumentVersionUrl);
+
+// Contract risk analysis and the agreement analysis report.
+router.get(
+    "/agreements/:agreementId/risk-analysis",
+    allowRoles("renter", "landlord", "legal_reviewer"),
+    getRiskAnalysis
+);
+router.post(
+    "/agreements/:agreementId/risk-analysis",
+    allowRoles("renter", "landlord"),
+    extractionLimiter,
+    runRiskAnalysis
+);
+router.patch(
+    "/agreements/:agreementId/risk-analysis/findings/:findingId",
+    allowRoles("renter", "landlord", "legal_reviewer"),
+    updateRiskFinding
+);
+router.get(
+    "/agreements/:agreementId/analysis-report",
+    allowRoles("renter", "landlord", "legal_reviewer"),
+    downloadAnalysisReport
 );
 router.post(
     "/agreements/:agreementId/record-links",

@@ -4,6 +4,7 @@ import Property from "../models/Property.js";
 import Inquiry from "../models/Inquiry.js";
 import PropertyViewEvent from "../models/PropertyViewEvent.js";
 import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
+import { landlordResponsiveness } from "../services/profile.service.js";
 
 function parseDate(value, fieldName) {
     if (value === undefined) return undefined;
@@ -179,6 +180,7 @@ export async function getLandlordPerformance(req, res, next) {
                 from: from?.toISOString() ?? null,
                 to: to?.toISOString() ?? null
             },
+            responsiveness: await landlordResponsiveness(landlordId),
             totals: {
                 views: performance.reduce(
                     (sum, item) => sum + item.views,

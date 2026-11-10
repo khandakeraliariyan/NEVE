@@ -4,6 +4,7 @@ import {
     createLegalSource,
     getLegalSourceForStaff,
     listLegalSourcesForStaff,
+    resolveLegalSourceFlag,
     transitionLegalSource,
     updateLegalSource,
 } from "../controllers/legalSource.controller.js";
@@ -21,5 +22,6 @@ router.get("/:sourceId", getLegalSourceForStaff);
 router.patch("/:sourceId", updateLegalSource);
 // { action: "submit" | "retire", note? }
 router.patch("/:sourceId/status", transitionLegalSource);
+router.patch("/:sourceId/flags/:flagId", resolveLegalSourceFlag);
 
 export default router;

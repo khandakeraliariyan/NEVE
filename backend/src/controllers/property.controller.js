@@ -12,6 +12,7 @@ import {
     getPropertySort,
 } from "../services/propertySearch.service.js";
 import { notifyRentersOfMatchingProperty } from "../services/matchingAlert.service.js";
+import { favoriteRecipients, notifyFavoriteChanged } from "../services/notificationEvents.service.js";
 import { manageablePropertyFilter } from "../services/propertyAccess.service.js";
 
 const editableFields = [
@@ -32,6 +33,15 @@ const editableFields = [
     "leaseDurationMonths",
     "houseRules",
 ];
+
+// The listing details renters who saved it are told about when they change.
+function favoriteSnapshot(property) {
+    return {
+        status: property.status,
+        availabilityDate: property.availabilityDate ?? null,
+        pricing: { monthlyRent: property.pricing?.monthlyRent ?? null },
+    };
+}
 
 function pickFields(source, allowedFields) {
     return Object.fromEntries(
@@ -198,8 +208,13 @@ export async function updateProperty(req, res, next) {
                 message: "Property not found or you do not own it",
             });
         }
+        const before = favoriteSnapshot(property);
         Object.assign(property, data);
         await property.save();
+
+        if (property.status === "published") {
+            await notifyFavoriteChanged({ before, property });
+        }
 
         return res.status(200).json({
             success: true,
@@ -252,9 +267,11 @@ export async function updatePropertyStatus(req, res, next) {
         }
 
         const wasPublished = property.status === "published";
+        const before = favoriteSnapshot(property);
         // A paused listing can be republished; a draft can be published.
         property.status = status;
         await property.save();
+        await notifyFavoriteChanged({ before, property });
 
         let matchingAlerts = null;
         if (status === "published" && !wasPublished) {
@@ -323,6 +340,10 @@ export async function deleteProperty(req, res, next) {
             status: { $in: ["requested", "confirmed"] },
         }).select("_id renter");
 
+        const before = favoriteSnapshot(property);
+        // Read before the saved copies are removed below.
+        const savedBy = await favoriteRecipients(property._id, property.landlord);
+
         property.status = "deleted";
         property.deletedAt = new Date();
         await property.save();
@@ -356,13 +377,18 @@ export async function deleteProperty(req, res, next) {
             ),
         ]);
 
+        if (before.status === "published") {
+            await notifyFavoriteChanged({ before, property, recipients: savedBy });
+        }
+
         await Promise.allSettled(
             openViewings.map((viewing) =>
                 createNotification({
                     recipient: viewing.renter,
-                    type: "viewing_request_declined",
+                    type: "viewing_request_cancelled",
                     title: "Viewing cancelled",
                     message: `"${property.title}" is no longer listed, so your viewing request was cancelled.`,
+                    link: "/viewings",
                     relatedProperty: property._id,
                     relatedViewingRequest: viewing._id,
                 })

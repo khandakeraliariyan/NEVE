@@ -21,6 +21,7 @@ export default function MediaFloorplans() {
     const [error, setError] = useState(null);
     const [progress, setProgress] = useState(null);
     const [removing, setRemoving] = useState(null);
+    const [duplicateNotice, setDuplicateNotice] = useState(null);
 
     // Drafts aren't public, so media IDs come from the landlord's own listing list.
     const load = useCallback(async () => {
@@ -61,7 +62,8 @@ export default function MediaFloorplans() {
             for (const [index, file] of files.entries()) {
                 setProgress(`Uploading ${index + 1} of ${files.length}: ${file.name}`);
                 const fileId = await uploadFile(file, { purpose: config.purpose, propertyId: id });
-                await api.post(`/property-images/${id}/${fileId}/attach`);
+                const attached = await api.post(`/property-images/${id}/${fileId}/attach`);
+                if (attached?.duplicatePhotoWarning) setDuplicateNotice(attached.duplicatePhotoWarning);
             }
             await load();
         } catch (err) {
@@ -102,6 +104,16 @@ export default function MediaFloorplans() {
                 description="Photos, video tours and floor plans renters see on the listing. The first photo is used as the cover."
                 actions={<StatusBadge status={property.status} />}
             />
+
+            {duplicateNotice && (
+                <div className="mb-6 rounded-xl border border-amber bg-amber/20 px-4 py-3 text-sm" role="status">
+                    <p className="font-medium text-ink">{duplicateNotice.message}</p>
+                    <p className="mt-1 text-muted">{duplicateNotice.notice}</p>
+                    <Link href="/listings/warnings" className="mt-1 inline-block text-forest underline">
+                        Review or appeal the warning
+                    </Link>
+                </div>
+            )}
 
             <div className="mb-6 grid gap-4 sm:grid-cols-3">
                 {Object.entries(KINDS).map(([key, k]) => (

@@ -174,7 +174,8 @@ function RunDetail({ runId }) {
     );
 }
 
-export default function AIEvaluations() {
+// readOnly: legal reviewers see results but can't record runs.
+export default function AIEvaluations({ readOnly = false, basePath = "/admin/ai-evaluations" }) {
     const { runId } = useParams();
     const router = useRouter();
     const [task, setTask] = useState("");
@@ -191,10 +192,10 @@ export default function AIEvaluations() {
                 eyebrow="AI reliability"
                 title="AI evaluation benchmarks"
                 description="Record and compare benchmark results for AI tasks evaluated outside Neve: OCR, extraction, evidence linking, citations and suspicious-listing detection."
-                actions={!submitting && <Button onClick={() => setSubmitting(true)}>+ Record a run</Button>}
+                actions={!readOnly && !submitting && <Button onClick={() => setSubmitting(true)}>+ Record a run</Button>}
             />
 
-            {submitting && (
+            {!readOnly && submitting && (
                 <Card className="mb-6">
                     <h2 className="mb-1 text-xl">Record an evaluation run</h2>
                     <p className="mb-4 text-sm text-muted">Use only consented or synthetic benchmark data. Case IDs are hashed before storage.</p>
@@ -202,7 +203,7 @@ export default function AIEvaluations() {
                         onCreated={(run) => {
                             setSubmitting(false);
                             runs.reload();
-                            router.push(`/admin/ai-evaluations/${run._id}`);
+                            router.push(`${basePath}/${run._id}`);
                         }}
                     />
                     <button type="button" className="mt-3 text-sm text-muted underline" onClick={() => setSubmitting(false)}>
@@ -258,7 +259,7 @@ export default function AIEvaluations() {
                                 {list.map((r) => (
                                     <tr key={r._id} className={runId === r._id ? "bg-sage/40" : "hover:bg-mist"}>
                                         <td className="px-4 py-3">
-                                            <Link href={`/admin/ai-evaluations/${r._id}`} className="font-semibold hover:text-forest">
+                                            <Link href={`${basePath}/${r._id}`} className="font-semibold hover:text-forest">
                                                 {r.modelName} {r.modelVersion}
                                             </Link>
                                             <p className="text-xs text-muted">
@@ -283,9 +284,9 @@ export default function AIEvaluations() {
                 </section>
             </div>
 
-            <Disclaimer title="Neve doesn't run AI" className="mt-8">
-                These results were produced elsewhere and submitted here. Neve calculates metrics from the cases you submit; it doesn't run OCR or AI models on
-                user data.
+            <Disclaimer title="Where results come from" className="mt-8">
+                Runs come from Neve&apos;s own test sets (npm run eval -- --save in the backend) or are submitted from outside evaluations. Test sets use
+                synthetic data only; no user data is evaluated.
             </Disclaimer>
         </div>
     );

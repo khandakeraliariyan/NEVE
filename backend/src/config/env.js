@@ -40,10 +40,21 @@ const envSchema = z.object({
         .number()
         .positive()
         .default(10),
+    // One Overpass server, or several separated by commas: each is tried in
+    // turn when the one before it fails or is too slow.
     OVERPASS_API_URL: z
         .string()
-        .url()
-        .default("https://overpass-api.de/api/interpreter"),
+        .default("https://overpass-api.de/api/interpreter")
+        .refine(
+            (value) =>
+                value
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter(Boolean)
+                    .every((item) => URL.canParse(item)),
+            "OVERPASS_API_URL must be one URL or a comma-separated list of URLs."
+        ),
+    OVERPASS_TIMEOUT_SECONDS: z.coerce.number().int().min(5).max(120).default(25),
     // OSRM-compatible routing services for walking and driving times.
     ROUTING_WALKING_URL: z
         .string()
@@ -61,10 +72,28 @@ const envSchema = z.object({
     EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).optional(),
     EMAIL_API_KEY: z.string().optional(),
     EMAIL_FROM: z.string().email().optional(),
-    // Push delivery through Firebase Cloud Messaging.
-    PUSH_NOTIFICATIONS_ENABLED: z
+    // Public address of this API, used for unsubscribe links and listing
+    // thumbnails in emails, e.g. https://api.neve.app
+    API_PUBLIC_URL: z.string().url().optional(),
+    // Signs unsubscribe links. Falls back to a key derived from ADMIN_JWT_SECRET.
+    NOTIFICATION_LINK_SECRET: z.string().min(32).optional(),
+    // Time zone used for dates in notifications and the digest hour.
+    NOTIFICATION_TIME_ZONE: z.string().min(1).default("Asia/Dhaka"),
+    // Local hour (0-23) when daily digest emails go out.
+    NOTIFICATION_DIGEST_HOUR: z.coerce.number().int().min(0).max(23).default(8),
+    // AES-256-GCM key for NID/passport numbers and dates of birth: 32 random
+    // bytes, base64. node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+    FIELD_ENCRYPTION_KEY: z.string().optional(),
+    FIELD_ENCRYPTION_KEY_VERSION: z.coerce.number().int().min(1).default(1),
+    // Earlier keys kept for reading old values after a rotation: "1:base64,2:base64".
+    FIELD_ENCRYPTION_OLD_KEYS: z.string().optional(),
+    // Days an account's photos and listing media are kept after the account
+    // is deleted, before the retention purge removes them.
+    ACCOUNT_DELETION_FILE_RETENTION_DAYS: z.coerce.number().int().min(0).max(3650).default(30),
+    // Inquiry, viewing, obligation and lease reminders.
+    NOTIFICATION_REMINDERS_ENABLED: z
         .enum(["true", "false"])
-        .default("false")
+        .default("true")
         .transform((value) => value === "true"),
     // Background jobs. Both are off unless enabled.
     RETENTION_PURGE_ENABLED: z
@@ -87,7 +116,12 @@ const envSchema = z.object({
         .default("http://localhost:5000/api/v1"),
 });
 
-const parsed = envSchema.safeParse(process.env);
+// A blank line like "EMAIL_PROVIDER=" means "not set", not an empty value.
+const definedEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([, value]) => typeof value !== "string" || value.trim() !== "")
+);
+
+const parsed = envSchema.safeParse(definedEnv);
 
 if (!parsed.success) {
     console.error("Invalid environment configuration:");

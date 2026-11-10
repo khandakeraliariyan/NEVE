@@ -17,11 +17,43 @@ import { deleteStoredObject } from "./fileUpload.service.js";
 //   and isn't used by any tenancy record (retention_ended)
 // - identity and ownership documents from requests reviewed or cancelled more
 //   than VERIFICATION_DOCUMENT_RETENTION_DAYS ago (verification_closed)
+// - photos and listing media of deleted accounts once their retention date
+//   passes (retention_ended)
 // Referenced files and files under legal hold are never deleted.
+// clearClosedIdentityDetails also removes the encrypted ID number and date of
+// birth from verification requests closed that long ago.
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const MAX_FILES_PER_RUN = 500;
+// File kinds deleted once their retentionUntil date passes.
+const RETENTION_DATED_PURPOSES = [
+    "tenancy_evidence",
+    "profile_photo",
+    "property_image",
+    "property_video",
+    "floor_plan",
+];
+
+// The verified number and date of birth stay on the user's profile; the
+// copies on closed requests are removed after the document retention period.
+export async function clearClosedIdentityDetails(now = new Date(), Requests = VerificationRequest) {
+    const closedBefore = new Date(now.getTime() - env.VERIFICATION_DOCUMENT_RETENTION_DAYS * DAY_MS);
+    const result = await Requests.updateMany(
+        {
+            type: "identity",
+            status: { $in: ["approved", "rejected", "cancelled"] },
+            updatedAt: { $lte: closedBefore },
+            $or: [
+                { "identityDetails.idNumber": { $exists: true } },
+                { "identityDetails.dateOfBirth": { $exists: true } },
+            ],
+        },
+        { $unset: { "identityDetails.idNumber": "", "identityDetails.dateOfBirth": "" } },
+        { timestamps: false }
+    );
+    return result.modifiedCount ?? 0;
+}
 
 export async function isFileReferenced(fileId) {
     const checks = await Promise.all([
@@ -59,7 +91,7 @@ export async function findPurgeCandidates(now = new Date()) {
         .lean();
 
     const retentionEnded = await UploadedFile.find({
-        purpose: "tenancy_evidence",
+        purpose: { $in: RETENTION_DATED_PURPOSES },
         status: "uploaded",
         legalHold: false,
         retentionUntil: { $ne: null, $lte: now },

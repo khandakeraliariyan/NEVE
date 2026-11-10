@@ -1,4 +1,5 @@
 "use client";
+import Announcement from "./Announcement";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -30,7 +31,7 @@ function NotificationBell() {
     }, []);
 
     return (
-        <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white text-forest hover:bg-sage" title={`${count} unread notifications`}>
+        <Link href="/notifications" className="relative flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white text-forest hover:bg-sage" title={`${count} unread notifications`} aria-label={`Notifications, ${count} unread`}>
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
                 <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
@@ -40,7 +41,7 @@ function NotificationBell() {
                     {count > 99 ? "99+" : count}
                 </span>
             )}
-        </span>
+        </Link>
     );
 }
 
@@ -128,6 +129,7 @@ export default function WorkspaceLayout({ children }) {
                     </div>
                 </header>
                 <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 md:px-8">
+                    <Announcement className="mb-6" />
                     {children}
                 </main>
             </div>

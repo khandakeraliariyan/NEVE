@@ -78,6 +78,42 @@ const caseReviewEntrySchema = new mongoose.Schema(
     }
 );
 
+// A party's own account of the dispute. Private to its author until they
+// share it; after that, edits add versions instead of replacing the text.
+const caseStatementSchema = new mongoose.Schema(
+    {
+        author: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        authorRole: { type: String, enum: ["renter", "landlord"], required: true },
+        title: { type: String, trim: true, maxlength: 150, default: "" },
+        body: { type: String, trim: true, required: true, maxlength: 8000 },
+        visibility: { type: String, enum: ["private", "shared"], default: "private" },
+        sharedAt: { type: Date, default: null },
+        previousVersions: {
+            type: [
+                {
+                    _id: false,
+                    body: { type: String, maxlength: 8000 },
+                    replacedAt: { type: Date, default: Date.now },
+                },
+            ],
+            default: [],
+        },
+    },
+    { timestamps: true }
+);
+
+// One disputed issue: what is disputed and, when money is involved, how much.
+const caseIssueSchema = new mongoose.Schema(
+    {
+        title: { type: String, trim: true, required: true, maxlength: 150 },
+        description: { type: String, trim: true, maxlength: 2000, default: "" },
+        amountBdt: { type: Number, min: 0, default: null },
+        addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        addedAt: { type: Date, default: Date.now },
+    },
+    { _id: true }
+);
+
 const tenancyCaseSchema = new mongoose.Schema(
     {
         agreement: {
@@ -112,6 +148,8 @@ const tenancyCaseSchema = new mongoose.Schema(
         evidence: { type: [caseEvidenceSchema], default: [] },
         sharedWith: { type: [caseShareSchema], default: [] },
         reviewEntries: { type: [caseReviewEntrySchema], default: [] },
+        issues: { type: [caseIssueSchema], default: [] },
+        statements: { type: [caseStatementSchema], default: [] },
     },
     { timestamps: true }
 );

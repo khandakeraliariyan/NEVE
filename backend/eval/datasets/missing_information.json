@@ -1,0 +1,133 @@
+{
+    "name": "neve-contract-risk-rules",
+    "version": "1",
+    "task": "missing_information",
+    "description": "Synthetic agreements with the contract-risk findings a careful reader expects. Labels are rule-finding keys without clause IDs, e.g. missing_clause:notice. All text is invented for testing.",
+    "cases": [
+        {
+            "id": "complete-clear",
+            "agreement": {
+                "monthlyRentBdt": 25000, "depositBdt": 50000, "startAt": "2026-01-01", "endAt": "2026-12-31",
+                "clauses": [
+                    { "category": "rent", "text": "The tenant pays rent of Tk 25,000 by the 5th day of each month by bank transfer." },
+                    { "category": "deposit", "text": "A deposit of Tk 50,000 is refunded within 30 days of the tenant leaving." },
+                    { "category": "term", "text": "The tenancy runs for 12 months from 1 January 2026." },
+                    { "category": "notice", "text": "Either party gives 2 months written notice to end the tenancy." },
+                    { "category": "maintenance", "text": "The landlord repairs structural damage; the tenant handles minor repairs." },
+                    { "category": "utilities", "text": "The tenant pays electricity, gas and water bills." }
+                ]
+            },
+            "expected": []
+        },
+        {
+            "id": "no-notice-no-utilities",
+            "agreement": {
+                "monthlyRentBdt": 18000, "depositBdt": 36000, "startAt": "2026-02-01", "endAt": "2027-01-31",
+                "clauses": [
+                    { "category": "rent", "text": "Rent is Tk 18,000, payable before the 10th of every month." },
+                    { "category": "deposit", "text": "The deposit of Tk 36,000 will be returned when the tenant leaves, less unpaid bills." },
+                    { "category": "term", "text": "The term is one year." },
+                    { "category": "maintenance", "text": "Repairs are shared as agreed." }
+                ]
+            },
+            "expected": ["missing_clause:notice", "missing_clause:utilities"]
+        },
+        {
+            "id": "vague-rent-and-deposit",
+            "agreement": {
+                "monthlyRentBdt": 30000, "depositBdt": 90000, "startAt": "2026-03-01", "endAt": "2027-02-28",
+                "clauses": [
+                    { "category": "rent", "text": "Rent is payable monthly as agreed between the parties." },
+                    { "category": "deposit", "text": "The tenant pays a deposit of Tk 90,000 at signing." },
+                    { "category": "term", "text": "The tenancy is for twelve months." },
+                    { "category": "notice", "text": "Either side gives 1 month notice." },
+                    { "category": "maintenance", "text": "The landlord handles major repairs." },
+                    { "category": "utilities", "text": "Utilities are paid by the tenant." }
+                ]
+            },
+            "expected": ["unclear_payment:no_amount", "unclear_payment:no_due_date", "unclear_deposit_refund:no_refund_terms"]
+        },
+        {
+            "id": "notice-without-period",
+            "agreement": {
+                "monthlyRentBdt": 22000, "depositBdt": 44000, "startAt": "2026-04-01", "endAt": "2027-03-31",
+                "clauses": [
+                    { "category": "rent", "text": "Rent is Tk 22,000 by the 3rd of each month." },
+                    { "category": "deposit", "text": "The deposit is refunded within 15 days after handover." },
+                    { "category": "term", "text": "The tenancy lasts twelve months." },
+                    { "category": "notice", "text": "The tenant must inform the landlord before leaving." },
+                    { "category": "maintenance", "text": "The tenant keeps the flat clean and reports damage." },
+                    { "category": "utilities", "text": "Gas and electricity are paid by the tenant." }
+                ]
+            },
+            "expected": ["termination_concern:no_notice_period"]
+        },
+        {
+            "id": "one-sided-eviction",
+            "agreement": {
+                "monthlyRentBdt": 15000, "depositBdt": 30000, "startAt": "2026-05-01", "endAt": "2027-04-30",
+                "clauses": [
+                    { "category": "rent", "text": "Rent is Tk 15,000 by the 7th of each month in cash with a receipt." },
+                    { "category": "deposit", "text": "The deposit is non-refundable if the tenant leaves early, otherwise returned within 30 days." },
+                    { "category": "term", "text": "The tenancy is for one year." },
+                    { "category": "notice", "text": "The landlord may end the tenancy at any time without notice. The tenant gives 2 months notice." },
+                    { "category": "maintenance", "text": "The landlord repairs the roof and plumbing." },
+                    { "category": "utilities", "text": "The tenant pays all utility bills." }
+                ]
+            },
+            "expected": ["one_sided_term:Money may be forfeited", "one_sided_term:Action without notice", "one_sided_term:\"At any time\" wording"]
+        },
+        {
+            "id": "two-rent-amounts",
+            "agreement": {
+                "monthlyRentBdt": 20000, "depositBdt": 40000, "startAt": "2026-06-01", "endAt": "2028-05-31",
+                "clauses": [
+                    { "category": "rent", "text": "Rent is Tk 20,000 by the 5th of each month." },
+                    { "category": "rent", "text": "From the second year rent is Tk 22,000 by the 5th of each month." },
+                    { "category": "deposit", "text": "The deposit is returned within one month of the end of the tenancy." },
+                    { "category": "term", "text": "The tenancy lasts two years." },
+                    { "category": "notice", "text": "Either party gives 60 days notice." },
+                    { "category": "maintenance", "text": "Repairs above Tk 2,000 are the landlord's." },
+                    { "category": "utilities", "text": "The tenant pays electricity." }
+                ]
+            },
+            "expected": ["contradiction:rent_amounts"]
+        },
+        {
+            "id": "facts-missing",
+            "agreement": {
+                "monthlyRentBdt": null, "depositBdt": null, "startAt": null, "endAt": null,
+                "clauses": [
+                    { "category": "rent", "text": "Rent is Tk 12,000 by the 5th of each month." },
+                    { "category": "deposit", "text": "The deposit is refunded at the end of the tenancy." },
+                    { "category": "term", "text": "The tenancy lasts eleven months." },
+                    { "category": "notice", "text": "One month notice is needed." },
+                    { "category": "maintenance", "text": "The landlord handles repairs." },
+                    { "category": "utilities", "text": "Bills are paid by the tenant." }
+                ]
+            },
+            "expected": ["missing_information:facts"]
+        },
+        {
+            "id": "document-disagrees",
+            "agreement": {
+                "monthlyRentBdt": 25000, "depositBdt": 50000, "startAt": "2026-01-01", "endAt": "2026-12-31",
+                "extractedFacts": { "depositBdt": 75000 },
+                "clauses": [
+                    { "category": "rent", "text": "Rent is Tk 25,000 by the 5th of each month." },
+                    { "category": "deposit", "text": "The deposit is returned within 30 days of handover." },
+                    { "category": "term", "text": "The tenancy is for one year." },
+                    { "category": "notice", "text": "Either party gives 2 months notice." },
+                    { "category": "maintenance", "text": "The landlord repairs major faults." },
+                    { "category": "utilities", "text": "The tenant pays utilities." }
+                ]
+            },
+            "expected": ["contradiction:extracted:depositBdt"]
+        },
+        {
+            "id": "no-clauses",
+            "agreement": { "monthlyRentBdt": 10000, "depositBdt": 20000, "startAt": "2026-01-01", "endAt": "2026-12-31", "clauses": [] },
+            "expected": ["missing_information:no_clauses"]
+        }
+    ]
+}

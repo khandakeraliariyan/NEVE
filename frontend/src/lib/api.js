@@ -1,6 +1,8 @@
 import { auth } from "./firebase";
 import { endAdminSession, getAdminToken } from "./adminSession";
 
+export const SESSION_REVOKED_EVENT = "neve:session-revoked";
+
 export const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api/v1";
 
@@ -62,6 +64,10 @@ export async function apiRequest(path, { method = "GET", body, params, auth: nee
     if (!response.ok) {
         // The admin token expired or was revoked (password changed, account deactivated).
         if (response.status === 401 && adminToken) endAdminSession();
+        // This session was signed out from another device.
+        if (response.status === 401 && payload?.code === "SESSION_REVOKED" && typeof window !== "undefined") {
+            window.dispatchEvent(new Event(SESSION_REVOKED_EVENT));
+        }
         const message =
             FRIENDLY[response.status] ??
             payload?.message ??
@@ -111,6 +117,33 @@ export async function uploadFile(file, { purpose, propertyId } = {}) {
 
     await api.patch(`/uploads/${fileId}/complete`);
     return fileId;
+}
+
+// Downloads a non-JSON response (e.g. a PDF) with the signed-in user's token.
+export async function downloadAuthenticated(path, filename) {
+    const headers = {};
+    const adminToken = getAdminToken();
+    if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+    else if (auth?.currentUser) headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
+    let response;
+    try {
+        response = await fetch(`${API_BASE_URL}${path}`, { headers });
+    } catch {
+        throw new ApiError(0, "Can't reach the Neve API. Check your connection and try again.");
+    }
+    if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new ApiError(response.status, payload?.message ?? `Download failed (${response.status}).`, [], payload?.code ?? null);
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function openPrivateFile(fileId) {

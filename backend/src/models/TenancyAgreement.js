@@ -181,6 +181,14 @@ const extractionSchema = new mongoose.Schema(
                         sourceText: { type: String, maxlength: 2000, default: "" },
                         sourcePage: { type: Number, min: 1, default: null },
                         sourceVerified: { type: Boolean, default: null },
+                        // A participant turns a proposal into an obligation
+                        // or dismisses it; until then it stays "pending".
+                        decision: {
+                            status: { type: String, enum: ["pending", "accepted", "dismissed"], default: "pending" },
+                            by: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+                            at: { type: Date, default: null },
+                            obligation: { type: mongoose.Schema.Types.ObjectId, default: null },
+                        },
                     },
                     { _id: true }
                 ),
@@ -194,6 +202,22 @@ const extractionSchema = new mongoose.Schema(
             outputTokens: { type: Number, default: null },
         },
         latencyMs: { type: Number, default: null },
+        // How the document's text was read: per page, text or OCR, and how
+        // many personal identifiers were removed before analysis.
+        textSource: { type: mongoose.Schema.Types.Mixed, default: null },
+        // The masked text that was analysed, page by page.
+        documentText: {
+            type: [
+                new mongoose.Schema(
+                    {
+                        page: { type: Number, min: 1 },
+                        text: { type: String, maxlength: 50000, default: "" },
+                    },
+                    { _id: false }
+                ),
+            ],
+            default: [],
+        },
     },
     { _id: false }
 );
@@ -211,7 +235,34 @@ const obligationSchema = new mongoose.Schema(
             enum: ["renter", "landlord", "shared"],
             required: true,
         },
+        category: {
+            type: String,
+            enum: ["payment", "maintenance", "notice", "property", "other"],
+            default: "other",
+        },
+        // "ai_extracted" obligations came from a proposal a participant accepted.
+        origin: { type: String, enum: ["user", "ai_extracted"], default: "user" },
+        sourceText: { type: String, maxlength: 2000, default: "" },
+        sourcePage: { type: Number, min: 1, default: null },
         dueAt: { type: Date, default: null },
+        // Recurring obligations move to the next due date when completed.
+        recurrence: {
+            frequency: { type: String, enum: ["none", "weekly", "monthly", "quarterly", "yearly"], default: "none" },
+            until: { type: Date, default: null },
+        },
+        completions: {
+            type: [
+                {
+                    _id: false,
+                    dueAt: { type: Date, default: null },
+                    completedAt: { type: Date, default: Date.now },
+                    by: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                    evidenceFile: { type: mongoose.Schema.Types.ObjectId, ref: "UploadedFile", default: null },
+                    note: { type: String, maxlength: 1000, default: "" },
+                },
+            ],
+            default: [],
+        },
         amountBdt: { type: Number, min: 0, default: null },
         evidenceFile: {
             type: mongoose.Schema.Types.ObjectId,
@@ -224,6 +275,10 @@ const obligationSchema = new mongoose.Schema(
             default: "open",
         },
         notes: { type: String, trim: true, maxlength: 1000, default: "" },
+        // The due date the "due soon" reminder was sent for.
+        dueReminderFor: { type: Date, default: null },
+        // The due date the "overdue" notice was sent for.
+        overdueNotifiedFor: { type: Date, default: null },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -340,10 +395,17 @@ const tenancyAgreementSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+        // The signed agreement document. Can be added later when the record
+        // was started from a landlord's invitation.
         documentFile: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "UploadedFile",
-            required: true,
+            default: null,
+        },
+        invitation: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TenancyInvitation",
+            default: null,
         },
         title: {
             type: String,
@@ -358,6 +420,8 @@ const tenancyAgreementSchema = new mongoose.Schema(
         },
         startAt: { type: Date, default: null },
         endAt: { type: Date, default: null },
+        // The end date the "lease ending" reminder was sent for.
+        leaseEndReminderFor: { type: Date, default: null },
         monthlyRentBdt: { type: Number, min: 0, default: null },
         depositBdt: { type: Number, min: 0, default: null },
         advanceRentBdt: { type: Number, min: 0, default: null },
