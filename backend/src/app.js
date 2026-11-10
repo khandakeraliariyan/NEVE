@@ -48,6 +48,7 @@ import legalSourceRoutes from "./routes/legalSource.routes.js";
 import adminLegalSourceRoutes from "./routes/adminLegalSource.routes.js";
 import legalReviewRoutes from "./routes/legalReview.routes.js";
 import platformSettingsRoutes from "./routes/platformSettings.routes.js";
+import legalCopilotRoutes from "./routes/legalCopilot.routes.js";
 import { getPublicPlatformInfo } from "./controllers/platformSettings.controller.js";
 
 const app = express();
@@ -118,6 +119,7 @@ app.use("/api/v1/admin/system", adminSystemRoutes);
 app.use("/api/v1/legal-sources", legalSourceRoutes);
 app.use("/api/v1/admin/legal-sources", adminLegalSourceRoutes);
 app.use("/api/v1/legal-review", legalReviewRoutes);
+app.use("/api/v1/copilot", legalCopilotRoutes);
 app.use("/api/v1/admin", platformSettingsRoutes);
 // Public: announcement banner and sign-up options.
 app.get("/api/v1/platform", getPublicPlatformInfo);

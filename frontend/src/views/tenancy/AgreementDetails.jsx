@@ -421,6 +421,7 @@ export default function AgreementDetails() {
                     <Button as={Link} href={`/agreements/${agreement._id}/evidence`} variant="outline">Evidence graph</Button>
                     <Button as={Link} href={`/agreements/${agreement._id}/condition`} variant="outline">Condition reports</Button>
                     <Button as={Link} href={`/agreements/${agreement._id}/maintenance`} variant="outline">Maintenance</Button>
+                    <Button as={Link} href={`/copilot?agreementId=${agreement._id}`} variant="outline">Ask Legal Copilot</Button>
                     {isParticipant && <Button as={Link} href={`/agreements/${agreement._id}/cases`}>Dispute cases</Button>}
                 </div>
             </div>

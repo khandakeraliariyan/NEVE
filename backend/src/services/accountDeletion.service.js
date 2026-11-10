@@ -8,6 +8,7 @@ import Property from "../models/Property.js";
 import RenterPreference from "../models/RenterPreference.js";
 import SavedProperty from "../models/SavedProperty.js";
 import SavedSearch from "../models/SavedSearch.js";
+import CopilotConversation from "../models/CopilotConversation.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
@@ -172,6 +173,7 @@ export async function deleteAccount(user, deps = {}) {
     await Promise.all([
         SavedProperty.deleteMany({ renter: user._id }),
         SavedSearch.deleteMany({ renter: user._id }),
+        CopilotConversation.deleteMany({ owner: user._id }),
         RenterPreference.deleteMany({ renter: user._id }),
         Notification.deleteMany({ recipient: user._id }),
         NotificationDelivery.deleteMany({ recipient: user._id, status: { $in: ["pending", "sending", "dead"] } }),

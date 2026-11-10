@@ -47,7 +47,10 @@ const LANDLORD_NAV = [
 const TENANCY_NAV = [
     {
         title: "Tenancy",
-        items: [{ to: "/agreements", label: "Tenancy dashboard", end: true }],
+        items: [
+            { to: "/agreements", label: "Tenancy dashboard", end: true },
+            { to: "/copilot", label: "Legal Copilot" },
+        ],
     },
 ];
 // Renters and landlords also see tenancy invitations.
@@ -58,6 +61,7 @@ const PARTY_TENANCY_NAV = (invitationsLabel) => [
             { to: "/agreements", label: "Tenancy dashboard", end: true },
             { to: "/compliance", label: "Obligations & deadlines" },
             { to: "/invitations", label: invitationsLabel },
+            { to: "/copilot", label: "Legal Copilot" },
         ],
     },
 ];

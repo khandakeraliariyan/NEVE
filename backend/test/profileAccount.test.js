@@ -16,6 +16,7 @@ import Property from "../src/models/Property.js";
 import RenterPreference from "../src/models/RenterPreference.js";
 import SavedProperty from "../src/models/SavedProperty.js";
 import SavedSearch from "../src/models/SavedSearch.js";
+import CopilotConversation from "../src/models/CopilotConversation.js";
 import UploadedFile from "../src/models/UploadedFile.js";
 import User from "../src/models/User.js";
 import UserSession from "../src/models/UserSession.js";
@@ -382,7 +383,7 @@ test("account deletion anonymises the user and removes their own data", async ()
     mock.method(VerificationRequest, "updateMany", async () => ({}));
     const fileUpdate = mock.method(UploadedFile, "updateMany", async () => ({ modifiedCount: 3 }));
     const removed = [];
-    for (const Model of [SavedSearch, RenterPreference, Notification, NotificationDelivery, UserSession]) {
+    for (const Model of [SavedSearch, CopilotConversation, RenterPreference, Notification, NotificationDelivery, UserSession]) {
         mock.method(Model, "deleteMany", async () => { removed.push(Model.modelName); return {}; });
     }
     mock.method(Notification, "create", async (doc) => doc);
@@ -404,7 +405,7 @@ test("account deletion anonymises the user and removes their own data", async ()
         fileUpdate.mock.calls[0].arguments[1].$set.retentionUntil.getTime(),
         now.getTime() + env.ACCOUNT_DELETION_FILE_RETENTION_DAYS * 24 * 60 * 60 * 1000
     );
-    assert.equal(removed.length, 5);
+    assert.equal(removed.length, 6);
 
     const [filter, update] = anonymise.mock.calls[0].arguments;
     assert.equal(String(filter._id), String(user._id));
