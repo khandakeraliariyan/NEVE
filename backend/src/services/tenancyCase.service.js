@@ -54,6 +54,40 @@ export function validateCaseReviewEntry({ kind, body, isReviewer, caseStatus }) 
     return { value: { kind, body: body.trim() } };
 }
 
+// Statements: a party sees all of their own and the other party's shared
+// ones; a shared legal reviewer sees shared ones only.
+export function visibleStatements(statements = [], userId, isReviewer) {
+    return statements.filter(
+        (s) => s.visibility === "shared" || (!isReviewer && String(s.author?._id ?? s.author) === String(userId))
+    );
+}
+
+export function validateStatementInput(body, { partial = false } = {}) {
+    const value = {};
+    if (!partial || body?.body !== undefined) {
+        if (typeof body?.body !== "string" || !body.body.trim() || body.body.trim().length > 8000) {
+            return { error: "body must be text of 1 to 8000 characters." };
+        }
+        value.body = body.body.trim();
+    }
+    if (body?.title !== undefined) {
+        if (typeof body.title !== "string" || body.title.length > 150) return { error: "title must be at most 150 characters." };
+        value.title = body.title.trim();
+    }
+    if (body?.share !== undefined && body.share !== true && body.share !== false) return { error: "share must be true or false." };
+    if (partial && body?.share === false) return { error: "Shared statements stay shared." };
+    if (partial && !Object.keys(value).length && body?.share !== true) return { error: "Nothing to update." };
+    return { value, share: body?.share === true };
+}
+
+export function validateIssueInput(body) {
+    if (typeof body?.title !== "string" || !body.title.trim() || body.title.trim().length > 150) return { error: "title is required (up to 150 characters)." };
+    if (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 2000)) return { error: "description must be at most 2000 characters." };
+    const amount = body.amountBdt ?? null;
+    if (amount !== null && !(typeof amount === "number" && Number.isFinite(amount) && amount >= 0)) return { error: "amountBdt must be a positive number." };
+    return { value: { title: body.title.trim(), description: (body.description ?? "").trim(), amountBdt: amount } };
+}
+
 export async function isEvidenceForAgreement(fileId, agreementId) {
     const agreement = await TenancyAgreement.exists({
         _id: agreementId,

@@ -85,6 +85,10 @@ import {
     shareTenancyCase,
     updateTenancyCaseStatus,
     addCaseReviewEntry,
+    addCaseIssue,
+    addCaseStatement,
+    removeCaseIssue,
+    updateCaseStatement,
 } from "../controllers/tenancyCase.controller.js";
 
 const router = express.Router();
@@ -149,6 +153,10 @@ router.delete(
 );
 // Reviewers and parties both post; the controller limits which kinds each may use.
 router.post("/cases/:caseId/review-entries", addCaseReviewEntry);
+router.post("/cases/:caseId/statements", allowRoles("renter", "landlord"), addCaseStatement);
+router.patch("/cases/:caseId/statements/:statementId", allowRoles("renter", "landlord"), updateCaseStatement);
+router.post("/cases/:caseId/issues", allowRoles("renter", "landlord"), addCaseIssue);
+router.delete("/cases/:caseId/issues/:issueId", allowRoles("renter", "landlord"), removeCaseIssue);
 router.patch(
     "/cases/:caseId/status",
     allowRoles("renter", "landlord"),
