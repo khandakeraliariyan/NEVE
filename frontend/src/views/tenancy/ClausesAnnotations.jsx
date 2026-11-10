@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import { api } from "../../lib/api";
 import { useApi } from "../../hooks/useApi";
 import { ClauseLegalSources, ClauseReview, ExtractionPanel, LegalSuggestionsBar } from "./ClauseAiPanels";
+import ClauseRewrites from "./ClauseRewrites";
+import { useAuth } from "../../context/AuthContext";
 import { dateTime, idOf, label } from "../../lib/format";
 import { useAgreement } from "./useAgreement";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, PageHeader } from "../../components/ui";
@@ -17,6 +19,7 @@ const BLANK = { heading: "", category: "other", text: "", plainLanguageNote: "",
 export default function ClausesAnnotations() {
     const { agreementId } = useParams();
     const { agreement, loading, error, reload, isParticipant } = useAgreement(agreementId);
+    const { profile } = useAuth();
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState("");
     const [adding, setAdding] = useState(false);
@@ -187,6 +190,15 @@ export default function ClausesAnnotations() {
                                 agreementId={agreementId}
                                 suggestions={suggestions}
                                 isParticipant={isParticipant}
+                                onChanged={refresh}
+                            />
+                            <ClauseRewrites
+                                clause={clause}
+                                agreement={agreement}
+                                agreementId={agreementId}
+                                me={profile?._id}
+                                isParticipant={isParticipant}
+                                isReviewer={profile?.role === "legal_reviewer"}
                                 onChanged={refresh}
                             />
                             <p className="text-xs text-muted">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { CircleMarker, MapContainer, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { DHAKA } from "../lib/geo";
 
@@ -26,8 +26,9 @@ function MoveListener({ onMove }) {
 
 /**
  * markers: [{ id, position: [lat, lng], label, tone: "primary" | "secondary", popup }]
+ * lines: [{ id, positions: [[lat, lng], ...] }], e.g. a walking route
  */
-export default function MapView({ markers = [], center, zoom = 13, className = "h-96", onMove, fit = true }) {
+export default function MapView({ markers = [], lines = [], center, zoom = 13, className = "h-96", onMove, fit = true }) {
     const points = markers.map((m) => m.position);
     return (
         <div className={`overflow-hidden rounded-2xl border border-line ${className}`}>
@@ -38,6 +39,9 @@ export default function MapView({ markers = [], center, zoom = 13, className = "
                 />
                 {fit && <FitBounds points={points} />}
                 {onMove && <MoveListener onMove={onMove} />}
+                {lines.map((line) => (
+                    <Polyline key={line.id} positions={line.positions} pathOptions={{ color: "#222222", weight: 4, opacity: 0.75 }} />
+                ))}
                 {markers.map((marker) => (
                     <CircleMarker
                         key={marker.id}

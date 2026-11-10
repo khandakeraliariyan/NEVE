@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
 const config = {
@@ -11,4 +11,7 @@ const config = {
 // Public pages still work when Firebase isn't configured; sign-in shows a notice.
 export const firebaseConfigured = Boolean(config.apiKey && config.projectId);
 
-export const auth = firebaseConfigured ? getAuth(initializeApp(config)) : null;
+// Reuse the app if this module runs again (hot reload, or another bundle
+// that already started Firebase), instead of starting a second one.
+export const firebaseApp = firebaseConfigured ? (getApps().length ? getApp() : initializeApp(config)) : null;
+export const auth = firebaseApp ? getAuth(firebaseApp) : null;
