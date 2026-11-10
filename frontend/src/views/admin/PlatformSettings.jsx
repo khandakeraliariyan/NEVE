@@ -16,8 +16,21 @@ function initialForm(data) {
         inquiryReminderHours: data.inquiryReminderHours,
         invitationExpiryDays: data.invitationExpiryDays,
         landlordSignupsOpen: data.landlordSignupsOpen,
+        aiEnabled: data.integrations?.aiEnabled !== false,
+        emailEnabled: data.integrations?.emailEnabled !== false,
+        copilotRoles: data.rolePermissions?.copilotRoles ?? ["renter", "landlord", "legal_reviewer"],
+        reviewersCanDraftSources: data.rolePermissions?.reviewersCanDraftSources !== false,
+        reviewersCanSeeAiEvaluations: data.rolePermissions?.reviewersCanSeeAiEvaluations !== false,
+        landlordsCanInviteRenters: data.rolePermissions?.landlordsCanInviteRenters !== false,
+        privacyPolicy: data.privacyPolicy?.text ?? "",
     };
 }
+
+const COPILOT_ROLES = [
+    ["renter", "Renters"],
+    ["landlord", "Landlords"],
+    ["legal_reviewer", "Legal reviewers"],
+];
 
 function SettingsForm() {
     const settings = useApi(() => api.get("/admin/settings"), []);
@@ -51,6 +64,14 @@ function SettingsFields({ data, onSaved }) {
                 inquiryReminderHours: Number(form.inquiryReminderHours),
                 invitationExpiryDays: Number(form.invitationExpiryDays),
                 landlordSignupsOpen: form.landlordSignupsOpen,
+                integrations: { aiEnabled: form.aiEnabled, emailEnabled: form.emailEnabled },
+                rolePermissions: {
+                    copilotRoles: form.copilotRoles,
+                    reviewersCanDraftSources: form.reviewersCanDraftSources,
+                    reviewersCanSeeAiEvaluations: form.reviewersCanSeeAiEvaluations,
+                    landlordsCanInviteRenters: form.landlordsCanInviteRenters,
+                },
+                privacyPolicy: { text: form.privacyPolicy.trim() },
             });
             setSaved(true);
             onSaved();
@@ -103,6 +124,64 @@ function SettingsFields({ data, onSaved }) {
                     <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.landlordSignupsOpen} onChange={set("landlordSignupsOpen")} />
                     New people can sign up as property owners
                 </label>
+            </Card>
+
+            <Card className="space-y-3">
+                <h2 className="text-xl">Service integrations</h2>
+                <p className="text-sm text-muted">Switch external services off, for example during an outage or a cost review. Status of each service is on the Platform health page.</p>
+                <label className="flex items-center gap-3 text-sm">
+                    <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.aiEnabled} onChange={set("aiEnabled")} />
+                    AI features (agreement reading, Legal Copilot, risk review, suggestions)
+                </label>
+                <label className="flex items-center gap-3 text-sm">
+                    <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.emailEnabled} onChange={set("emailEnabled")} />
+                    Email notifications (in-app notifications always continue)
+                </label>
+            </Card>
+
+            <Card className="space-y-3">
+                <h2 className="text-xl">Role permissions</h2>
+                <p className="text-sm text-muted">Optional capabilities per role. Core rules, such as who can see private tenancy records, stay fixed.</p>
+                <div className="text-sm">
+                    <p className="mb-1 font-medium">Legal Copilot is available to</p>
+                    <div className="flex flex-wrap gap-4">
+                        {COPILOT_ROLES.map(([role, text]) => (
+                            <label key={role} className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4 accent-forest"
+                                    checked={form.copilotRoles.includes(role)}
+                                    onChange={(e) => {
+                                        setSaved(false);
+                                        setForm({ ...form, copilotRoles: e.target.checked ? [...form.copilotRoles, role] : form.copilotRoles.filter((r) => r !== role) });
+                                    }}
+                                />
+                                {text}
+                            </label>
+                        ))}
+                    </div>
+                </div>
+                <label className="flex items-center gap-3 text-sm">
+                    <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.reviewersCanDraftSources} onChange={set("reviewersCanDraftSources")} />
+                    Legal reviewers can draft and upload legal sources
+                </label>
+                <label className="flex items-center gap-3 text-sm">
+                    <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.reviewersCanSeeAiEvaluations} onChange={set("reviewersCanSeeAiEvaluations")} />
+                    Legal reviewers can see AI evaluation results
+                </label>
+                <label className="flex items-center gap-3 text-sm">
+                    <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.landlordsCanInviteRenters} onChange={set("landlordsCanInviteRenters")} />
+                    Landlords can invite renters to tenancy records
+                </label>
+            </Card>
+
+            <Card className="space-y-3">
+                <h2 className="text-xl">Privacy policy</h2>
+                <p className="text-sm text-muted">
+                    Shown at /privacy. Saving a change publishes a new version (currently version {data.privacyPolicy?.version ?? 1}
+                    {data.privacyPolicy?.updatedAt ? `, ${dateTime(data.privacyPolicy.updatedAt)}` : ""}).
+                </p>
+                <textarea className="field min-h-48" minLength={50} maxLength={20000} value={form.privacyPolicy} onChange={set("privacyPolicy")} />
             </Card>
 
             <ErrorBox error={error} />

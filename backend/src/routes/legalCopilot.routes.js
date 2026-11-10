@@ -13,11 +13,17 @@ import {
 } from "../controllers/legalCopilot.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { copilotLimiter } from "../middleware/rateLimit.middleware.js";
-import { allowRoles } from "../middleware/role.middleware.js";
+import { allowRoles, requirePermission } from "../middleware/role.middleware.js";
 
 const router = express.Router();
 
 router.use(authenticateUser, allowRoles("renter", "landlord", "legal_reviewer"));
+router.use(
+    requirePermission(
+        (settings, user) => (settings.rolePermissions.copilotRoles ?? []).includes(user.role),
+        "Legal Copilot isn't available for your role."
+    )
+);
 
 router.get("/sources/:legalSourceId/sections/:sectionId", getCitedSection);
 router.get("/conversations", listConversations);

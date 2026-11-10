@@ -67,7 +67,7 @@ import {
 } from "../controllers/tenancyInvitation.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { extractionLimiter } from "../middleware/rateLimit.middleware.js";
-import { allowRoles } from "../middleware/role.middleware.js";
+import { allowRoles, requirePermission } from "../middleware/role.middleware.js";
 import {
     addConditionEntry,
     correctConditionEntry,
@@ -125,7 +125,12 @@ router.post(
 );
 
 // Landlord invites a renter by email; the renter accepts to start the record.
-router.post("/invitations", allowRoles("landlord"), createInvitation);
+router.post(
+    "/invitations",
+    allowRoles("landlord"),
+    requirePermission((settings) => settings.rolePermissions.landlordsCanInviteRenters !== false, "Tenancy invitations are turned off."),
+    createInvitation
+);
 router.get("/invitations", allowRoles("renter", "landlord"), listInvitations);
 router.get("/invitations/:invitationId", allowRoles("renter", "landlord"), getInvitation);
 router.post("/invitations/:invitationId/accept", allowRoles("renter", "landlord"), acceptInvitation);

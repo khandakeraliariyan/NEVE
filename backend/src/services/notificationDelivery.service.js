@@ -6,7 +6,7 @@ import User from "../models/User.js";
 import { unsubscribeUrl } from "./notificationLinks.service.js";
 import { renderDigestEmail, renderNotificationEmail } from "./notificationTemplates.js";
 import { DIGEST_TYPES, isSecurityType } from "./notificationTypes.js";
-import { emailAllowedByTemplate, getSettings, getTemplateOverrides } from "./platformSettings.service.js";
+import { emailAllowedByTemplate, getSettings, getTemplateOverrides, settingsSnapshot } from "./platformSettings.service.js";
 
 // Sends in-app notifications out by email. Each send is a
 // stored job: it is retried with backoff, never sent twice (idempotency key
@@ -32,7 +32,7 @@ export class DeliveryError extends Error {
 }
 
 export function isEmailConfigured() {
-    return Boolean(env.EMAIL_PROVIDER && env.EMAIL_API_KEY && env.EMAIL_FROM);
+    return Boolean(env.EMAIL_PROVIDER && env.EMAIL_API_KEY && env.EMAIL_FROM) && settingsSnapshot().integrations?.emailEnabled !== false;
 }
 
 export function isDeliveryConfigured() {

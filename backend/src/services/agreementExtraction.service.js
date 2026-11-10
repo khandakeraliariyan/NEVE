@@ -3,6 +3,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { textDocumentBlock } from "./aiDocument.service.js";
+import { settingsSnapshot } from "./platformSettings.service.js";
 
 export const CLAUSE_CATEGORIES = [
     "rent",
@@ -99,8 +100,9 @@ export class ExtractionError extends Error {
     }
 }
 
+// AI features need an API key, and an admin can switch them off.
 export function isExtractionConfigured() {
-    return Boolean(env.ANTHROPIC_API_KEY);
+    return Boolean(env.ANTHROPIC_API_KEY) && settingsSnapshot().integrations?.aiEnabled !== false;
 }
 
 let defaultClient = null;

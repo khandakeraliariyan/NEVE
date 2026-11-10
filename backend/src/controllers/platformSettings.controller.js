@@ -30,8 +30,22 @@ export async function getPublicPlatformInfo(req, res, next) {
                 announcement: settings.announcement.enabled && settings.announcement.text ? settings.announcement : null,
                 supportEmail: settings.supportEmail || null,
                 landlordSignupsOpen: settings.landlordSignupsOpen,
+                aiEnabled: settings.integrations.aiEnabled,
+                copilotRoles: settings.rolePermissions.copilotRoles,
+                privacyPolicy: { version: settings.privacyPolicy.version, updatedAt: settings.privacyPolicy.updatedAt },
             },
         });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/platform/privacy-policy
+export async function getPrivacyPolicy(req, res, next) {
+    try {
+        const { privacyPolicy } = await getSettings();
+        res.set("Cache-Control", "public, max-age=60");
+        return res.json({ success: true, data: privacyPolicy });
     } catch (error) {
         next(error);
     }
@@ -60,14 +74,22 @@ export async function updatePlatformSettings(req, res, next) {
         }
         const set = { updatedBy: req.neveUser._id };
         for (const [key, entry] of Object.entries(value)) {
-            if (key === "announcement") {
-                for (const [field, fieldValue] of Object.entries(entry)) set[`announcement.${field}`] = fieldValue;
+            if (key === "privacyPolicy") {
+                const current = await getSettings();
+                if (entry.text !== current.privacyPolicy.text) {
+                    set["privacyPolicy.text"] = entry.text;
+                    set["privacyPolicy.version"] = (current.privacyPolicy.version ?? 1) + 1;
+                    set["privacyPolicy.updatedAt"] = new Date();
+                }
+            } else if (["announcement", "integrations", "rolePermissions"].includes(key)) {
+                for (const [field, fieldValue] of Object.entries(entry)) set[`${key}.${field}`] = fieldValue;
             } else {
                 set[key] = entry;
             }
         }
         await PlatformSetting.updateOne({ _id: "platform" }, { $set: set }, { upsert: true, runValidators: true });
         clearSettingsCache();
+        await getSettings();
         await recordAdminAction({
             req,
             action: "platform_settings_updated",

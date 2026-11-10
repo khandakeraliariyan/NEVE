@@ -119,6 +119,7 @@ export default function PublicLayout({ children }) {
                             <ul className="space-y-2 text-white/75">
                                 <li><Link href="/sign-in" className="link-sweep hover:text-white">Sign in</Link></li>
                                 <li><Link href="/sign-up" className="link-sweep hover:text-white">Create an account</Link></li>
+                                <li><Link href="/privacy" className="link-sweep hover:text-white">Privacy policy</Link></li>
                             </ul>
                         </div>
                         <div className="text-xs leading-relaxed text-white/50">

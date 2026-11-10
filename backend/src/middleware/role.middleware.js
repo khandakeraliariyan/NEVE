@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import { getSettings } from "../services/platformSettings.service.js";
 import { ADMIN_SIGN_IN_PROVIDER } from "../services/adminAuth.service.js";
 import { trackSignIn } from "../services/securityAlerts.service.js";
 import { SESSION_REVOKED, isSessionRevoked, touchSession } from "../services/sessions.service.js";
@@ -7,6 +8,20 @@ import { SESSION_REVOKED, isSessionRevoked, touchSession } from "../services/ses
 // sign-in (a Neve-signed JWT), never Firebase, even when the email matches.
 export function isAdminSessionAllowed(role, signInProvider) {
     return role !== "admin" || signInProvider === ADMIN_SIGN_IN_PROVIDER;
+}
+
+// Refuses a request when an admin has switched a capability off.
+// check(settings, user) returns true when the request may continue.
+export function requirePermission(check, message) {
+    return async (req, res, next) => {
+        try {
+            const settings = await getSettings();
+            if (check(settings, req.neveUser)) return next();
+            return res.status(403).json({ success: false, message, code: "PERMISSION_DISABLED" });
+        } catch (error) {
+            next(error);
+        }
+    };
 }
 
 export function allowRoles(...allowedRoles) {

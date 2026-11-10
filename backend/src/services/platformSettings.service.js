@@ -16,7 +16,17 @@ export const DEFAULT_SETTINGS = Object.freeze({
     inquiryReminderHours: 24,
     invitationExpiryDays: 14,
     landlordSignupsOpen: true,
+    integrations: { aiEnabled: true, emailEnabled: true },
+    rolePermissions: {
+        copilotRoles: ["renter", "landlord", "legal_reviewer"],
+        reviewersCanDraftSources: true,
+        reviewersCanSeeAiEvaluations: true,
+        landlordsCanInviteRenters: true,
+    },
+    privacyPolicy: { version: 1, text: 'Neve keeps your rental records private by default. Tenancy documents, statements and identity details are visible only to you, the other party where you share them, and legal reviewers you choose. Personal identifiers are removed before any document or question is sent to an AI model. You can export your data or ask for your account to be deleted at any time from Settings.', updatedAt: null },
 });
+
+export const COPILOT_ROLE_CHOICES = ["renter", "landlord", "legal_reviewer"];
 
 let settingsCache = null;
 let templatesCache = null;
@@ -31,7 +41,28 @@ function withDefaults(doc) {
         ...DEFAULT_SETTINGS,
         ...(doc ?? {}),
         announcement: { ...DEFAULT_SETTINGS.announcement, ...(doc?.announcement ?? {}) },
+        integrations: { ...DEFAULT_SETTINGS.integrations, ...(doc?.integrations ?? {}) },
+        rolePermissions: { ...DEFAULT_SETTINGS.rolePermissions, ...(doc?.rolePermissions ?? {}) },
+        privacyPolicy: {
+            ...DEFAULT_SETTINGS.privacyPolicy,
+            ...(doc?.privacyPolicy ?? {}),
+            text: doc?.privacyPolicy?.text || DEFAULT_SETTINGS.privacyPolicy.text,
+        },
     };
+}
+
+// The last settings read, for checks that can't wait for the database.
+// Defaults apply until the first read; the server keeps this fresh.
+export function settingsSnapshot() {
+    return settingsCache?.value ?? withDefaults(null);
+}
+
+let refreshTimer = null;
+export function keepSettingsFresh(intervalMs = CACHE_MS) {
+    getSettings().catch(() => null);
+    if (refreshTimer) return;
+    refreshTimer = setInterval(() => getSettings().catch(() => null), intervalMs);
+    refreshTimer.unref?.();
 }
 
 // Never throws: if the database can't be read, the defaults apply.
@@ -83,6 +114,18 @@ export const SettingsSchema = z
         inquiryReminderHours: z.number().int().min(6).max(168).optional(),
         invitationExpiryDays: z.number().int().min(1).max(60).optional(),
         landlordSignupsOpen: z.boolean().optional(),
+        integrations: z.object({ aiEnabled: z.boolean(), emailEnabled: z.boolean() }).partial().strict().optional(),
+        rolePermissions: z
+            .object({
+                copilotRoles: z.array(z.enum(COPILOT_ROLE_CHOICES)).max(3),
+                reviewersCanDraftSources: z.boolean(),
+                reviewersCanSeeAiEvaluations: z.boolean(),
+                landlordsCanInviteRenters: z.boolean(),
+            })
+            .partial()
+            .strict()
+            .optional(),
+        privacyPolicy: z.object({ text: z.string().trim().min(50).max(20000) }).strict().optional(),
     })
     .strict();
 
