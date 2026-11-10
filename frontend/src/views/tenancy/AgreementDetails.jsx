@@ -416,6 +416,7 @@ export default function AgreementDetails() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button as={Link} href={`/agreements/${agreement._id}/clauses`} variant="outline">Clauses</Button>
+                    <Button as={Link} href={`/agreements/${agreement._id}/documents`} variant="outline">Documents</Button>
                     <Button as={Link} href={`/agreements/${agreement._id}/evidence`} variant="outline">Evidence graph</Button>
                     <Button as={Link} href={`/agreements/${agreement._id}/condition`} variant="outline">Condition reports</Button>
                     <Button as={Link} href={`/agreements/${agreement._id}/maintenance`} variant="outline">Maintenance</Button>

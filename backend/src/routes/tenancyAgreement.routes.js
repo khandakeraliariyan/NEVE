@@ -38,6 +38,14 @@ import {
     runLegalSuggestions,
 } from "../controllers/legalSuggestion.controller.js";
 import {
+    addDocumentVersion,
+    createDocument,
+    getDocumentVersionUrl,
+    listDocuments,
+    respondToDocument,
+    updateDocument,
+} from "../controllers/tenancyDocument.controller.js";
+import {
     acceptProposedObligation,
     dismissProposedObligation,
     getAgreementCompliance,
@@ -256,6 +264,14 @@ router.patch(
     allowRoles("legal_reviewer"),
     assessClauseRewrite
 );
+// Evidence vault: categorised documents with versions, amendments and notices.
+router.get("/agreements/:agreementId/documents", listDocuments);
+router.post("/agreements/:agreementId/documents", allowRoles("renter", "landlord"), createDocument);
+router.patch("/agreements/:agreementId/documents/:documentId", allowRoles("renter", "landlord"), updateDocument);
+router.post("/agreements/:agreementId/documents/:documentId/versions", allowRoles("renter", "landlord"), addDocumentVersion);
+router.post("/agreements/:agreementId/documents/:documentId/respond", allowRoles("renter", "landlord"), respondToDocument);
+router.get("/agreements/:agreementId/documents/:documentId/versions/:version/access-url", getDocumentVersionUrl);
+
 router.post(
     "/agreements/:agreementId/record-links",
     allowRoles("renter", "landlord"),

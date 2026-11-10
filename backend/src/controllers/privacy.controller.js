@@ -10,6 +10,7 @@ import Notification from "../models/Notification.js";
 import PropertyReport from "../models/PropertyReport.js";
 import PropertyViewEvent from "../models/PropertyViewEvent.js";
 import RenterPreference from "../models/RenterPreference.js";
+import TenancyDocument from "../models/TenancyDocument.js";
 import Review from "../models/Review.js";
 import ReviewReport from "../models/ReviewReport.js";
 import SavedProperty from "../models/SavedProperty.js";
@@ -80,6 +81,7 @@ export async function exportMyData(req, res, next) {
             propertyViews,
             reviews,
             reviewReports,
+            vaultDocuments,
         ] = await Promise.all([
             User.findById(actorId)
                 .select(
@@ -126,6 +128,7 @@ export async function exportMyData(req, res, next) {
             PropertyViewEvent.find({ viewer: actorId }).lean(),
             Review.find({ renter: actorId }).lean(),
             ReviewReport.find({ reporter: actorId }).lean(),
+            TenancyDocument.find({ owner: actorId }).lean(),
         ]);
         const inquiryIds = inquiries.map((inquiry) => inquiry._id);
         const agreementIds = agreements.map((agreement) => agreement._id);
@@ -206,6 +209,7 @@ export async function exportMyData(req, res, next) {
             propertyViews,
             reviews,
             reviewReports,
+            vaultDocuments,
             messages,
             viewings,
             agreements,

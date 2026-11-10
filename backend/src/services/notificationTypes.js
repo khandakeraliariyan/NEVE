@@ -31,6 +31,7 @@ export const NOTIFICATION_TYPES = [
     "obligation_due",
     "obligation_overdue",
     "tenancy_case_shared",
+    "tenancy_document_added",
     "tenancy_case_review_activity",
     "tenancy_invitation_received",
     "tenancy_invitation_accepted",
@@ -64,6 +65,7 @@ export const DIGEST_TYPES = new Set([
     "lease_ending",
     "obligation_due",
     "tenancy_case_shared",
+    "tenancy_document_added",
     "tenancy_case_review_activity",
     "legal_source_submitted",
 ]);
@@ -91,6 +93,8 @@ export function defaultNotificationLink(notification) {
         case "maintenance_request_submitted":
         case "maintenance_request_updated":
             return agreement ? `/agreements/${agreement}/maintenance` : "/agreements";
+        case "tenancy_document_added":
+            return agreement ? `/agreements/${agreement}/documents` : "/agreements";
         case "condition_entry_reviewed":
             return agreement ? `/agreements/${agreement}/condition` : "/agreements";
         case "evidence_link_proposed":
