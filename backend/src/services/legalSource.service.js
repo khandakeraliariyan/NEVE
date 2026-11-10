@@ -134,23 +134,61 @@ export function validateFlagInput(body, reasons) {
     return { value: { reason: body.reason, note: body.note.trim(), sectionId: body.sectionId ?? null } };
 }
 
+// A light English stemmer, so "increased", "increases" and "increase" match.
+// Bangla and other words are left as they are.
+export function stem(word) {
+    if (!/^[a-z]+$/.test(word) || word.length <= 4) return word;
+    for (const suffix of ["ments", "ment", "ings", "ing", "ies", "ied", "ed", "es", "s"]) {
+        if (word.endsWith(suffix) && word.length - suffix.length >= 3) {
+            const root = word.slice(0, -suffix.length);
+            return suffix === "ies" || suffix === "ied" ? `${root}y` : root;
+        }
+    }
+    return word;
+}
+
 export function tokenize(value) {
     return String(value ?? "")
         .toLowerCase()
         .split(/[^\p{L}\p{N}]+/u)
-        .filter((word) => word.length > 2 && !STOP_WORDS.has(word));
+        .filter((word) => word.length > 2 && !STOP_WORDS.has(word))
+        .map(stem);
+}
+
+// Everyday words that point at a clause topic, for questions that don't
+// say which topic they are about.
+const TOPIC_WORDS = {
+    rent: ["rent", "pay", "payment", "receipt", "increas", "raise", "late", "fine", "ভাড়া"],
+    deposit: ["deposit", "advance", "refund", "return", "back", "deduct", "অগ্রিম", "জামানত"],
+    term: ["term", "renew", "renewal", "expir", "lease", "length", "period"],
+    notice: ["notice", "leav", "vacat", "evict", "terminat", "move", "quit", "notify", "নোটিশ"],
+    maintenance: ["repair", "fix", "leak", "broken", "damag", "mainten", "plumb", "clean", "মেরামত"],
+    utilities: ["bill", "electric", "electricity", "gas", "water", "utility", "utiliti", "service", "charge"],
+};
+
+export function inferTopics(query) {
+    const words = tokenize(query);
+    return Object.entries(TOPIC_WORDS)
+        .filter(([, cues]) => words.some((word) => cues.some((cue) => word.startsWith(cue))))
+        .map(([topic]) => topic);
 }
 
 // Ranks approved sections by topic match and shared words with the query.
+// Without a category, topics are inferred from the query's wording and a
+// matching section gets a smaller boost. Heading words count double.
 export function searchSections(sources, { query = "", category = null, limit = 10 } = {}) {
     const terms = new Set(tokenize(query));
+    const inferred = category ? [] : inferTopics(query);
     const results = [];
     for (const source of sources) {
         for (const section of source.sections ?? []) {
             const words = tokenize(`${section.heading} ${section.text}`);
+            const headingWords = new Set(tokenize(section.heading));
             const shared = new Set(words.filter((word) => terms.has(word)));
+            const headingHits = [...headingWords].filter((word) => terms.has(word)).length;
             const topicMatch = category && (section.topics ?? []).includes(category);
-            const score = shared.size + (topicMatch ? 3 : 0);
+            const inferredHits = inferred.filter((topic) => (section.topics ?? []).includes(topic)).length;
+            const score = shared.size + headingHits + (topicMatch ? 3 : 0) + Math.min(inferredHits, 1) * 2;
             if (score <= 0) continue;
             results.push({
                 score,
