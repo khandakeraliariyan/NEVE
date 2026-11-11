@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, openPrivateFile, uploadFile } from "../../lib/api";
 import { date, dateTime, label } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
+import { useAuth } from "../../context/AuthContext";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, PageHeader, Pagination, StatusBadge, Tabs } from "../../components/ui";
 
 const PAGE_SIZE = 20;
@@ -21,6 +22,8 @@ const MODES = {
         resolveFlag: (id, flagId) => `/admin/legal-sources/${id}/flags/${flagId}`,
         statuses: ["all", "draft", "in_review", "approved", "rejected", "retired", "flagged"],
         initial: "all",
+        outdated: "/admin/legal-sources/outdated-citations",
+        assignmentFilters: [["", "Any assignment"], ["none", "Unassigned"]],
     },
     reviewer: {
         base: "/legal-review/sources",
@@ -30,6 +33,8 @@ const MODES = {
         resolveFlag: (id, flagId) => `/legal-review/sources/${id}/flags/${flagId}`,
         statuses: ["in_review", "approved", "draft", "flagged", "rejected", "retired", "all"],
         initial: "in_review",
+        outdated: "/legal-review/citations/outdated",
+        assignmentFilters: [["", "Any assignment"], ["me", "Assigned to me"], ["none", "Unassigned"]],
     },
 };
 const FLAG_REASONS = ["questionable_authenticity", "outdated", "incorrect_reference", "wrong_jurisdiction", "misleading_text", "other"];
@@ -43,6 +48,8 @@ const DONE_TEXT = {
 };
 
 const EMPTY_SECTION ={ sectionNumber: "", heading: "", text: "", topics: [] };
+const APPLICABILITY_SCOPES = ["residential", "commercial", "shared_accommodation", "mixed_use", "all_tenancies"];
+const splitList = (value) => [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
 
 function blankForm(from) {
     return {
@@ -55,6 +62,10 @@ function blankForm(from) {
         language: from?.language ?? "en",
         effectiveFrom: from?.effectiveFrom ? String(from.effectiveFrom).slice(0, 10) : "",
         changeSummary: "",
+        applicabilitySummary: from?.applicability?.summary ?? "",
+        appliesTo: from?.applicability?.appliesTo ?? [],
+        regions: (from?.applicability?.regions ?? []).join(", "),
+        exclusions: from?.applicability?.exclusions ?? "",
         sections: from?.sections?.length
             ? from.sections.map((s) => ({ sectionNumber: s.sectionNumber, heading: s.heading ?? "", text: s.text ?? "", topics: s.topics ?? [] }))
             : [{ ...EMPTY_SECTION }],
@@ -89,6 +100,12 @@ function SourceForm({ initial, editing, mode, onCancel, onSaved }) {
             language: form.language.trim(),
             effectiveFrom: form.effectiveFrom || null,
             changeSummary: form.changeSummary.trim(),
+            applicability: {
+                summary: form.applicabilitySummary.trim(),
+                appliesTo: form.appliesTo,
+                regions: splitList(form.regions),
+                exclusions: form.exclusions.trim(),
+            },
             sections: form.sections.map((s) => ({ ...s, sectionNumber: s.sectionNumber.trim(), heading: s.heading.trim(), text: s.text.trim() })),
         };
         try {
@@ -141,6 +158,36 @@ function SourceForm({ initial, editing, mode, onCancel, onSaved }) {
                     <Field label="What changed in this version" className="md:col-span-2">
                         <textarea className="field min-h-16" maxLength={2000} value={form.changeSummary} onChange={(e) => set("changeSummary", e.target.value)} />
                     </Field>
+                </div>
+
+                <div className="rounded-xl border border-line p-4">
+                    <p className="eyebrow mb-1">Applicability</p>
+                    <p className="mb-3 text-xs text-muted">Who and what this source covers, so explanations aren't applied outside its scope.</p>
+                    <div className="mb-3 flex flex-wrap gap-3 text-sm">
+                        <span className="text-muted">Applies to:</span>
+                        {APPLICABILITY_SCOPES.map((scope) => (
+                            <label key={scope} className="flex items-center gap-1">
+                                <input
+                                    type="checkbox"
+                                    className="accent-forest"
+                                    checked={form.appliesTo.includes(scope)}
+                                    onChange={() => set("appliesTo", form.appliesTo.includes(scope) ? form.appliesTo.filter((x) => x !== scope) : [...form.appliesTo, scope])}
+                                />
+                                {label(scope)}
+                            </label>
+                        ))}
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Field label="Summary" className="md:col-span-2">
+                            <textarea className="field min-h-16" maxLength={2000} value={form.applicabilitySummary} onChange={(e) => set("applicabilitySummary", e.target.value)} />
+                        </Field>
+                        <Field label="Regions" hint="Comma-separated, e.g. Dhaka City Corporation. Leave empty for the whole jurisdiction.">
+                            <input className="field" value={form.regions} onChange={(e) => set("regions", e.target.value)} />
+                        </Field>
+                        <Field label="Exclusions" hint="What the source does not cover.">
+                            <input className="field" maxLength={2000} value={form.exclusions} onChange={(e) => set("exclusions", e.target.value)} />
+                        </Field>
+                    </div>
                 </div>
 
                 <div>
@@ -269,8 +316,67 @@ function Flags({ source, mode, onChanged }) {
     );
 }
 
-function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
+// Admins pick a verified, active reviewer; the list comes from reviewer activity.
+function AssignmentControl({ source, reviewers, onChanged }) {
+    const [reviewerId, setReviewerId] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const eligible = reviewers.filter((r) => r.reviewer.isActive && r.reviewer.credentialStatus === "verified" && String(r.reviewer._id) !== String(source.assignedReviewer?.user));
+
+    async function assign(value) {
+        setBusy(true);
+        setError(null);
+        try {
+            await api.patch(`/admin/legal-sources/${source._id}/assignment`, { reviewerId: value });
+            setReviewerId("");
+            onChanged(value ? "Source assigned. The reviewer has been notified." : "Assignment cleared.");
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    if (["rejected", "retired"].includes(source.status)) return null;
+    return (
+        <div className="space-y-2 rounded-xl border border-line p-3">
+            <p className="eyebrow">Assign a reviewer</p>
+            <div className="flex flex-wrap gap-2">
+                <select className="field max-w-xs" value={reviewerId} onChange={(e) => setReviewerId(e.target.value)} aria-label="Reviewer">
+                    <option value="">Choose a verified reviewer…</option>
+                    {eligible.map((r) => (
+                        <option key={r.reviewer._id} value={r.reviewer._id}>
+                            {r.reviewer.displayName || "Reviewer"} · {r.openAssignments.in_review + r.openAssignments.draft} open
+                        </option>
+                    ))}
+                </select>
+                <Button variant="secondary" disabled={busy || !reviewerId} onClick={() => assign(reviewerId)}>Assign</Button>
+                {source.assignedReviewer && <Button variant="ghost" disabled={busy} onClick={() => assign(null)}>Unassign</Button>}
+            </div>
+            {!eligible.length && <p className="text-xs text-muted">No other active reviewer has verified credentials.</p>}
+            <ErrorBox error={error} />
+        </div>
+    );
+}
+
+function Applicability({ applicability }) {
+    if (!applicability || (!applicability.summary && !applicability.appliesTo?.length && !applicability.regions?.length && !applicability.exclusions)) return null;
+    return (
+        <div className="rounded-xl bg-mist px-3 py-2">
+            <p className="eyebrow mb-1">Applicability</p>
+            {applicability.appliesTo?.length > 0 && (
+                <div className="mb-1 flex flex-wrap gap-1">{applicability.appliesTo.map((scope) => <Badge key={scope} tone="gray">{label(scope)}</Badge>)}</div>
+            )}
+            {applicability.summary && <p>{applicability.summary}</p>}
+            {applicability.regions?.length > 0 && <p className="text-xs text-muted">Regions: {applicability.regions.join(", ")}</p>}
+            {applicability.exclusions && <p className="text-xs text-muted">Not covered: {applicability.exclusions}</p>}
+        </div>
+    );
+}
+
+function SourceDetail({ id, mode, reviewers, onClose, onChanged, onEdit, onNewVersion }) {
     const cfg = MODES[mode];
+    const { profile } = useAuth();
     const detail = useApi(() => api.get(`${cfg.base}/${id}`), [id]);
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
@@ -311,7 +417,9 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
             );
         }
     }
-    if (s && mode === "reviewer" && s.status === "in_review") {
+    const assignee = s?.assignedReviewer?.user ? String(s.assignedReviewer.user) : null;
+    const assignedElsewhere = mode === "reviewer" && assignee && assignee !== String(profile?._id);
+    if (s && mode === "reviewer" && s.status === "in_review" && !assignedElsewhere) {
         actions.push(<Button key="approve" disabled={busy} onClick={() => transition("approve")}>Approve</Button>);
         actions.push(<Button key="changes" variant="outline" disabled={busy} onClick={() => transition("request_changes")}>Request changes</Button>);
         actions.push(<Button key="reject" variant="danger" disabled={busy} onClick={() => transition("reject", "Reject this source? It will be excluded from the knowledge base.")}>Reject</Button>);
@@ -350,6 +458,24 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
                     )}
                     {s.changeSummary && <p className="rounded-xl bg-mist px-3 py-2 text-muted">{s.changeSummary}</p>}
                     {s.reviewNote && <p className="rounded-xl border border-amber px-3 py-2"><span className="font-medium">Reviewer note:</span> {s.reviewNote}</p>}
+                    <Applicability applicability={s.applicability} />
+                    {assignee && (
+                        <p className="rounded-xl bg-sage/60 px-3 py-2">
+                            {mode === "reviewer"
+                                ? assignee === String(profile?._id)
+                                    ? "Assigned to you."
+                                    : "Assigned to another reviewer; only they can approve, reject or request changes."
+                                : `Assigned to ${reviewers.find((r) => String(r.reviewer._id) === assignee)?.reviewer.displayName || "a reviewer"}`}
+                            <span className="text-xs text-muted"> · since {dateTime(s.assignedReviewer.assignedAt)}</span>
+                        </p>
+                    )}
+                    {mode === "admin" && (
+                        <AssignmentControl
+                            source={s}
+                            reviewers={reviewers}
+                            onChanged={(text) => { detail.reload(); onChanged(text); }}
+                        />
+                    )}
 
                     <div>
                         <p className="eyebrow mb-2">Sections ({s.sections?.length ?? 0})</p>
@@ -401,8 +527,99 @@ function SourceDetail({ id, mode, onClose, onChanged, onEdit, onNewVersion }) {
     );
 }
 
+function OutdatedCitations({ mode }) {
+    const outdated = useApi(() => api.get(MODES[mode].outdated, { limit: 100 }), [mode]);
+    const rows = outdated.data?.data ?? [];
+    return (
+        <div>
+            <p className="mb-4 text-sm text-muted">
+                Retired source versions that Legal Copilot answers or agreements still cite. Check that the cited guidance still holds under the current version. Users see these citations marked as outdated.
+            </p>
+            <ErrorBox error={outdated.error} onRetry={outdated.reload} />
+            {outdated.loading && <Loading />}
+            {!outdated.loading && !outdated.error && rows.length === 0 && <Empty title="No outdated citations">Nothing cites a retired source version.</Empty>}
+            {rows.length > 0 && (
+                <Card className="overflow-x-auto p-0">
+                    <table className="w-full min-w-[560px] text-sm">
+                        <thead className="bg-mist text-left">
+                            <tr>
+                                {["Source version", "Now", "Copilot answers", "Agreements", "Retired"].map((h) => (
+                                    <th key={h} className="px-4 py-3 text-xs uppercase tracking-wide text-muted">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-line">
+                            {rows.map((row) => (
+                                <tr key={row._id}>
+                                    <td className="px-4 py-3">
+                                        <p className="font-medium">{row.title}</p>
+                                        <p className="text-xs text-muted">{row.sourceKey} · v{row.version}{row.citation ? ` · ${row.citation}` : ""}</p>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {row.currency?.status === "superseded" ? <Badge tone="amber">Replaced by v{row.currency.currentVersion}</Badge> : <Badge tone="rose">Withdrawn</Badge>}
+                                    </td>
+                                    <td className="px-4 py-3">{row.citingAnswers}</td>
+                                    <td className="px-4 py-3">{row.citingAgreements}</td>
+                                    <td className="px-4 py-3 text-xs text-muted">{date(row.retiredAt)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </Card>
+            )}
+        </div>
+    );
+}
+
+function ReviewerWorkload({ activity }) {
+    const rows = activity.data?.data?.reviewers ?? [];
+    return (
+        <div>
+            <p className="mb-4 text-sm text-muted">Open assignments and review decisions in the last {activity.data?.data?.days ?? 90} days. Assign sources from a source's detail panel.</p>
+            <ErrorBox error={activity.error} onRetry={activity.reload} />
+            {activity.loading && <Loading />}
+            {!activity.loading && !activity.error && rows.length === 0 && <Empty title="No legal reviewers yet">Create reviewer accounts in Users.</Empty>}
+            {rows.length > 0 && (
+                <Card className="overflow-x-auto p-0">
+                    <table className="w-full min-w-[640px] text-sm">
+                        <thead className="bg-mist text-left">
+                            <tr>
+                                {["Reviewer", "Credentials", "Open assignments", "Approved", "Changes requested", "Rejected", "Flags", "Last activity"].map((h) => (
+                                    <th key={h} className="px-4 py-3 text-xs uppercase tracking-wide text-muted">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-line">
+                            {rows.map((row) => (
+                                <tr key={row.reviewer._id}>
+                                    <td className="px-4 py-3">
+                                        <p className="font-medium">{row.reviewer.displayName || "Reviewer"}</p>
+                                        <p className="text-xs text-muted">{row.reviewer.jurisdictions.join(", ") || "No jurisdictions listed"}{row.reviewer.isActive ? "" : " · suspended"}</p>
+                                    </td>
+                                    <td className="px-4 py-3"><StatusBadge status={row.reviewer.credentialStatus === "verified" ? "approved" : row.reviewer.credentialStatus} /></td>
+                                    <td className="px-4 py-3">{row.openAssignments.in_review} in review · {row.openAssignments.draft} draft</td>
+                                    <td className="px-4 py-3">{row.decisions.approved}</td>
+                                    <td className="px-4 py-3">{row.decisions.changes_requested}</td>
+                                    <td className="px-4 py-3">{row.decisions.rejected}</td>
+                                    <td className="px-4 py-3">{row.decisions.flagged}</td>
+                                    <td className="px-4 py-3 text-xs text-muted">{row.lastActivityAt ? dateTime(row.lastActivityAt) : "—"}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </Card>
+            )}
+        </div>
+    );
+}
+
 export default function LegalSources({ mode = "admin" }) {
     const cfg = MODES[mode];
+    const { profile } = useAuth();
+    const [view, setView] = useState("sources");
+    const [assignedTo, setAssignedTo] = useState("");
+    const activity = useApi(() => api.get("/admin/legal-sources/reviewer-activity"), [], { enabled: mode === "admin" });
+    const reviewers = activity.data?.data?.reviewers ?? [];
     const [status, setStatus] = useState(cfg.initial);
     const [page, setPage] = useState(1);
     const [selected, setSelected] = useState(null);
@@ -413,11 +630,18 @@ export default function LegalSources({ mode = "admin" }) {
             api.get(cfg.base, {
                 status: status === "all" || status === "flagged" ? undefined : status,
                 flagged: status === "flagged" ? "true" : undefined,
+                assignedTo: assignedTo || undefined,
                 page,
                 limit: PAGE_SIZE,
             }),
-        [status, page]
+        [status, page, assignedTo]
     );
+    const assigneeName = (source) => {
+        const id = source.assignedReviewer?.user ? String(source.assignedReviewer.user) : null;
+        if (!id) return null;
+        if (mode === "reviewer") return id === String(profile?._id) ? "You" : "Another reviewer";
+        return reviewers.find((r) => String(r.reviewer._id) === id)?.reviewer.displayName || "Reviewer";
+    };
     const items = list.data?.data ?? [];
 
     return (
@@ -436,7 +660,23 @@ export default function LegalSources({ mode = "admin" }) {
             />
             {message && <p className="mb-4 rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{message}</p>}
 
-            {form ? (
+            {!form && (
+                <Tabs
+                    tabs={[
+                        { value: "sources", label: "Sources" },
+                        { value: "outdated", label: "Outdated citations" },
+                        ...(mode === "admin" ? [{ value: "workload", label: "Reviewer workload" }] : []),
+                    ]}
+                    active={view}
+                    onChange={setView}
+                />
+            )}
+
+            {!form && view === "outdated" ? (
+                <OutdatedCitations mode={mode} />
+            ) : !form && view === "workload" ? (
+                <ReviewerWorkload activity={activity} />
+            ) : form ? (
                 <SourceForm
                     key={form.editing ?? form.initial.sourceKey ?? "new"}
                     initial={form.initial}
@@ -457,6 +697,11 @@ export default function LegalSources({ mode = "admin" }) {
                         active={status}
                         onChange={(v) => { setStatus(v); setPage(1); setSelected(null); }}
                     />
+                    <div className="mb-4">
+                        <select className="field max-w-xs" value={assignedTo} onChange={(e) => { setAssignedTo(e.target.value); setPage(1); setSelected(null); }} aria-label="Assignment">
+                            {cfg.assignmentFilters.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                        </select>
+                    </div>
                     <div className={`grid gap-6 ${selected ? "lg:grid-cols-[1fr_32rem]" : ""}`}>
                         <div>
                             {list.loading && <Loading text="Loading sources…" />}
@@ -471,7 +716,7 @@ export default function LegalSources({ mode = "admin" }) {
                                     <table className="w-full min-w-[560px] text-sm">
                                         <thead className="bg-mist text-left">
                                             <tr>
-                                                {["Source", "Version", "Jurisdiction", "Status", "Updated"].map((h) => (
+                                                {["Source", "Version", "Jurisdiction", "Status", "Assigned", "Updated"].map((h) => (
                                                     <th key={h} className="px-4 py-3 text-xs uppercase tracking-wide text-muted">{h}</th>
                                                 ))}
                                             </tr>
@@ -486,6 +731,7 @@ export default function LegalSources({ mode = "admin" }) {
                                                     <td className="px-4 py-3">v{s.version}</td>
                                                     <td className="px-4 py-3 text-xs">{s.jurisdiction}</td>
                                                     <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
+                                                    <td className="px-4 py-3 text-xs">{assigneeName(s) ?? <span className="text-muted">—</span>}</td>
                                                     <td className="px-4 py-3 text-xs text-muted">{date(s.updatedAt)}</td>
                                                 </tr>
                                             ))}
@@ -500,8 +746,9 @@ export default function LegalSources({ mode = "admin" }) {
                                 key={selected}
                                 id={selected}
                                 mode={mode}
+                                reviewers={reviewers}
                                 onClose={() => setSelected(null)}
-                                onChanged={(text) => { setMessage(text); list.reload(); }}
+                                onChanged={(text) => { setMessage(text); list.reload(); if (mode === "admin") activity.reload(); }}
                                 onEdit={(s) => setForm({ initial: blankForm(s), editing: s._id })}
                                 onNewVersion={(s) => setForm({ initial: blankForm(s), editing: null })}
                             />
