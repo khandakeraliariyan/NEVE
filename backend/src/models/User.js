@@ -170,6 +170,12 @@ const userSchema = new mongoose.Schema(
             default: true,
         },
 
+        // Why and when an admin last deactivated the account; cleared on reactivation.
+        suspension: {
+            reason: { type: String, trim: true, maxlength: 500, default: "" },
+            suspendedAt: { type: Date, default: null },
+        },
+
         // Admins only: salted scrypt hash of the admin portal password
         // ("scrypt$N$r$p$salt$hash"). Never returned by default.
         passwordHash: {

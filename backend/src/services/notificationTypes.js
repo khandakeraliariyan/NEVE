@@ -51,6 +51,8 @@ export const NOTIFICATION_TYPES = [
     "verification_reviewed",
     "staff_role_changed",
     "account_status_changed",
+    "account_appeal_submitted",
+    "account_appeal_decided",
     // Security (always sent by email; can't be muted)
     "security_new_device",
     "security_password_changed",
@@ -127,6 +129,10 @@ export function defaultNotificationLink(notification) {
             return "/legal-review/ai-oversight";
         case "verification_reviewed":
             return "/verification";
+        case "account_appeal_submitted":
+            return "/admin/users";
+        case "account_appeal_decided":
+            return "/settings";
         case "security_new_device":
         case "security_password_changed":
             return "/settings";

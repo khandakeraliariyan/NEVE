@@ -453,3 +453,40 @@ export function notifyLegalSourceAssigned({ source, reviewerId, note = "", actor
         );
     });
 }
+
+// Admins hear about a new account appeal or complaint.
+export function notifyAccountAppealSubmitted({ appeal, label, user }) {
+    return safely("account appeal submitted", async () => {
+        const admins = await activeUserIds("admin");
+        const who = user?.displayName ? `${user.displayName} (${user.role})` : "A user";
+        return notifyAll(
+            admins.map((recipient) => ({
+                recipient,
+                type: "account_appeal_submitted",
+                title: `New ${label}`,
+                message: `${who} submitted a ${label}. It's waiting for review.`,
+                link: "/admin/users",
+            })),
+            "account appeal submitted"
+        );
+    });
+}
+
+// The person hears the outcome of their appeal or complaint.
+export function notifyAccountAppealDecided({ appeal, label }) {
+    return safely("account appeal decided", async () => {
+        const accepted = appeal.status === "accepted";
+        const reactivated = appeal.decision?.accountReactivated ? " Your account is active again." : "";
+        const note = appeal.decision?.note ? ` Note from the reviewer: ${appeal.decision.note.slice(0, 300)}` : "";
+        return notifyAll(
+            [{
+                recipient: appeal.user,
+                type: "account_appeal_decided",
+                title: accepted ? `Your ${label} was accepted` : `Your ${label} was not accepted`,
+                message: `${accepted ? "We reviewed and accepted" : "We reviewed and did not accept"} your ${label}.${reactivated}${note}`,
+                link: "/settings",
+            }],
+            "account appeal decided"
+        );
+    });
+}

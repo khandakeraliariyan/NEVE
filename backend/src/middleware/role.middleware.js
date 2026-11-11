@@ -25,6 +25,17 @@ export function requirePermission(check, message) {
 }
 
 export function allowRoles(...allowedRoles) {
+    return roleGuard(allowedRoles);
+}
+
+// Like allowRoles, but also lets suspended (inactive) accounts through, for
+// the few routes a suspended person still needs, such as appealing.
+// Deleted accounts are still refused.
+export function allowSuspendedRoles(...allowedRoles) {
+    return roleGuard(allowedRoles, { allowInactive: true });
+}
+
+function roleGuard(allowedRoles, { allowInactive = false } = {}) {
     return async function (req, res, next) {
         try {
             if (!req.user?.uid) {
@@ -46,7 +57,7 @@ export function allowRoles(...allowedRoles) {
                 });
             }
 
-            if (!user.isActive) {
+            if (!user.isActive && (!allowInactive || user.deletedAt)) {
                 return res.status(403).json({
                     success: false,
                     message: "Your account is inactive",

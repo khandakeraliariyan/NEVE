@@ -151,7 +151,14 @@ export async function changeAccountStatus(req, res, next) {
         // Only switch if the state is still what we checked, so two admins can't race.
         const updated = await User.findOneAndUpdate(
             { _id: target._id, isActive: !value.isActive, role: { $ne: "admin" } },
-            { $set: { isActive: value.isActive } },
+            {
+                $set: {
+                    isActive: value.isActive,
+                    suspension: value.isActive
+                        ? { reason: "", suspendedAt: null }
+                        : { reason: value.reason, suspendedAt: new Date() },
+                },
+            },
             { new: true, runValidators: true }
         ).select("displayName email photoURL role isActive createdAt");
         if (!updated) {
