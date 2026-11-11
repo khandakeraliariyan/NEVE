@@ -102,6 +102,7 @@ const ADMIN_NAV = [
             { to: "/admin/system", label: "System jobs & delivery" },
             { to: "/admin/settings", label: "Platform settings" },
             { to: "/admin/ai-evaluations", label: "AI evaluations" },
+            { to: "/admin/ai-usage", label: "AI usage & cost" },
         ],
     },
 ];
