@@ -103,3 +103,16 @@ test("nearby search validates its map center and radius", () => {
         })
     );
 });
+
+test("property search filters by bathroom count range", () => {
+    const { query } = propertySearchSchema.parse({
+        query: { minBathrooms: "1", maxBathrooms: "3" },
+    });
+
+    assert.equal(query.minBathrooms, 1);
+    assert.deepEqual(buildPropertySearchFilter(query).bathrooms, { $gte: 1, $lte: 3 });
+    assert.equal(buildPropertySearchFilter({}).bathrooms, undefined);
+    assert.throws(() =>
+        propertySearchSchema.parse({ query: { minBathrooms: "4", maxBathrooms: "2" } })
+    );
+});

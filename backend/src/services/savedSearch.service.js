@@ -13,6 +13,8 @@ const allowedFields = new Set([
     "maxRent",
     "minBedrooms",
     "maxBedrooms",
+    "minBathrooms",
+    "maxBathrooms",
     "availableBy",
     "minLeaseDurationMonths",
     "maxLeaseDurationMonths",
@@ -72,6 +74,8 @@ export function normalizeSavedSearchInput(input, { partial = false } = {}) {
         "maxRent",
         "minBedrooms",
         "maxBedrooms",
+        "minBathrooms",
+        "maxBathrooms",
         "minLeaseDurationMonths",
         "maxLeaseDurationMonths",
     ]) {
@@ -80,7 +84,7 @@ export function normalizeSavedSearchInput(input, { partial = false } = {}) {
             return { error: `${field} must be a non-negative number or null.` };
         }
         if (
-            field.includes("Bedrooms") &&
+            (field.includes("Bedrooms") || field.includes("Bathrooms")) &&
             input[field] !== null &&
             (!Number.isInteger(input[field]) || input[field] > 100)
         ) {
@@ -145,6 +149,7 @@ export function normalizeSavedSearchInput(input, { partial = false } = {}) {
     for (const [minimum, maximum] of [
         ["minRent", "maxRent"],
         ["minBedrooms", "maxBedrooms"],
+        ["minBathrooms", "maxBathrooms"],
         ["minLeaseDurationMonths", "maxLeaseDurationMonths"],
     ]) {
         const min = resolved(minimum);
@@ -199,6 +204,12 @@ export function propertyMatchesSavedSearch(property, savedSearch) {
         (savedSearch.maxBedrooms == null ||
             (Number.isFinite(property.bedrooms) &&
                 property.bedrooms <= savedSearch.maxBedrooms)) &&
+        (savedSearch.minBathrooms == null ||
+            (Number.isFinite(property.bathrooms) &&
+                property.bathrooms >= savedSearch.minBathrooms)) &&
+        (savedSearch.maxBathrooms == null ||
+            (Number.isFinite(property.bathrooms) &&
+                property.bathrooms <= savedSearch.maxBathrooms)) &&
         (!savedSearch.availableBy ||
             (availability &&
                 availability <= new Date(savedSearch.availableBy))) &&
