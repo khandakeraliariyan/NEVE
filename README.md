@@ -30,54 +30,60 @@ The platform is intended to help users answer the questions that matter in renta
 
 ## Main feature taxonomy
 
-The project follows the NEVE master feature specification. The high-level feature map is:
+The project follows the NEVE Project Feature & Role Specification: four roles (Renter, Landlord, Legal Reviewer, Platform Administrator) and 18 functional modules. Backend status:
 
-| Section | Feature | Status |
-|---|---|---|
-| 4.1 | Neve Discover | Mostly implemented |
-| 4.2 | Property Intelligence | Implemented |
-| 4.3 | Neighborhood Intelligence | Mostly implemented |
-| 4.4 | True Cost of Renting | Implemented |
-| 4.5 | Listing Trust & Fraud Prevention | Mostly implemented |
-| 4.6 | Move-In & Move-Out Records | Implemented |
-| 4.7 | Maintenance & Repair | Implemented |
-| 4.8 | Smart Choice | Implemented |
-| 4.9 | Neve Connect | Mostly implemented |
-| 4.10 | Agreement & Trust | Mostly implemented |
-| 4.11 | Evidence Graph | Implemented |
-| 4.12 | Property Manager | Not implemented |
-| 4.13 | Security, Privacy & Dispute Support | Implemented |
-| 4.14 | AI Reliability & Evaluation | Partial |
+| No. | Module | Primary users | Backend status |
+|---|---|---|---|
+| 01 | Rental Marketplace | Renter | Implemented |
+| 02 | Property Intelligence | Renter, Landlord, Admin | Implemented |
+| 03 | Neighbourhood Intelligence | Renter, Landlord | Implemented |
+| 04 | True Cost Engine | Renter, Landlord | Implemented |
+| 05 | ContractMind AI | Renter, Landlord | Implemented |
+| 06 | Legal Copilot | Renter, Landlord, Legal Reviewer | Implemented |
+| 07 | ComplianceOS | Renter, Landlord | Implemented |
+| 08 | Contract Risk Intelligence | Renter, Landlord, Legal Reviewer | Implemented |
+| 09 | Legal Knowledge Base | Legal Reviewer, Admin | Implemented |
+| 10 | Evidence Graph | Renter, Landlord | Implemented |
+| 11 | Dispute Intelligence | Renter, Landlord | Implemented |
+| 12 | Tenancy Management | Renter, Landlord | Implemented |
+| 13 | Condition & Maintenance | Renter, Landlord | Implemented |
+| 14 | Landlord Workspace | Landlord | Implemented |
+| 15 | Legal Review Workspace | Legal Reviewer | Implemented |
+| 16 | Admin & AI Evaluation | Admin | Implemented |
+| 17 | Profile & Security | All roles | Implemented |
+| 18 | Notifications | All roles | Implemented |
 
 ## What is already implemented
 
 The current platform includes a strong set of implemented functionality, especially in these areas:
 
-- property discovery and search
+- property discovery and search, including bathroom-count and saved-search filters
 - detailed listing intelligence and media support
 - true cost breakdowns and transparent rent calculations
 - room-by-room condition and meter record workflows
 - maintenance request management
 - recommendation and explainable matching logic
 - evidence graph and record-linking system
-- tenancy agreement extraction and review support
+- tenancy agreement extraction, risk analysis and obligation tracking
+- Legal Copilot with source-backed citations, flagged when a cited source version is outdated
+- dispute cases with agreement-level and per-case PDF reports
+- legal knowledge base with reviewer assignment, applicability and version history
 - privacy/security controls for sensitive records
-- admin moderation, audit, and evaluation modules
+- account appeals and complaints, including appeals by suspended users
+- admin moderation, audit, platform statistics, AI usage/cost monitoring, system error review and AI evaluation
 
-## Main incomplete areas
+## Known limitations
 
-The project documentation also makes the gaps clear. The largest missing area is:
+- Several backend features added recently (AI usage dashboard, system errors, reviewer assignment, account appeals, outdated-citation review, per-case reports, data-policy settings) have API endpoints but no frontend screens yet.
+- AI cost figures are estimates from list prices.
+- The evaluation datasets in `backend/eval/datasets` are small and synthetic. Model-backed tasks (agreement and obligation extraction, Copilot answer quality, AI risk review) only run with `npm run eval -- --live`, which calls the Claude API.
 
-- Property Manager module
-
-Additional partially completed areas include:
+Earlier project notes also list these refinements (not re-checked against the current code):
 
 - Discovery refinements
 - Neighborhood comparison improvements
 - Fraud/trust heuristic tuning
 - Connect status-flow normalization
-- Agreement legal rewrite workflow completion
-- AI evaluation dataset expansion and quality validation
 
 ## Core design principles
 

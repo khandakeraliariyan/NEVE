@@ -31,6 +31,7 @@ The backend is organized in a modular layered structure:
 - `src/models/` - MongoDB/Mongoose schema definitions
 - `src/utils/` - shared utilities and response formatting helpers
 - `scripts/` - operational CLI scripts for setup, backups, and admin actions
+- `eval/` - AI evaluation datasets, runner (`npm run eval`) and regression baseline
 
 ## Technology stack
 
@@ -47,24 +48,28 @@ The backend is organized in a modular layered structure:
 
 ## Feature coverage summary
 
-The project follows the NEVE master document feature taxonomy. The backend status is summarized below.
+The project follows the NEVE Project Feature & Role Specification (four roles: Renter, Landlord, Legal Reviewer, Platform Administrator; 18 modules). The backend status is summarized below.
 
-| Section | Feature | Backend status |
+| No. | Module | Backend status |
 |---|---|---|
-| 4.1 | Neve Discover | Mostly implemented |
-| 4.2 | Property Intelligence | Implemented |
-| 4.3 | Neighborhood Intelligence | Mostly implemented |
-| 4.4 | True Cost of Renting | Implemented |
-| 4.5 | Listing Trust & Fraud Prevention | Mostly implemented |
-| 4.6 | Move-In & Move-Out Records | Implemented |
-| 4.7 | Maintenance & Repair | Implemented |
-| 4.8 | Smart Choice | Implemented |
-| 4.9 | Neve Connect | Mostly implemented |
-| 4.10 | Agreement & Trust | Mostly implemented |
-| 4.11 | Evidence Graph | Implemented |
-| 4.12 | Property Manager | Not implemented |
-| 4.13 | Security, Privacy & Dispute Support | Implemented |
-| 4.14 | AI Reliability & Evaluation | Partial |
+| 01 | Rental Marketplace | Implemented |
+| 02 | Property Intelligence | Implemented |
+| 03 | Neighbourhood Intelligence | Implemented |
+| 04 | True Cost Engine | Implemented |
+| 05 | ContractMind AI | Implemented |
+| 06 | Legal Copilot | Implemented |
+| 07 | ComplianceOS | Implemented |
+| 08 | Contract Risk Intelligence | Implemented |
+| 09 | Legal Knowledge Base | Implemented |
+| 10 | Evidence Graph | Implemented |
+| 11 | Dispute Intelligence | Implemented |
+| 12 | Tenancy Management | Implemented |
+| 13 | Condition & Maintenance | Implemented |
+| 14 | Landlord Workspace | Implemented |
+| 15 | Legal Review Workspace | Implemented |
+| 16 | Admin & AI Evaluation | Implemented |
+| 17 | Profile & Security | Implemented |
+| 18 | Notifications | Implemented |
 
 ## Implemented features
 
@@ -196,25 +201,37 @@ The system includes an admin evaluation workflow for:
 - latency and cost metrics
 - model-backed and deterministic task evaluation
 
-## Main incomplete areas
+Evaluation tasks include agreement and obligation extraction, missing-information and risk detection, legal citation, source retrieval (recall@3) and Copilot answer quality, where unsupported (hallucinated) citations count as false positives. `npm run eval -- --check` and `test/evalRegression.test.js` fail when a deterministic task drops below `eval/baseline.json`.
 
-The project documentation clearly lists the main gaps.
+### 13. Legal knowledge base and reviewer workflow
 
-### Not implemented
+- reviewer profiles with Bar enrolment, jurisdictions, expertise and qualifications, verified by an admin
+- legal sources with versions, effective dates and applicability (tenancy scopes, regions, exclusions)
+- admins assign sources to verified reviewers; only the assignee may decide an assigned source
+- when a source version is replaced or retired, reviewers are asked to check the Copilot answers and agreements that still cite it, and conversations show which citations are outdated
+- reviewers are notified of submissions, decisions, published versions, citation reviews, assignments and new AI evaluation runs
 
-- Property Manager feature set
-  - manager role flow is not complete
-  - property assignment management is still absent
-  - manager-specific dashboard and task flows are not included
+### 14. Platform administration
 
-### Partially implemented or still incomplete
+- dashboard statistics: users by role, suspended accounts, active tenancies, verification queues, latest evaluation per task and AI usage
+- AI usage and cost monitoring for every Claude call, by feature, model and day (`GET /admin/dashboard/ai-usage`)
+- account appeals and complaints, including suspension appeals that suspended users can still submit (`/users/me/appeals`, `/admin/users/appeals`)
+- grouped server-error review (`/admin/system/errors`)
+- admin-editable retention and backup limits that override the environment defaults (`dataPolicies` in `/admin/settings`)
+- per-case dispute reports as JSON or PDF (`GET /tenancy/cases/:caseId/report?format=pdf`)
+
+## Known limitations
+
+- Several recent backend features have API endpoints but no frontend screens yet: AI usage, system errors, reviewer assignment and activity, account appeals, outdated-citation review, per-case reports and data-policy settings.
+- AI cost figures are estimates from list prices.
+- The evaluation datasets are small and synthetic; model-backed tasks only run with `npm run eval -- --live`, which calls the Claude API.
+
+Earlier project notes also list these refinements (not re-checked against the current code):
 
 - Discover refinement
 - Neighborhood comparison features
 - Trust/fraud heuristic tuning
 - Connect status-flow normalization
-- Agreement legal rewrite flow completion
-- AI evaluation test-set expansion and broader validation
 
 ## Project structure
 
@@ -233,6 +250,7 @@ backend/
 ¦   +-- utils/
 ¦   +-- validators/
 +-- scripts/
++-- eval/
 +-- test/
 +-- .env
 +-- package.json
@@ -317,7 +335,7 @@ npm run eval
 
 - `dev` - runs the API with nodemon for live development
 - `start` - starts the main server process
-- `test` - runs the Node test suite
+- `test` - runs the Node test suite. Tests need no database or network, but the environment must validate: set `CLIENT_URL`, `MONGODB_URI`, `ADMIN_JWT_SECRET` (32+ characters) and `FIREBASE_SERVICE_ACCOUNT_PATH` pointing at a readable service-account JSON file
 - `create-admin` - creates or initializes an admin account
 - `backup` - performs backup procedures
 - `restore-backup` - restores a backup snapshot
@@ -373,7 +391,8 @@ Authentication is based on Firebase ID tokens.
 
 - Firebase identity proof is used to authenticate requests
 - received tokens are checked against server-side auth rules
-- the backend distinguishes between renter, landlord, manager, reviewer, and admin roles
+- the backend distinguishes between renter, landlord, legal reviewer, and admin roles
+- suspended accounts are refused everywhere except the routes for appealing the suspension
 - additional access control checks are enforced in route and middleware logic
 
 ## File uploads and media processing
@@ -457,6 +476,4 @@ The strongest implemented areas are:
 - security, privacy, and retention controls
 - property discovery and rental intelligence
 
-The largest missing area remains:
-
-- property manager workflows
+The main remaining work is frontend screens for the newer admin and legal-review endpoints (see Known limitations).
