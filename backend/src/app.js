@@ -51,6 +51,7 @@ import platformSettingsRoutes from "./routes/platformSettings.routes.js";
 import legalCopilotRoutes from "./routes/legalCopilot.routes.js";
 import { getPrivacyPolicy, getPublicPlatformInfo } from "./controllers/platformSettings.controller.js";
 import adminSecurityRoutes from "./routes/adminSecurity.routes.js";
+import { recordSystemError } from "./services/systemErrors.service.js";
 
 const app = express();
 
@@ -149,6 +150,11 @@ app.use((error, req, res, next) => {
             error.status < 600
             ? error.status
             : 500;
+
+    // Server-side failures are kept for admins to review; client errors are not.
+    if (statusCode >= 500) {
+        recordSystemError({ error, req, status: statusCode });
+    }
 
     return res.status(statusCode).json({
         success: false,

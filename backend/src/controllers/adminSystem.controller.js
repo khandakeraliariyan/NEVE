@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 import NotificationDelivery from "../models/NotificationDelivery.js";
+import SystemError from "../models/SystemError.js";
 import SystemJobRun from "../models/SystemJobRun.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
 import { retryDeadDelivery } from "../services/notificationDelivery.service.js";
@@ -181,6 +182,79 @@ export async function getSystemHealth(req, res, next) {
     try {
         res.set("Cache-Control", "private, no-store");
         return res.json({ success: true, data: await systemHealth() });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/admin/system/errors?status=open&page=&limit=
+// Grouped unexpected server errors, most recent first.
+export async function listSystemErrors(req, res, next) {
+    try {
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+        const filter = {};
+        if (req.query.status !== undefined) {
+            if (!["open", "resolved", "ignored"].includes(req.query.status)) {
+                return res.status(400).json({ success: false, message: "status must be open, resolved or ignored." });
+            }
+            filter.status = req.query.status;
+        }
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const [data, total, openCount, recentCount] = await Promise.all([
+            SystemError.find(filter).sort({ lastSeenAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+            SystemError.countDocuments(filter),
+            SystemError.countDocuments({ status: "open" }),
+            SystemError.countDocuments({ lastSeenAt: { $gte: since24h } }),
+        ]);
+        res.set("Cache-Control", "private, no-store");
+        return res.json({
+            success: true,
+            data,
+            summary: { open: openCount, seenLast24Hours: recentCount },
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH /api/v1/admin/system/errors/:errorId  { status: "open" | "resolved" | "ignored", note? }
+export async function updateSystemError(req, res, next) {
+    try {
+        const { errorId } = req.params;
+        if (!mongoose.isValidObjectId(errorId)) {
+            return res.status(400).json({ success: false, message: "Invalid error ID." });
+        }
+        const { status, note = "" } = req.body ?? {};
+        if (!["open", "resolved", "ignored"].includes(status)) {
+            return res.status(400).json({ success: false, message: "status must be open, resolved or ignored." });
+        }
+        if (typeof note !== "string" || note.length > 1000) {
+            return res.status(400).json({ success: false, message: "note must be at most 1000 characters." });
+        }
+        const resolving = status !== "open";
+        const updated = await SystemError.findByIdAndUpdate(
+            errorId,
+            {
+                $set: {
+                    status,
+                    note: note.trim(),
+                    resolvedBy: resolving ? req.neveUser._id : null,
+                    resolvedAt: resolving ? new Date() : null,
+                },
+            },
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ success: false, message: "Error not found." });
+        await recordAdminAction({
+            req,
+            action: `system_error_${status}`,
+            targetType: "system_error",
+            targetId: updated._id,
+            details: { name: updated.name, route: updated.route, count: updated.count },
+        });
+        return res.json({ success: true, data: updated });
     } catch (error) {
         next(error);
     }

@@ -99,3 +99,21 @@ test("saved search input rejects unsupported values and inverted ranges", () => 
         "A non-empty saved-search name is required."
     );
 });
+
+test("saved search respects bathroom count limits", () => {
+    const property = { ...publishedProperty, bathrooms: 2 };
+
+    assert.equal(propertyMatchesSavedSearch(property, { minBathrooms: 2, maxBathrooms: 3 }), true);
+    assert.equal(propertyMatchesSavedSearch(property, { minBathrooms: 3 }), false);
+    assert.equal(propertyMatchesSavedSearch(publishedProperty, { minBathrooms: 1 }), false);
+
+    assert.equal(normalizeSavedSearchInput({ minBathrooms: 1.5 }, { partial: true }).error !== undefined, true);
+    assert.match(
+        normalizeSavedSearchInput({ minBathrooms: 3, maxBathrooms: 1 }, { partial: true }).error,
+        /minBathrooms cannot exceed maxBathrooms/
+    );
+    assert.deepEqual(
+        normalizeSavedSearchInput({ minBathrooms: 1, maxBathrooms: 2 }, { partial: true }).updates,
+        { minBathrooms: 1, maxBathrooms: 2 }
+    );
+});

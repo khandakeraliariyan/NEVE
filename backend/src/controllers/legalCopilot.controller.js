@@ -15,6 +15,7 @@ import {
 import { findAccessibleAgreement } from "../services/tenancyAgreement.service.js";
 import { notifyCopilotAnswerReported } from "../services/notificationEvents.service.js";
 import { maskPersonalIdentifiers } from "../services/piiMasking.service.js";
+import { annotateConversationCitations } from "../services/legalCitationCurrency.service.js";
 
 export const REVIEW_VERDICTS = ["accurate", "unsupported_claim", "misleading", "wrong_citation", "applicability_issue", "outdated_source"];
 
@@ -107,8 +108,10 @@ export async function getConversation(req, res, next) {
         const conversation = await findOwnConversation(req, res);
         if (!conversation) return;
         await conversation.populate("agreement", "title");
+        // Mark citations whose source version has since been replaced or withdrawn.
+        const data = await annotateConversationCitations(conversation.toObject());
         noStore(res);
-        return res.json({ success: true, data: conversation, aiAvailable: isExtractionConfigured(), disclaimer: COPILOT_DISCLAIMER });
+        return res.json({ success: true, data, aiAvailable: isExtractionConfigured(), disclaimer: COPILOT_DISCLAIMER });
     } catch (error) {
         next(error);
     }
@@ -207,7 +210,7 @@ export async function getCitedSection(req, res, next) {
         const { legalSourceId, sectionId } = req.params;
         if (!validId(legalSourceId) || !validId(sectionId)) return res.status(400).json({ success: false, message: "Invalid ID." });
         const source = await LegalSource.findOne({ _id: legalSourceId, status: { $in: ["approved", "retired"] } })
-            .select("sourceKey version title citation jurisdiction sourceType sourceUrl language effectiveFrom status reviewedAt sections")
+            .select("sourceKey version title citation jurisdiction sourceType sourceUrl language effectiveFrom applicability status reviewedAt sections")
             .lean();
         const section = source?.sections?.find((s) => String(s._id) === String(sectionId));
         if (!section) return res.status(404).json({ success: false, message: "Section not found." });

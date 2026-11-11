@@ -11,6 +11,7 @@ import {
 } from "./notification.service.js";
 import { propertyThumbnailUrl } from "./notificationLinks.service.js";
 import { formatBdt, formatDateTime } from "./notificationTemplates.js";
+import { settingsSnapshot } from "./platformSettings.service.js";
 
 // One function per thing that happens in Neve and who hears about it.
 // Each one swallows its own errors: a failed notification never fails the
@@ -329,6 +330,163 @@ export function notifyLegalSourceSubmitted({ source, actorId }) {
                     link: "/legal-review",
                 })),
             "legal source submitted"
+        );
+    });
+}
+
+const sourceName = (source) => [source.title, source.citation].filter(Boolean).join(", ") || "A legal source";
+const notMe = (actorId) => (recipient) => String(recipient) !== String(actorId);
+
+const DECISION_COPY = {
+    approve: { title: "Your legal source was approved", verb: "was approved and is now part of the approved knowledge base" },
+    reject: { title: "Your legal source was rejected", verb: "was rejected" },
+    request_changes: { title: "Changes requested on your legal source", verb: "needs changes before it can be approved" },
+};
+
+// The author of a draft hears the reviewer's decision.
+export function notifyLegalSourceDecided({ source, action, note = "", actorId }) {
+    return safely("legal source decided", async () => {
+        const copy = DECISION_COPY[action];
+        if (!copy || !source.createdBy || String(source.createdBy) === String(actorId)) return;
+        const reason = note.trim() ? ` Reviewer note: ${note.trim().slice(0, 300)}` : "";
+        return notifyAll(
+            [{
+                recipient: source.createdBy,
+                type: "legal_source_decided",
+                title: copy.title,
+                message: `${sourceName(source)} (version ${source.version ?? 1}) ${copy.verb}.${reason}`,
+                link: "/legal-review",
+            }],
+            "legal source decided"
+        );
+    });
+}
+
+// Reviewers and admins hear when a new version enters the knowledge base.
+export function notifyLegalSourcePublished({ source, replacedVersions = 0, actorId }) {
+    return safely("legal source published", async () => {
+        const [reviewers, admins] = await Promise.all([activeUserIds("legal_reviewer"), activeUserIds("admin")]);
+        const replaced = replacedVersions ? " It replaces the previously approved version." : "";
+        return notifyAll(
+            [...new Set([...reviewers, ...admins].map(String))]
+                .filter(notMe(actorId))
+                .map((recipient) => ({
+                    recipient,
+                    type: "legal_source_published",
+                    title: "Legal source updated",
+                    message: `${sourceName(source)} version ${source.version ?? 1} (${source.jurisdiction ?? "Bangladesh"}) is now approved.${replaced}`,
+                    link: "/legal-review",
+                })),
+            "legal source published"
+        );
+    });
+}
+
+// Reviewers check answers that cite a source version that is no longer current.
+export function notifyCitationReviewRequested({ source, affectedAnswers, affectedAgreements, actorId }) {
+    return safely("citation review requested", async () => {
+        if (!affectedAnswers && !affectedAgreements) return;
+        const reviewers = await activeUserIds("legal_reviewer");
+        const parts = [
+            affectedAnswers ? `${affectedAnswers} Legal Copilot answer${affectedAnswers === 1 ? "" : "s"}` : null,
+            affectedAgreements ? `${affectedAgreements} agreement${affectedAgreements === 1 ? "" : "s"}` : null,
+        ].filter(Boolean);
+        return notifyAll(
+            reviewers.filter(notMe(actorId)).map((recipient) => ({
+                recipient,
+                type: "citation_review_requested",
+                title: "Citations need review",
+                message: `${parts.join(" and ")} cite ${sourceName(source)} version ${source.version ?? 1}, which is no longer current. Check that the cited guidance still holds.`,
+                link: "/legal-review/ai-oversight",
+            })),
+            "citation review requested"
+        );
+    });
+}
+
+const percent = (value) => (value == null ? null : `${Math.round(value * 1000) / 10}%`);
+
+// A new evaluation run is announced to admins, and to reviewers when they may see evaluations.
+export function notifyAIEvaluationRecorded({ run, actorId }) {
+    return safely("ai evaluation recorded", async () => {
+        const reviewersAllowed = settingsSnapshot().rolePermissions?.reviewersCanSeeAiEvaluations !== false;
+        const [reviewers, admins] = await Promise.all([
+            reviewersAllowed ? activeUserIds("legal_reviewer") : [],
+            activeUserIds("admin"),
+        ]);
+        const scores = [
+            run.f1 != null ? `F1 ${percent(run.f1)}` : null,
+            run.exactMatchRate != null ? `exact match ${percent(run.exactMatchRate)}` : null,
+            run.characterErrorRate != null ? `CER ${percent(run.characterErrorRate)}` : null,
+        ].filter(Boolean).join(", ");
+        const task = String(run.task).replace(/_/g, " ");
+        return notifyAll(
+            [
+                ...reviewers.filter(notMe(actorId)).map((recipient) => ({ recipient, link: `/legal-review/ai-evaluations/${run._id}` })),
+                ...admins.filter(notMe(actorId)).map((recipient) => ({ recipient, link: `/admin/ai-evaluations/${run._id}` })),
+            ].map(({ recipient, link }) => ({
+                recipient,
+                type: "ai_evaluation_recorded",
+                title: `AI evaluation recorded: ${task}`,
+                message: `${run.datasetName} (${run.caseCount} cases)${scores ? `: ${scores}` : ""}${run.status === "failed" ? ". The run failed." : "."}`,
+                link,
+            })),
+            "ai evaluation recorded"
+        );
+    });
+}
+
+// A reviewer is told when an admin assigns a source to them.
+export function notifyLegalSourceAssigned({ source, reviewerId, note = "", actorId }) {
+    return safely("legal source assigned", async () => {
+        if (String(reviewerId) === String(actorId)) return;
+        const extra = note.trim() ? ` Note: ${note.trim().slice(0, 300)}` : "";
+        return notifyAll(
+            [{
+                recipient: reviewerId,
+                type: "legal_source_assigned",
+                title: "A legal source was assigned to you",
+                message: `${sourceName(source)} (version ${source.version ?? 1}, ${source.status.replace("_", " ")}) is assigned to you for review.${extra}`,
+                link: "/legal-review",
+            }],
+            "legal source assigned"
+        );
+    });
+}
+
+// Admins hear about a new account appeal or complaint.
+export function notifyAccountAppealSubmitted({ appeal, label, user }) {
+    return safely("account appeal submitted", async () => {
+        const admins = await activeUserIds("admin");
+        const who = user?.displayName ? `${user.displayName} (${user.role})` : "A user";
+        return notifyAll(
+            admins.map((recipient) => ({
+                recipient,
+                type: "account_appeal_submitted",
+                title: `New ${label}`,
+                message: `${who} submitted a ${label}. It's waiting for review.`,
+                link: "/admin/users",
+            })),
+            "account appeal submitted"
+        );
+    });
+}
+
+// The person hears the outcome of their appeal or complaint.
+export function notifyAccountAppealDecided({ appeal, label }) {
+    return safely("account appeal decided", async () => {
+        const accepted = appeal.status === "accepted";
+        const reactivated = appeal.decision?.accountReactivated ? " Your account is active again." : "";
+        const note = appeal.decision?.note ? ` Note from the reviewer: ${appeal.decision.note.slice(0, 300)}` : "";
+        return notifyAll(
+            [{
+                recipient: appeal.user,
+                type: "account_appeal_decided",
+                title: accepted ? `Your ${label} was accepted` : `Your ${label} was not accepted`,
+                message: `${accepted ? "We reviewed and accepted" : "We reviewed and did not accept"} your ${label}.${reactivated}${note}`,
+                link: "/settings",
+            }],
+            "account appeal decided"
         );
     });
 }

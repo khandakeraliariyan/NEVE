@@ -7,6 +7,9 @@ import {
     resolveLegalSourceFlag,
     transitionLegalSource,
     updateLegalSource,
+    getOutdatedCitations,
+    assignLegalSource,
+    getReviewerActivity,
 } from "../controllers/legalSource.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
@@ -16,12 +19,15 @@ const router = express.Router();
 router.use(authenticateUser);
 router.use(allowRoles("admin"));
 
+router.get("/outdated-citations", getOutdatedCitations);
+router.get("/reviewer-activity", getReviewerActivity);
 router.get("/", listLegalSourcesForStaff);
 router.post("/", createLegalSource);
 router.get("/:sourceId", getLegalSourceForStaff);
 router.patch("/:sourceId", updateLegalSource);
 // { action: "submit" | "retire", note? }
 router.patch("/:sourceId/status", transitionLegalSource);
+router.patch("/:sourceId/assignment", assignLegalSource);
 router.patch("/:sourceId/flags/:flagId", resolveLegalSourceFlag);
 
 export default router;

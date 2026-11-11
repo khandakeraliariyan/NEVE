@@ -8,6 +8,7 @@ import {
     resolveLegalSourceFlag,
     transitionLegalSource,
     updateLegalSource,
+    getOutdatedCitations,
 } from "../controllers/legalSource.controller.js";
 import { copilotQualitySummary, listReportedAnswers, reviewReportedAnswer } from "../controllers/legalCopilot.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
@@ -19,6 +20,9 @@ const router = express.Router();
 
 router.use(authenticateUser);
 router.use(allowRoles("legal_reviewer"));
+
+// Retired source versions that answers or agreements still cite.
+router.get("/citations/outdated", getOutdatedCitations);
 
 // Legal reviewers see sources (use ?status=in_review for the queue) and
 // approve them or send them back with notes.

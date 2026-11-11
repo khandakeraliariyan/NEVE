@@ -4,6 +4,7 @@ import { z } from "zod";
 import { env } from "../config/env.js";
 import { textDocumentBlock } from "./aiDocument.service.js";
 import { settingsSnapshot } from "./platformSettings.service.js";
+import { trackAIUsage } from "./aiUsage.service.js";
 
 export const CLAUSE_CATEGORIES = [
     "rent",
@@ -107,7 +108,7 @@ export function isExtractionConfigured() {
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= new Anthropic();
+    defaultClient ??= trackAIUsage(new Anthropic(), "agreement_extraction");
     return defaultClient;
 };
 

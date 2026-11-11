@@ -39,6 +39,8 @@ const savedSearchSchema = new mongoose.Schema(
         maxRent: { type: Number, min: 0, default: null },
         minBedrooms: { type: Number, min: 0, max: 100, default: null },
         maxBedrooms: { type: Number, min: 0, max: 100, default: null },
+        minBathrooms: { type: Number, min: 0, max: 100, default: null },
+        maxBathrooms: { type: Number, min: 0, max: 100, default: null },
         availableBy: { type: Date, default: null },
         minLeaseDurationMonths: { type: Number, min: 1, max: 120, default: null },
         maxLeaseDurationMonths: { type: Number, min: 1, max: 120, default: null },

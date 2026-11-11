@@ -21,7 +21,8 @@ import {
     revokeMySession,
 } from "../controllers/sessions.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
-import { allowRoles } from "../middleware/role.middleware.js";
+import { allowRoles, allowSuspendedRoles } from "../middleware/role.middleware.js";
+import { getMyAppeals, submitAppeal } from "../controllers/accountAppeal.controller.js";
 
 import {
     addFavorite,
@@ -49,6 +50,10 @@ router.get("/me/sessions", authenticateUser, anyRole, getMySessions);
 router.post("/me/sessions/revoke-others", authenticateUser, anyRole, revokeMyOtherSessions);
 router.delete("/me/sessions/:sessionId", authenticateUser, anyRole, revokeMySession);
 router.get("/me/login-history", authenticateUser, anyRole, getMyLoginHistory);
+// Appeals and account complaints; reachable while the account is suspended.
+const appellant = allowSuspendedRoles("renter", "landlord", "legal_reviewer");
+router.get("/me/appeals", authenticateUser, appellant, getMyAppeals);
+router.post("/me/appeals", authenticateUser, appellant, submitAppeal);
 
 router.get(
     "/lookup",

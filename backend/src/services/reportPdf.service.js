@@ -151,7 +151,8 @@ export class PdfWriter {
     }
 
     heading(value, { size = 13 } = {}) {
-        this.ensure(size * 3.2);
+        // Room for the heading and its first lines, so it never ends a page alone.
+        this.ensure(size * 3.2 + 40);
         this.y += 10;
         this.text(value, { size, bold: true, after: 2 });
         this.ctx.strokeStyle = COLORS.rule;
@@ -450,6 +451,76 @@ export function renderEvidenceReportPdf(report, extras = {}) {
         analysis.disclaimer,
     ].filter(Boolean);
     for (const item of [...new Set(limitations)]) writer.bullet(item, { size: 8.8, color: COLORS.muted });
+
+    return writer.close();
+}
+
+// One dispute case (tenancyCase.service.js buildCaseReport) as a PDF.
+export function renderCaseReportPdf(report) {
+    const writer = new PdfWriter({
+        title: `Neve dispute case: ${report.scope.title}`,
+        footer: `Neve dispute case report · ${String(report.scope.title).slice(0, 60)} · ${report.scope.caseId}`,
+    });
+    writer.text("NEVE", { size: 11, bold: true, color: COLORS.accent, after: 2 });
+    writer.text("Dispute case report", { size: 20, bold: true, after: 2 });
+    writer.text(report.scope.title, { size: 12, color: COLORS.muted, after: 10 });
+    writer.keyValues([
+        ["Agreement", report.agreement?.title],
+        ["Property", report.agreement?.propertyTitle],
+        ["Renter", report.agreement?.renterName],
+        ["Landlord", report.agreement?.landlordName],
+        ["Case status", cap(report.scope.status)],
+        ["Opened", [day(report.scope.createdAt), report.scope.openedByRole ? `by the ${report.scope.openedByRole}` : null].filter(Boolean).join(" ")],
+        ["Amount claimed", money(report.totals.claimedBdt)],
+        ["Generated", `${when(report.generatedAt)} (${env.NOTIFICATION_TIME_ZONE})`],
+        ["Case ID", report.scope.caseId],
+    ]);
+    writer.text(report.disclaimer + " Bring the original documents to any mediator, lawyer or authority.", { size: 9, color: COLORS.muted, after: 6 });
+
+    if (report.scope.summary) {
+        writer.heading("Summary");
+        writer.text(report.scope.summary);
+    }
+
+    writer.heading("Disputed issues");
+    if (!report.issues.length) writer.text("No issues were listed.", { color: COLORS.muted });
+    for (const issue of report.issues) {
+        writer.entry(`${issue.title}${typeof issue.amountBdt === "number" ? ` · ${money(issue.amountBdt)}` : ""}`, [
+            issue.description || null,
+            `Added ${issue.addedByRole ? `by the ${issue.addedByRole} ` : ""}on ${day(issue.addedAt)}.`,
+        ]);
+    }
+
+    writer.heading("Statements");
+    if (!report.statements.length) writer.text("No statements are visible to you.", { color: COLORS.muted });
+    for (const statement of report.statements) {
+        const label = statement.ownPrivateDraft ? "your private draft, not shared" : `shared ${day(statement.sharedAt)}`;
+        writer.entry(`${cap(statement.authorRole)}${statement.title ? `: ${statement.title}` : ""} (${label})`, [
+            statement.body,
+            statement.edits ? `Edited ${statement.edits} time(s); earlier versions are kept on Neve.` : null,
+        ], { tone: statement.ownPrivateDraft ? COLORS.muted : COLORS.accent });
+    }
+
+    writer.heading("Chronology");
+    if (!report.chronology.length) writer.text("No dated events.", { color: COLORS.muted });
+    for (const event of report.chronology.slice(0, MAX_CHRONOLOGY)) writer.keyValues([[day(event.at), event.text]]);
+
+    if (report.reviewEntries.length) {
+        writer.heading("Review notes");
+        for (const entry of report.reviewEntries) {
+            writer.entry(`${entry.authorRole === "legal_reviewer" ? "Legal reviewer" : cap(entry.authorRole)} · ${cap(entry.kind)} · ${when(entry.createdAt)}`, [entry.body]);
+        }
+    }
+
+    writer.heading("Evidence files and integrity");
+    if (!report.evidence.length) writer.text("No evidence files were added to this case.", { color: COLORS.muted });
+    for (const file of report.evidence) {
+        writer.entry(`${file.name}${file.removedAt ? " (withdrawn)" : ""}`, [
+            `${file.mimeType ?? ""}${file.sizeBytes ? ` · ${Math.max(1, Math.round(file.sizeBytes / 1024))} KB` : ""} · added ${day(file.addedAt)}${file.removedAt ? ` · withdrawn ${day(file.removedAt)}` : ""}`,
+            file.sha256 ? `SHA-256: ${file.sha256}` : "No hash was recorded.",
+        ], { tone: file.removedAt ? COLORS.muted : COLORS.accent });
+    }
+    writer.text("A hash shows whether a file changed after it was recorded. It does not prove that a document is genuine or who wrote it. File contents are not reproduced here.", { size: 8.8, color: COLORS.muted });
 
     return writer.close();
 }

@@ -35,6 +35,8 @@ const propertySearchFields = {
     maxRent: z.coerce.number().min(0).optional(),
     bedrooms: z.coerce.number().int().min(0).max(100).optional(),
     maxBedrooms: z.coerce.number().int().min(0).max(100).optional(),
+    minBathrooms: z.coerce.number().int().min(0).max(100).optional(),
+    maxBathrooms: z.coerce.number().int().min(0).max(100).optional(),
     availableBy: z.coerce.date().optional(),
     minLeaseDurationMonths: z.coerce.number().int().min(1).max(120).optional(),
     maxLeaseDurationMonths: z.coerce.number().int().min(1).max(120).optional(),
@@ -69,6 +71,18 @@ const validatePropertySearchRanges = (query, context) => {
             code: "custom",
             message: "Minimum bedrooms cannot exceed maximum bedrooms.",
             path: ["bedrooms"],
+        });
+    }
+
+    if (
+        query.minBathrooms !== undefined &&
+        query.maxBathrooms !== undefined &&
+        query.minBathrooms > query.maxBathrooms
+    ) {
+        context.addIssue({
+            code: "custom",
+            message: "Minimum bathrooms cannot exceed maximum bathrooms.",
+            path: ["minBathrooms"],
         });
     }
 

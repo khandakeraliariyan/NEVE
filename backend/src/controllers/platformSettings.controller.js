@@ -8,6 +8,7 @@ import {
     SettingsSchema,
     TemplateSchema,
     clearSettingsCache,
+    effectivePolicies,
     getSettings,
     isTemplateType,
 } from "../services/platformSettings.service.js";
@@ -56,7 +57,8 @@ export async function getPlatformSettings(req, res, next) {
     try {
         clearSettingsCache();
         privateResponse(res);
-        return res.json({ success: true, data: await getSettings() });
+        const settings = await getSettings();
+        return res.json({ success: true, data: { ...settings, effectiveDataPolicies: effectivePolicies(settings) } });
     } catch (error) {
         next(error);
     }
@@ -81,7 +83,7 @@ export async function updatePlatformSettings(req, res, next) {
                     set["privacyPolicy.version"] = (current.privacyPolicy.version ?? 1) + 1;
                     set["privacyPolicy.updatedAt"] = new Date();
                 }
-            } else if (["announcement", "integrations", "rolePermissions"].includes(key)) {
+            } else if (["announcement", "integrations", "rolePermissions", "dataPolicies"].includes(key)) {
                 for (const [field, fieldValue] of Object.entries(entry)) set[`${key}.${field}`] = fieldValue;
             } else {
                 set[key] = entry;
@@ -98,7 +100,8 @@ export async function updatePlatformSettings(req, res, next) {
             details: { changed: Object.keys(set).filter((key) => key !== "updatedBy") },
         });
         privateResponse(res);
-        return res.json({ success: true, message: "Settings saved.", data: await getSettings() });
+        const saved = await getSettings();
+        return res.json({ success: true, message: "Settings saved.", data: { ...saved, effectiveDataPolicies: effectivePolicies(saved) } });
     } catch (error) {
         next(error);
     }

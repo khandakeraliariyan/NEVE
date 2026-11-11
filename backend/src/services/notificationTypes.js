@@ -43,9 +43,16 @@ export const NOTIFICATION_TYPES = [
     "legal_source_submitted",
     "legal_source_flagged",
     "copilot_answer_reported",
+    "legal_source_decided",
+    "legal_source_assigned",
+    "legal_source_published",
+    "citation_review_requested",
+    "ai_evaluation_recorded",
     "verification_reviewed",
     "staff_role_changed",
     "account_status_changed",
+    "account_appeal_submitted",
+    "account_appeal_decided",
     // Security (always sent by email; can't be muted)
     "security_new_device",
     "security_password_changed",
@@ -70,6 +77,8 @@ export const DIGEST_TYPES = new Set([
     "tenancy_document_added",
     "tenancy_case_review_activity",
     "legal_source_submitted",
+    "legal_source_published",
+    "ai_evaluation_recorded",
 ]);
 
 export function isSecurityType(type) {
@@ -108,11 +117,22 @@ export function defaultNotificationLink(notification) {
             return agreement ? `/agreements/${agreement}` : "/agreements";
         case "legal_source_submitted":
         case "legal_source_flagged":
+        case "legal_source_decided":
+        case "legal_source_assigned":
+        case "legal_source_published":
             return "/legal-review";
+        case "citation_review_requested":
+            return "/legal-review/ai-oversight";
+        case "ai_evaluation_recorded":
+            return "/legal-review/ai-evaluations";
         case "copilot_answer_reported":
             return "/legal-review/ai-oversight";
         case "verification_reviewed":
             return "/verification";
+        case "account_appeal_submitted":
+            return "/admin/users";
+        case "account_appeal_decided":
+            return "/settings";
         case "security_new_device":
         case "security_password_changed":
             return "/settings";

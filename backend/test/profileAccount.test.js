@@ -197,7 +197,7 @@ test("only legal reviewers verify credentials, and they need an enrolment number
         body: { type: "credential", documentType: "bar_enrolment_certificate", documents: [String(id())] },
     });
     assert.equal(ok.statusCode, 201);
-    assert.deepEqual(create.mock.calls[0].arguments[0].credentialDetails, { barEnrolmentNumber: "BC/1234/2015", jurisdictions: ["Dhaka"] });
+    assert.deepEqual(create.mock.calls[0].arguments[0].credentialDetails, { barEnrolmentNumber: "BC/1234/2015", jurisdictions: ["Dhaka"], expertise: "", qualifications: [] });
 });
 
 test("approving identity copies the encrypted number to the profile", async () => {

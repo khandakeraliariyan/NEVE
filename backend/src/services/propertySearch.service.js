@@ -64,6 +64,21 @@ export function buildPropertySearchFilter(query = {}) {
         }
     }
 
+    if (
+        query.minBathrooms !== undefined ||
+        query.maxBathrooms !== undefined
+    ) {
+        filter.bathrooms = {};
+
+        if (query.minBathrooms !== undefined) {
+            filter.bathrooms.$gte = query.minBathrooms;
+        }
+
+        if (query.maxBathrooms !== undefined) {
+            filter.bathrooms.$lte = query.maxBathrooms;
+        }
+    }
+
     if (query.minRent !== undefined || query.maxRent !== undefined) {
         filter["pricing.monthlyRent"] = {};
 

@@ -7,6 +7,7 @@ import { RISK_SEVERITIES, RISK_TYPES } from "../models/ContractRiskAnalysis.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
 import { searchSections } from "./legalSource.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
+import { trackAIUsage } from "./aiUsage.service.js";
 
 // Contract Risk Intelligence: finds wording the parties should look at
 // again (ambiguous, missing, contradictory or one-sided terms). Rule checks
@@ -294,7 +295,7 @@ Rules:
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= new Anthropic();
+    defaultClient ??= trackAIUsage(new Anthropic(), "contract_risk");
     return defaultClient;
 };
 

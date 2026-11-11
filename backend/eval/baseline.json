@@ -1,0 +1,18 @@
+{
+    "note": "Minimum scores for the deterministic evaluations, set from the first measured run (keyword mode still misses: rent-increase also matches the deposit and receipt sections; eviction matches the notice section first). npm run eval -- --check and test/evalRegression.test.js fail below these. Raise them when scores improve; lower them only for an intended change, with the reason in the commit message. risk_detection and source_retrieval were added with their first measured run (source_retrieval is judged on recall@3; its precision is low by design).",
+    "missing_information": {
+        "f1": 0.95,
+        "exactMatchRate": 0.85
+    },
+    "legal_citation": {
+        "f1": 0.75,
+        "exactMatchRate": 0.75
+    },
+    "risk_detection": {
+        "f1": 0.95,
+        "exactMatchRate": 0.85
+    },
+    "source_retrieval": {
+        "recall": 1.0
+    }
+}

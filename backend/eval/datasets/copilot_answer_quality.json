@@ -1,0 +1,150 @@
+{
+    "name": "neve-copilot-answer-quality",
+    "version": "1",
+    "task": "copilot_answer_quality",
+    "description": "Live-only. Questions put to Legal Copilot with the synthetic pack. Labels are the section numbers that genuinely support an answer; questions the pack doesn't cover expect the single label 'abstain' (Copilot reports the question as not covered and cites nothing). A citation to a section that doesn't support the answer, or any citation for an out-of-scope question, is a false positive, so precision is the supported-citation rate and false positives are hallucinated support. The pack is copied from neve-legal-retrieval; it is invented for testing, is not real law and must never be loaded as an approved source.",
+    "sourcePack": [
+        {
+            "_id": "000000000000000000000001",
+            "sourceKey": "eval-sample-tenancy-rules",
+            "version": 1,
+            "title": "Sample Tenancy Rules (evaluation only)",
+            "citation": "Synthetic",
+            "sections": [
+                {
+                    "_id": "0000000000000000000000a1",
+                    "sectionNumber": "1",
+                    "heading": "Advance rent and security deposit",
+                    "text": "A landlord may take an advance or security deposit from the tenant only up to the amount agreed in writing, and must give a receipt for it.",
+                    "topics": [
+                        "deposit",
+                        "rent"
+                    ]
+                },
+                {
+                    "_id": "0000000000000000000000a2",
+                    "sectionNumber": "2",
+                    "heading": "Return of the deposit",
+                    "text": "When the tenancy ends, the landlord returns the deposit within a reasonable time, less any amount for unpaid rent or damage shown with evidence.",
+                    "topics": [
+                        "deposit"
+                    ]
+                },
+                {
+                    "_id": "0000000000000000000000a3",
+                    "sectionNumber": "3",
+                    "heading": "Rent receipts",
+                    "text": "The landlord gives a signed receipt for every rent payment, stating the amount and the month it covers.",
+                    "topics": [
+                        "rent"
+                    ]
+                },
+                {
+                    "_id": "0000000000000000000000a4",
+                    "sectionNumber": "4",
+                    "heading": "Rent increases",
+                    "text": "Rent may be increased only as the written agreement allows, and the tenant must be told in writing before the increase takes effect.",
+                    "topics": [
+                        "rent"
+                    ]
+                },
+                {
+                    "_id": "0000000000000000000000a5",
+                    "sectionNumber": "5",
+                    "heading": "Notice to end the tenancy",
+                    "text": "Either party ending a monthly tenancy gives written notice before the end of a rental month, as the agreement sets out.",
+                    "topics": [
+                        "notice",
+                        "term"
+                    ]
+                },
+                {
+                    "_id": "0000000000000000000000a6",
+                    "sectionNumber": "6",
+                    "heading": "Eviction",
+                    "text": "A tenant may be required to leave only for the reasons and through the steps the law allows, after notice in writing.",
+                    "topics": [
+                        "notice"
+                    ]
+                },
+                {
+                    "_id": "0000000000000000000000a7",
+                    "sectionNumber": "7",
+                    "heading": "Repairs and maintenance",
+                    "text": "The landlord keeps the premises in a fit state of repair; the tenant takes reasonable care and reports damage promptly.",
+                    "topics": [
+                        "maintenance"
+                    ]
+                },
+                {
+                    "_id": "0000000000000000000000a8",
+                    "sectionNumber": "8",
+                    "heading": "Utilities and service charges",
+                    "text": "Electricity, gas, water and service charges are paid by the party the agreement names; charges passed on must be shown with bills.",
+                    "topics": [
+                        "utilities"
+                    ]
+                }
+            ]
+        }
+    ],
+    "cases": [
+        {
+            "id": "deposit-return",
+            "question": "How soon must my landlord return my deposit after I move out?",
+            "expected": [
+                "2"
+            ]
+        },
+        {
+            "id": "rent-increase",
+            "question": "Can the rent go up without anything in writing?",
+            "expected": [
+                "4"
+            ]
+        },
+        {
+            "id": "notice",
+            "question": "What notice do I need to give to end a monthly tenancy?",
+            "expected": [
+                "5"
+            ]
+        },
+        {
+            "id": "repairs",
+            "question": "Who is responsible for repairs in a rented flat?",
+            "expected": [
+                "7"
+            ]
+        },
+        {
+            "id": "receipt-and-deposit",
+            "question": "Should I get a receipt for my advance and for each month's rent?",
+            "expected": [
+                "1",
+                "3"
+            ]
+        },
+        {
+            "id": "out-of-scope-pets",
+            "question": "Can my landlord ban pets in the building?",
+            "expected": [
+                "abstain"
+            ]
+        },
+        {
+            "id": "out-of-scope-tax",
+            "question": "Do I have to pay income tax on the rent I receive as a landlord?",
+            "expected": [
+                "abstain"
+            ]
+        },
+        {
+            "id": "out-of-scope-subletting",
+            "question": "Am I allowed to sublet one room to a friend?",
+            "expected": [
+                "abstain"
+            ]
+        }
+    ]
+}

@@ -1,11 +1,14 @@
 import mongoose from "mongoose";
+import Property from "../models/Property.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import TenancyCase from "../models/TenancyCase.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import { createNotification } from "../services/notification.service.js";
+import { renderCaseReportPdf } from "../services/reportPdf.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
 import {
+    buildCaseReport,
     buildSharedCaseFilter,
     findCaseForUser,
     isEvidenceForAgreement,
@@ -862,6 +865,69 @@ export async function updateTenancyCaseStatus(req, res, next) {
         });
         setPrivateResponse(res);
         return res.json({ success: true, data: tenancyCase });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/tenancy/cases/:caseId/report[?format=pdf]
+// One dispute case as a report: issues, statements the viewer may see,
+// evidence with hashes, review notes and a chronology.
+export async function getTenancyCaseReport(req, res, next) {
+    try {
+        const format = req.query.format ?? "json";
+        if (!["json", "pdf"].includes(format)) {
+            return res.status(400).json({ success: false, message: "format must be json or pdf." });
+        }
+        const result = await getCase(req, res);
+        if (!result) return;
+        const { tenancyCase, isSharedReviewer } = result;
+
+        const populated = await TenancyCase.findById(tenancyCase._id)
+            .populate("evidence.file", "originalName mimeType sizeBytes status sha256")
+            .populate("createdBy", "displayName role")
+            .populate("reviewEntries.author", "displayName role")
+            .populate("statements.author", "displayName role")
+            .populate("issues.addedBy", "displayName role")
+            .lean();
+        populated.statements = visibleStatements(populated.statements, req.neveUser._id, isSharedReviewer);
+
+        const agreement = await TenancyAgreement.findById(tenancyCase.agreement).select("title property renter landlord").lean();
+        let agreementInfo = null;
+        if (agreement) {
+            const [property, people] = await Promise.all([
+                Property.findById(agreement.property).setOptions({ includeDeleted: true }).select("title").lean(),
+                User.find({ _id: { $in: [agreement.renter, agreement.landlord].filter(Boolean) } }).select("displayName").lean(),
+            ]);
+            const nameFor = (id) => people.find((person) => String(person._id) === String(id))?.displayName ?? null;
+            agreementInfo = {
+                title: agreement.title ?? null,
+                propertyTitle: property?.title ?? null,
+                renterName: nameFor(agreement.renter),
+                landlordName: nameFor(agreement.landlord),
+            };
+        }
+
+        const report = buildCaseReport({ tenancyCase: populated, viewerId: req.neveUser._id, isSharedReviewer, agreement: agreementInfo });
+        await recordSensitiveAccess({
+            actor: req.neveUser._id,
+            action: format === "pdf" ? "tenancy_case_report_pdf_generated" : "tenancy_case_report_generated",
+            resourceType: "case",
+            resourceId: tenancyCase._id,
+            agreement: tenancyCase.agreement,
+            details: { scope: isSharedReviewer ? "shared_case" : "agreement" },
+            ipAddress: req.ip,
+        });
+
+        setPrivateResponse(res);
+        if (format === "pdf") {
+            const pdf = renderCaseReportPdf(report);
+            res.set("Content-Type", "application/pdf");
+            res.set("Content-Disposition", `attachment; filename="neve-dispute-case-${tenancyCase._id}.pdf"`);
+            res.set("Content-Length", String(pdf.length));
+            return res.end(pdf);
+        }
+        return res.json({ success: true, data: report });
     } catch (error) {
         next(error);
     }

@@ -1,5 +1,5 @@
 import { CLAUSE_CATEGORIES } from "./agreementExtraction.service.js";
-import { LEGAL_SOURCE_TYPES } from "../models/LegalSource.js";
+import { APPLICABILITY_SCOPES, LEGAL_SOURCE_TYPES } from "../models/LegalSource.js";
 
 // Draft input, the review workflow's allowed moves, and keyword retrieval of
 // approved sections.
@@ -12,7 +12,7 @@ export function validateLegalSourceInput(body, { partial = false } = {}) {
     if (!isObject(body)) return { error: "Request body must be an object." };
     const allowed = [
         "sourceKey", "jurisdiction", "sourceType", "title", "citation", "sourceUrl",
-        "language", "effectiveFrom", "changeSummary", "sections", "documentFileId",
+        "language", "effectiveFrom", "changeSummary", "sections", "documentFileId", "applicability",
     ];
     const unknown = Object.keys(body).filter((key) => !allowed.includes(key));
     if (unknown.length) return { error: `Unsupported fields: ${unknown.join(", ")}` };
@@ -56,6 +56,11 @@ export function validateLegalSourceInput(body, { partial = false } = {}) {
         if (date !== null && Number.isNaN(date.getTime())) return { error: "effectiveFrom must be a date." };
         value.effectiveFrom = date;
     }
+    if (body.applicability !== undefined) {
+        const { applicability, error } = validateApplicability(body.applicability);
+        if (error) return { error };
+        value.applicability = applicability;
+    }
     if (need("sections")) {
         if (!Array.isArray(body.sections) || body.sections.length < 1 || body.sections.length > 500) {
             return { error: "sections must list 1 to 500 sections." };
@@ -90,6 +95,31 @@ export function validateLegalSourceInput(body, { partial = false } = {}) {
     return { value };
 }
 
+// Applicability: { summary?, appliesTo?, regions?, exclusions? }.
+export function validateApplicability(input) {
+    if (!isObject(input)) return { error: "applicability must be an object." };
+    const unknown = Object.keys(input).filter((key) => !["summary", "appliesTo", "regions", "exclusions"].includes(key));
+    if (unknown.length) return { error: `Unsupported applicability fields: ${unknown.join(", ")}` };
+    if (!optionalText(input.summary, 2000)) return { error: "applicability.summary must be at most 2000 characters." };
+    if (!optionalText(input.exclusions, 2000)) return { error: "applicability.exclusions must be at most 2000 characters." };
+    const appliesTo = input.appliesTo ?? [];
+    if (!Array.isArray(appliesTo) || !appliesTo.every((scope) => APPLICABILITY_SCOPES.includes(scope))) {
+        return { error: `applicability.appliesTo must be from: ${APPLICABILITY_SCOPES.join(", ")}.` };
+    }
+    const regions = input.regions ?? [];
+    if (!Array.isArray(regions) || regions.length > 50 || !regions.every((region) => text(region, 100))) {
+        return { error: "applicability.regions must list up to 50 names of at most 100 characters." };
+    }
+    return {
+        applicability: {
+            summary: input.summary?.trim() ?? "",
+            appliesTo: [...new Set(appliesTo)],
+            regions: [...new Set(regions.map((region) => region.trim()))],
+            exclusions: input.exclusions?.trim() ?? "",
+        },
+    };
+}
+
 // Allowed status moves: who may make them, and from where.
 // Admins and legal reviewers draft and submit; only legal reviewers decide.
 // Rejected sources are never part of the approved knowledge base.
@@ -109,6 +139,9 @@ export const TRANSITION_HISTORY = {
     retire: "retired",
 };
 
+// Review decisions an assignment reserves for the assigned reviewer.
+export const DECISIONS = new Set(["approve", "request_changes", "reject"]);
+
 export function checkTransition(source, action, actor) {
     const transition = TRANSITIONS[action];
     if (!transition) return { error: "Unknown action.", status: 400 };
@@ -118,6 +151,10 @@ export function checkTransition(source, action, actor) {
     }
     if (!transition.from.includes(source.status)) {
         return { error: `A ${source.status} legal source can't be moved with ${action}.`, status: 409 };
+    }
+    const assignee = source.assignedReviewer?.user;
+    if (DECISIONS.has(action) && assignee && String(assignee) !== String(actor._id)) {
+        return { error: "This legal source is assigned to another reviewer.", status: 403 };
     }
     return { value: transition };
 }

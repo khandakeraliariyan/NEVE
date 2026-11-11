@@ -9,6 +9,7 @@ import {
 import mongoose from "mongoose";
 
 import { env } from "../config/env.js";
+import { currentPolicyValues } from "./platformSettings.service.js";
 import { requireR2 } from "../config/r2.js";
 
 // Database backups to private object storage. Each backup is a folder
@@ -91,7 +92,7 @@ export async function runBackup({ now = new Date(), deps = {} } = {}) {
         })
     );
 
-    const pruned = await pruneOldBackups({ client, bucket, keep: env.BACKUP_RETENTION_COUNT });
+    const pruned = await pruneOldBackups({ client, bucket, keep: (await currentPolicyValues()).backupRetentionCount });
 
     return {
         backupId: id,

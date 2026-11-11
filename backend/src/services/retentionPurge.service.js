@@ -8,7 +8,7 @@ import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
 import UploadedFile from "../models/UploadedFile.js";
 import User from "../models/User.js";
 import VerificationRequest from "../models/VerificationRequest.js";
-import { env } from "../config/env.js";
+import { currentPolicyValues } from "./platformSettings.service.js";
 import { deleteStoredObject } from "./fileUpload.service.js";
 
 // Deletes files Neve no longer needs to keep:
@@ -38,7 +38,7 @@ const RETENTION_DATED_PURPOSES = [
 // The verified number and date of birth stay on the user's profile; the
 // copies on closed requests are removed after the document retention period.
 export async function clearClosedIdentityDetails(now = new Date(), Requests = VerificationRequest) {
-    const closedBefore = new Date(now.getTime() - env.VERIFICATION_DOCUMENT_RETENTION_DAYS * DAY_MS);
+    const closedBefore = new Date(now.getTime() - (await currentPolicyValues()).verificationDocumentRetentionDays * DAY_MS);
     const result = await Requests.updateMany(
         {
             type: "identity",
@@ -84,7 +84,7 @@ export async function isFileReferenced(fileId) {
 export async function findPurgeCandidates(now = new Date()) {
     const abandoned = await UploadedFile.find({
         status: "pending_upload",
-        createdAt: { $lte: new Date(now.getTime() - env.ABANDONED_UPLOAD_HOURS * HOUR_MS) },
+        createdAt: { $lte: new Date(now.getTime() - (await currentPolicyValues()).abandonedUploadHours * HOUR_MS) },
     })
         .select("_id storageKey purpose")
         .limit(MAX_FILES_PER_RUN)
@@ -100,7 +100,7 @@ export async function findPurgeCandidates(now = new Date()) {
         .limit(MAX_FILES_PER_RUN)
         .lean();
 
-    const closedBefore = new Date(now.getTime() - env.VERIFICATION_DOCUMENT_RETENTION_DAYS * DAY_MS);
+    const closedBefore = new Date(now.getTime() - (await currentPolicyValues()).verificationDocumentRetentionDays * DAY_MS);
     const closedRequests = await VerificationRequest.find({
         status: { $in: ["approved", "rejected", "cancelled"] },
         updatedAt: { $lte: closedBefore },

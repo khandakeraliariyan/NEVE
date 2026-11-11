@@ -1,5 +1,7 @@
+import mongoose from "mongoose";
 import { z } from "zod";
 
+import { env } from "../config/env.js";
 import EmailTemplate from "../models/EmailTemplate.js";
 import PlatformSetting from "../models/PlatformSetting.js";
 import { NOTIFICATION_TYPES, isSecurityType } from "./notificationTypes.js";
@@ -23,6 +25,12 @@ export const DEFAULT_SETTINGS = Object.freeze({
         reviewersCanSeeAiEvaluations: true,
         landlordsCanInviteRenters: true,
     },
+    dataPolicies: {
+        accountDeletionFileRetentionDays: null,
+        verificationDocumentRetentionDays: null,
+        abandonedUploadHours: null,
+        backupRetentionCount: null,
+    },
     privacyPolicy: { version: 1, text: 'Neve keeps your rental records private by default. Tenancy documents, statements and identity details are visible only to you, the other party where you share them, and legal reviewers you choose. Personal identifiers are removed before any document or question is sent to an AI model. You can export your data or ask for your account to be deleted at any time from Settings.', updatedAt: null },
 });
 
@@ -43,6 +51,7 @@ function withDefaults(doc) {
         announcement: { ...DEFAULT_SETTINGS.announcement, ...(doc?.announcement ?? {}) },
         integrations: { ...DEFAULT_SETTINGS.integrations, ...(doc?.integrations ?? {}) },
         rolePermissions: { ...DEFAULT_SETTINGS.rolePermissions, ...(doc?.rolePermissions ?? {}) },
+        dataPolicies: { ...DEFAULT_SETTINGS.dataPolicies, ...(doc?.dataPolicies ?? {}) },
         privacyPolicy: {
             ...DEFAULT_SETTINGS.privacyPolicy,
             ...(doc?.privacyPolicy ?? {}),
@@ -125,9 +134,51 @@ export const SettingsSchema = z
             .partial()
             .strict()
             .optional(),
+        // null clears an override so the environment default applies again.
+        dataPolicies: z
+            .object({
+                accountDeletionFileRetentionDays: z.number().int().min(0).max(3650).nullable(),
+                verificationDocumentRetentionDays: z.number().int().min(1).max(3650).nullable(),
+                abandonedUploadHours: z.number().int().min(1).max(720).nullable(),
+                backupRetentionCount: z.number().int().min(1).max(365).nullable(),
+            })
+            .partial()
+            .strict()
+            .optional(),
         privacyPolicy: z.object({ text: z.string().trim().min(50).max(20000) }).strict().optional(),
     })
     .strict();
+
+const POLICY_ENV = {
+    accountDeletionFileRetentionDays: "ACCOUNT_DELETION_FILE_RETENTION_DAYS",
+    verificationDocumentRetentionDays: "VERIFICATION_DOCUMENT_RETENTION_DAYS",
+    abandonedUploadHours: "ABANDONED_UPLOAD_HOURS",
+    backupRetentionCount: "BACKUP_RETENTION_COUNT",
+};
+
+// Retention and backup limits in force: an admin's value, else the env default.
+export function effectivePolicies(settings = settingsSnapshot(), environment = env) {
+    const policies = {};
+    for (const [key, envName] of Object.entries(POLICY_ENV)) {
+        const override = settings?.dataPolicies?.[key];
+        policies[key] = Number.isInteger(override)
+            ? { value: override, source: "setting" }
+            : { value: environment[envName], source: "environment" };
+    }
+    return policies;
+}
+
+// Just the numbers, for the jobs that apply them.
+export function policyValues(settings = settingsSnapshot(), environment = env) {
+    return Object.fromEntries(Object.entries(effectivePolicies(settings, environment)).map(([key, entry]) => [key, entry.value]));
+}
+
+// Fresh policy values for a job run. Without a database connection a read
+// would only wait for the driver's buffer timeout, so the last snapshot is used.
+export async function currentPolicyValues() {
+    if (mongoose.connection.readyState !== 1) return policyValues();
+    return policyValues(await getSettings());
+}
 
 export const TemplateSchema = z
     .object({
