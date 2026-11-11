@@ -6,6 +6,7 @@ import {
     getAdminReports,
     getAdminWarnings,
     getAdminClaims,
+    getAIUsage,
 } from "../controllers/adminDashboard.controller.js";
 import { getCommunicationReports } from "../controllers/communicationReport.controller.js";
 
@@ -21,6 +22,7 @@ router.get("/overview", getAdminOverview);
 router.get("/reports", getAdminReports);
 router.get("/warnings", getAdminWarnings);
 router.get("/claims", getAdminClaims);
+router.get("/ai-usage", getAIUsage);
 router.get("/communication-reports", getCommunicationReports);
 
 export default router;

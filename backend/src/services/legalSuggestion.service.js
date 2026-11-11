@@ -10,6 +10,7 @@ import TenancyRecordLink from "../models/TenancyRecordLink.js";
 import { isExtractionConfigured } from "./agreementExtraction.service.js";
 import { searchSections } from "./legalSource.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
+import { trackAIUsage } from "./aiUsage.service.js";
 
 // Finds approved legal-source sections relevant to each clause of an
 // agreement. Retrieval ranks approved sections by topic and shared words;
@@ -49,7 +50,7 @@ For each clause you get a short list of candidate sections, each with an ID. Cho
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= new Anthropic();
+    defaultClient ??= trackAIUsage(new Anthropic(), "legal_suggestion");
     return defaultClient;
 };
 

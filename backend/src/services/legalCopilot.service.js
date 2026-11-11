@@ -6,6 +6,7 @@ import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
 import { searchSections } from "./legalSource.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
+import { trackAIUsage } from "./aiUsage.service.js";
 
 // Legal Copilot: answers questions about rental law and about one agreement,
 // using only legal-source sections a legal reviewer approved and the
@@ -47,7 +48,7 @@ How to answer:
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= new Anthropic();
+    defaultClient ??= trackAIUsage(new Anthropic(), "legal_copilot");
     return defaultClient;
 };
 

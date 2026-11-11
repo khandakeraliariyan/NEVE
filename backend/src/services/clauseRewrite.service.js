@@ -5,6 +5,7 @@ import { maskPersonalIdentifiers } from "./piiMasking.service.js";
 
 import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
+import { trackAIUsage } from "./aiUsage.service.js";
 
 // Claude suggests balanced wording for one clause, grounded only in approved
 // legal-source sections that were retrieved for it. A suggestion is a draft
@@ -33,7 +34,7 @@ Rules:
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= new Anthropic();
+    defaultClient ??= trackAIUsage(new Anthropic(), "clause_rewrite");
     return defaultClient;
 };
 

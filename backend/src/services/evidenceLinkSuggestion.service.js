@@ -6,6 +6,7 @@ import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
 import { textDocumentBlock } from "./aiDocument.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
+import { trackAIUsage } from "./aiUsage.service.js";
 
 // Claude reads one evidence file and proposes how it relates to the
 // agreement's clauses, obligations and payment records. Proposals are stored
@@ -50,7 +51,7 @@ Rules:
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= new Anthropic();
+    defaultClient ??= trackAIUsage(new Anthropic(), "evidence_link_suggestion");
     return defaultClient;
 };
 
