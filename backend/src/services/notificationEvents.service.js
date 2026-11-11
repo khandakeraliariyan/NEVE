@@ -435,3 +435,21 @@ export function notifyAIEvaluationRecorded({ run, actorId }) {
         );
     });
 }
+
+// A reviewer is told when an admin assigns a source to them.
+export function notifyLegalSourceAssigned({ source, reviewerId, note = "", actorId }) {
+    return safely("legal source assigned", async () => {
+        if (String(reviewerId) === String(actorId)) return;
+        const extra = note.trim() ? ` Note: ${note.trim().slice(0, 300)}` : "";
+        return notifyAll(
+            [{
+                recipient: reviewerId,
+                type: "legal_source_assigned",
+                title: "A legal source was assigned to you",
+                message: `${sourceName(source)} (version ${source.version ?? 1}, ${source.status.replace("_", " ")}) is assigned to you for review.${extra}`,
+                link: "/legal-review",
+            }],
+            "legal source assigned"
+        );
+    });
+}

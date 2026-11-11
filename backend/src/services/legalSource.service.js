@@ -139,6 +139,9 @@ export const TRANSITION_HISTORY = {
     retire: "retired",
 };
 
+// Review decisions an assignment reserves for the assigned reviewer.
+export const DECISIONS = new Set(["approve", "request_changes", "reject"]);
+
 export function checkTransition(source, action, actor) {
     const transition = TRANSITIONS[action];
     if (!transition) return { error: "Unknown action.", status: 400 };
@@ -148,6 +151,10 @@ export function checkTransition(source, action, actor) {
     }
     if (!transition.from.includes(source.status)) {
         return { error: `A ${source.status} legal source can't be moved with ${action}.`, status: 409 };
+    }
+    const assignee = source.assignedReviewer?.user;
+    if (DECISIONS.has(action) && assignee && String(assignee) !== String(actor._id)) {
+        return { error: "This legal source is assigned to another reviewer.", status: 403 };
     }
     return { value: transition };
 }

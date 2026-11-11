@@ -44,6 +44,7 @@ export const NOTIFICATION_TYPES = [
     "legal_source_flagged",
     "copilot_answer_reported",
     "legal_source_decided",
+    "legal_source_assigned",
     "legal_source_published",
     "citation_review_requested",
     "ai_evaluation_recorded",
@@ -115,6 +116,7 @@ export function defaultNotificationLink(notification) {
         case "legal_source_submitted":
         case "legal_source_flagged":
         case "legal_source_decided":
+        case "legal_source_assigned":
         case "legal_source_published":
             return "/legal-review";
         case "citation_review_requested":

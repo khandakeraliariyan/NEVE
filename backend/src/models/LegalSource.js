@@ -31,7 +31,7 @@ const reviewEventSchema = new mongoose.Schema(
         actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         action: {
             type: String,
-            enum: ["created", "edited", "submitted", "approved", "changes_requested", "rejected", "retired", "flagged", "flag_resolved"],
+            enum: ["created", "edited", "submitted", "approved", "changes_requested", "rejected", "retired", "flagged", "flag_resolved", "assigned", "unassigned"],
             required: true,
         },
         note: { type: String, trim: true, maxlength: 2000, default: "" },
@@ -84,6 +84,16 @@ const legalSourceSchema = new mongoose.Schema(
         reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
         reviewedAt: { type: Date, default: null },
         reviewNote: { type: String, trim: true, maxlength: 2000, default: "" },
+        // Set by an admin: only this reviewer may decide the source while assigned.
+        assignedReviewer: {
+            type: {
+                _id: false,
+                user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                assignedAt: { type: Date, default: Date.now },
+            },
+            default: null,
+        },
         retiredAt: { type: Date, default: null },
         rejectedAt: { type: Date, default: null },
         // The uploaded original (PDF or text), for checking authenticity.
@@ -117,5 +127,6 @@ legalSourceSchema.index(
     { unique: true, partialFilterExpression: { status: "approved" }, name: "one_approved_version" }
 );
 legalSourceSchema.index({ jurisdiction: 1, status: 1 });
+legalSourceSchema.index({ "assignedReviewer.user": 1, status: 1 });
 
 export default mongoose.model("LegalSource", legalSourceSchema);

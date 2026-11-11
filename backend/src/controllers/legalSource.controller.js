@@ -1,12 +1,14 @@
 import mongoose from "mongoose";
 import { flagOutdatedCitations, listOutdatedCitationSources } from "../services/legalCitationCurrency.service.js";
 import {
+    notifyLegalSourceAssigned,
     notifyLegalSourceDecided,
     notifyLegalSourceFlagged,
     notifyLegalSourcePublished,
     notifyLegalSourceSubmitted,
 } from "../services/notificationEvents.service.js";
 
+import User from "../models/User.js";
 import LegalSource, { FLAG_REASONS } from "../models/LegalSource.js";
 import UploadedFile from "../models/UploadedFile.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
@@ -132,6 +134,14 @@ export async function listLegalSourcesForStaff(req, res, next) {
         }
         if (req.query.jurisdiction) filter.jurisdiction = String(req.query.jurisdiction);
         if (req.query.flagged === "true") filter.flags = { $elemMatch: { resolvedAt: null } };
+        // ?assignedTo=me | <userId> | none
+        if (req.query.assignedTo !== undefined) {
+            const assignedTo = String(req.query.assignedTo);
+            if (assignedTo === "none") filter.assignedReviewer = null;
+            else if (assignedTo === "me") filter["assignedReviewer.user"] = req.neveUser._id;
+            else if (mongoose.isValidObjectId(assignedTo)) filter["assignedReviewer.user"] = assignedTo;
+            else return res.status(400).json({ success: false, message: "assignedTo must be me, none or a user ID." });
+        }
         const [data, total] = await Promise.all([
             LegalSource.find(filter)
                 .select("-sections.text")
@@ -398,6 +408,123 @@ export async function getOutdatedCitations(req, res, next) {
         const data = await listOutdatedCitationSources({ limit });
         privateResponse(res);
         return res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PATCH /api/v1/admin/legal-sources/:sourceId/assignment  { reviewerId: string | null, note? }
+// Assigns a source to one verified legal reviewer, or clears the assignment.
+export async function assignLegalSource(req, res, next) {
+    try {
+        const { reviewerId, note = "" } = req.body ?? {};
+        if (typeof note !== "string" || note.length > 2000) {
+            return res.status(400).json({ success: false, message: "note must be at most 2000 characters." });
+        }
+        if (reviewerId !== null && !mongoose.isValidObjectId(reviewerId)) {
+            return res.status(400).json({ success: false, message: "reviewerId must be a user ID, or null to clear the assignment." });
+        }
+        const source = await loadSource(req, res);
+        if (!source) return;
+        if (["rejected", "retired"].includes(source.status)) {
+            return res.status(409).json({ success: false, message: `A ${source.status} legal source can't be assigned.` });
+        }
+
+        const now = new Date();
+        const previous = source.assignedReviewer?.user ?? null;
+        let reviewer = null;
+        if (reviewerId === null) {
+            if (!previous) return res.status(409).json({ success: false, message: "This legal source isn't assigned." });
+            source.assignedReviewer = null;
+            source.history.push({ actor: req.neveUser._id, action: "unassigned", note: note.trim(), createdAt: now });
+        } else {
+            reviewer = await User.findOne({
+                _id: reviewerId,
+                role: "legal_reviewer",
+                isActive: true,
+                deletedAt: null,
+                "verification.credential.status": "verified",
+            }).select("_id displayName");
+            if (!reviewer) {
+                return res.status(404).json({ success: false, message: "Active legal reviewer with verified credentials not found." });
+            }
+            if (previous && String(previous) === String(reviewer._id)) {
+                return res.status(409).json({ success: false, message: "This legal source is already assigned to that reviewer." });
+            }
+            if (String(source.createdBy) === String(reviewer._id) && source.status === "in_review") {
+                return res.status(409).json({ success: false, message: "A reviewer can't be assigned to approve a source they drafted." });
+            }
+            source.assignedReviewer = { user: reviewer._id, assignedBy: req.neveUser._id, assignedAt: now };
+            const label = reviewer.displayName ? `Assigned to ${reviewer.displayName}.` : "Assigned.";
+            source.history.push({ actor: req.neveUser._id, action: "assigned", note: [label, note.trim()].filter(Boolean).join(" ").slice(0, 2000), createdAt: now });
+        }
+        await source.save();
+
+        if (reviewer) {
+            await notifyLegalSourceAssigned({ source, reviewerId: reviewer._id, note, actorId: req.neveUser._id });
+        }
+        await auditIfAdmin(req, {
+            action: reviewer ? "legal_source_assigned" : "legal_source_unassigned",
+            targetType: "legal_source",
+            targetId: source._id,
+            details: { sourceKey: source.sourceKey, version: source.version, reviewer: reviewer?._id ?? null, previousReviewer: previous },
+        });
+        privateResponse(res);
+        return res.json({ success: true, data: source });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/admin/legal-sources/reviewer-activity?days=90
+// Each legal reviewer's open assignments and review decisions in the window.
+export async function getReviewerActivity(req, res, next) {
+    try {
+        const days = req.query.days === undefined ? 90 : Number(req.query.days);
+        if (!Number.isInteger(days) || days < 1 || days > 365) {
+            return res.status(400).json({ success: false, message: "days must be a whole number from 1 to 365." });
+        }
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const [reviewers, assigned, decisions] = await Promise.all([
+            User.find({ role: "legal_reviewer", deletedAt: null })
+                .select("displayName isActive verification.credential.status profile.reviewer.jurisdictions")
+                .lean(),
+            LegalSource.aggregate([
+                { $match: { "assignedReviewer.user": { $ne: null }, status: { $in: ["draft", "in_review", "approved"] } } },
+                { $group: { _id: { user: "$assignedReviewer.user", status: "$status" }, count: { $sum: 1 } } },
+            ]),
+            LegalSource.aggregate([
+                { $unwind: "$history" },
+                { $match: { "history.createdAt": { $gte: since }, "history.action": { $in: ["approved", "changes_requested", "rejected", "retired", "flagged", "flag_resolved"] } } },
+                { $group: { _id: { user: "$history.actor", action: "$history.action" }, count: { $sum: 1 }, last: { $max: "$history.createdAt" } } },
+            ]),
+        ]);
+        const rows = new Map(
+            reviewers.map((reviewer) => [String(reviewer._id), {
+                reviewer: {
+                    _id: reviewer._id,
+                    displayName: reviewer.displayName ?? "",
+                    isActive: reviewer.isActive !== false,
+                    credentialStatus: reviewer.verification?.credential?.status ?? "unverified",
+                    jurisdictions: reviewer.profile?.reviewer?.jurisdictions ?? [],
+                },
+                openAssignments: { draft: 0, in_review: 0 },
+                decisions: { approved: 0, changes_requested: 0, rejected: 0, retired: 0, flagged: 0, flag_resolved: 0 },
+                lastActivityAt: null,
+            }])
+        );
+        for (const row of assigned) {
+            const entry = rows.get(String(row._id.user));
+            if (entry && row._id.status in entry.openAssignments) entry.openAssignments[row._id.status] = row.count;
+        }
+        for (const row of decisions) {
+            const entry = rows.get(String(row._id.user));
+            if (!entry) continue;
+            entry.decisions[row._id.action] = row.count;
+            if (!entry.lastActivityAt || row.last > entry.lastActivityAt) entry.lastActivityAt = row.last;
+        }
+        privateResponse(res);
+        return res.json({ success: true, data: { days, reviewers: [...rows.values()] } });
     } catch (error) {
         next(error);
     }
