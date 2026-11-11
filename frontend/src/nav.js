@@ -88,6 +88,7 @@ const ADMIN_NAV = [
         title: "People & content",
         items: [
             { to: "/admin/users", label: "Users" },
+            { to: "/admin/appeals", label: "Account appeals" },
             { to: "/admin/reviewers", label: "Legal reviewers" },
             { to: "/admin/legal-sources", label: "Legal sources" },
         ],
