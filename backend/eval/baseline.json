@@ -1,0 +1,5 @@
+{
+    "note": "Minimum scores for the deterministic evaluations, set from the first measured run (keyword mode still misses: rent-increase also matches the deposit and receipt sections; eviction matches the notice section first). npm run eval -- --check and test/evalRegression.test.js fail below these. Raise them when scores improve; lower them only for an intended change, with the reason in the commit message.",
+    "missing_information": { "f1": 0.95, "exactMatchRate": 0.85 },
+    "legal_citation": { "f1": 0.75, "exactMatchRate": 0.75 }
+}
