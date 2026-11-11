@@ -33,6 +33,14 @@ const platformSettingSchema = new mongoose.Schema(
             reviewersCanSeeAiEvaluations: { type: Boolean, default: true },
             landlordsCanInviteRenters: { type: Boolean, default: true },
         },
+        // Retention and backup limits. null means "use the server's
+        // environment default" (ACCOUNT_DELETION_FILE_RETENTION_DAYS etc.).
+        dataPolicies: {
+            accountDeletionFileRetentionDays: { type: Number, min: 0, max: 3650, default: null },
+            verificationDocumentRetentionDays: { type: Number, min: 1, max: 3650, default: null },
+            abandonedUploadHours: { type: Number, min: 1, max: 720, default: null },
+            backupRetentionCount: { type: Number, min: 1, max: 365, default: null },
+        },
         // The privacy policy shown to everyone. Each change gets a new version.
         privacyPolicy: {
             version: { type: Number, min: 1, default: 1 },

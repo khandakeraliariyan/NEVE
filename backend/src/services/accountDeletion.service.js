@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { env } from "../config/env.js";
+import { currentPolicyValues, policyValues } from "./platformSettings.service.js";
 import Inquiry from "../models/Inquiry.js";
 import Notification from "../models/Notification.js";
 import NotificationDelivery from "../models/NotificationDelivery.js";
@@ -26,8 +26,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MEDIA_PURPOSES = ["profile_photo", "property_image", "property_video", "floor_plan"];
 
 export function deletionRules() {
-    const days = env.ACCOUNT_DELETION_FILE_RETENTION_DAYS;
-    const verificationDays = env.VERIFICATION_DOCUMENT_RETENTION_DAYS;
+    const policies = policyValues();
+    const days = policies.accountDeletionFileRetentionDays;
+    const verificationDays = policies.verificationDocumentRetentionDays;
     return {
         removedNow: [
             "Your name, email, phone number, photo, bio and profile details (replaced with \"Deleted user\")",
@@ -164,7 +165,7 @@ export async function deleteAccount(user, deps = {}) {
     );
 
     // Photos and listing media are deleted by the retention purge later.
-    const retentionUntil = new Date(now.getTime() + env.ACCOUNT_DELETION_FILE_RETENTION_DAYS * DAY_MS);
+    const retentionUntil = new Date(now.getTime() + (await currentPolicyValues()).accountDeletionFileRetentionDays * DAY_MS);
     const media = await UploadedFile.updateMany(
         { uploadedBy: user._id, purpose: { $in: MEDIA_PURPOSES }, status: "uploaded", legalHold: false },
         { $set: { retentionUntil } }
