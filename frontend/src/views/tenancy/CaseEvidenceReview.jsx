@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api } from "../../lib/api";
+import { api, downloadAuthenticated } from "../../lib/api";
 import { dateTime, label } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { useAuth } from "../../context/AuthContext";
@@ -220,6 +220,7 @@ export default function CaseEvidenceReview() {
     const detail = useApi(() => api.get(`/tenancy/cases/${caseId}`), [caseId]);
     const [selectedId, setSelectedId] = useState(null);
     const [error, setError] = useState(null);
+    const [downloading, setDownloading] = useState(false);
     const reviewer = role === "legal_reviewer";
     const canManage = ["renter", "landlord"].includes(role);
 
@@ -231,6 +232,18 @@ export default function CaseEvidenceReview() {
     const current = c.evidence.filter((e) => !e.removedAt);
     const removed = c.evidence.filter((e) => e.removedAt);
     const selected = current.find((e) => String(e.file?._id) === selectedId) ?? current[0];
+
+    async function downloadReport() {
+        setDownloading(true);
+        setError(null);
+        try {
+            await downloadAuthenticated(`/tenancy/cases/${caseId}/report?format=pdf`, `neve-dispute-case-${caseId}.pdf`);
+        } catch (err) {
+            setError(err);
+        } finally {
+            setDownloading(false);
+        }
+    }
 
     async function remove(fileId) {
         if (!window.confirm("Remove this file from the case? The removal stays in the case history.")) return;
@@ -265,9 +278,14 @@ export default function CaseEvidenceReview() {
                         Case #{String(c._id).slice(-6).toUpperCase()} · opened by {c.createdBy?.displayName} ({label(c.createdBy?.role)}) · {dateTime(c.createdAt)}
                     </p>
                 </div>
-                <div className="rounded-xl bg-panel px-5 py-3 text-center">
-                    <p className="text-3xl font-semibold text-forest">{current.length}</p>
-                    <p className="text-xs text-muted">selected file{current.length === 1 ? "" : "s"}</p>
+                <div className="flex flex-wrap items-center gap-3">
+                    <Button variant="outline" disabled={downloading} onClick={downloadReport}>
+                        {downloading ? "Preparing PDF…" : "Download case report (PDF)"}
+                    </Button>
+                    <div className="rounded-xl bg-panel px-5 py-3 text-center">
+                        <p className="text-3xl font-semibold text-forest">{current.length}</p>
+                        <p className="text-xs text-muted">selected file{current.length === 1 ? "" : "s"}</p>
+                    </div>
                 </div>
             </Card>
             <ErrorBox error={error} />
