@@ -59,7 +59,10 @@ export function ProfileDetailsCard({ profile, setProfile }) {
         barEnrolmentNumber: p.reviewer?.barEnrolmentNumber ?? "",
         jurisdictions: (p.reviewer?.jurisdictions ?? []).join(", "),
         expertise: p.reviewer?.expertise ?? "",
+        qualifications: (p.reviewer?.qualifications ?? []).map((q) => ({ title: q.title ?? "", institution: q.institution ?? "", year: q.year ?? "" })),
     });
+    const setQualification = (index, key, value) =>
+        setReviewer({ ...reviewer, qualifications: reviewer.qualifications.map((q, i) => (i === index ? { ...q, [key]: value } : q)) });
     const { busy, error, saved, save } = useSave(setProfile);
     const role = profile.role;
 
@@ -86,6 +89,13 @@ export function ProfileDetailsCard({ profile, setProfile }) {
                 barEnrolmentNumber: reviewer.barEnrolmentNumber.trim(),
                 jurisdictions: reviewer.jurisdictions.split(",").map((item) => item.trim()).filter(Boolean),
                 expertise: reviewer.expertise.trim(),
+                qualifications: reviewer.qualifications
+                    .filter((q) => q.title.trim())
+                    .map((q) => ({
+                        title: q.title.trim(),
+                        institution: q.institution.trim(),
+                        year: q.year === "" ? null : Number(q.year),
+                    })),
             };
         }
         save(body);
@@ -163,6 +173,36 @@ export function ProfileDetailsCard({ profile, setProfile }) {
                         <Field label="Area of expertise">
                             <input className="field" maxLength={300} value={reviewer.expertise} onChange={(e) => setReviewer({ ...reviewer, expertise: e.target.value })} />
                         </Field>
+                        <fieldset className="rounded-xl border border-line p-4">
+                            <legend className="px-1 text-sm font-medium text-ink">Qualifications</legend>
+                            <p className="mb-3 text-xs text-muted">Degrees and professional certificates, e.g. LLB, University of Dhaka, 2015. Shown on your public profile and included when you ask for a credential check.</p>
+                            <div className="space-y-2">
+                                {reviewer.qualifications.map((q, index) => (
+                                    <div key={index} className="grid gap-2 md:grid-cols-[1fr_1fr_7rem_auto]">
+                                        <input className="field" placeholder="Qualification" maxLength={150} value={q.title} onChange={(e) => setQualification(index, "title", e.target.value)} aria-label="Qualification" />
+                                        <input className="field" placeholder="Institution (optional)" maxLength={150} value={q.institution} onChange={(e) => setQualification(index, "institution", e.target.value)} aria-label="Institution" />
+                                        <input type="number" className="field" placeholder="Year" min={1950} max={new Date().getFullYear()} value={q.year} onChange={(e) => setQualification(index, "year", e.target.value)} aria-label="Year" />
+                                        <button
+                                            type="button"
+                                            className="text-xs text-rose-ink"
+                                            onClick={() => setReviewer({ ...reviewer, qualifications: reviewer.qualifications.filter((_, i) => i !== index) })}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            {reviewer.qualifications.length < 10 && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="mt-2"
+                                    onClick={() => setReviewer({ ...reviewer, qualifications: [...reviewer.qualifications, { title: "", institution: "", year: "" }] })}
+                                >
+                                    + Add qualification
+                                </Button>
+                            )}
+                        </fieldset>
                     </>
                 )}
 
