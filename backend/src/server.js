@@ -3,6 +3,13 @@ import app from "./app.js";
 import { connectDatabase } from "./config/database.js";
 import { startScheduledJobs } from "./services/systemJobs.service.js";
 import { keepSettingsFresh } from "./services/platformSettings.service.js";
+import { recordSystemError } from "./services/systemErrors.service.js";
+
+// Keep crashes outside a request visible to admins too.
+process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled rejection:", reason);
+    recordSystemError({ error: reason instanceof Error ? reason : new Error(String(reason)), source: "process" });
+});
 
 async function startServer() {
     try {

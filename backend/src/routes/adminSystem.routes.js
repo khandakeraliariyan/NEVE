@@ -3,6 +3,8 @@ import express from "express";
 import {
     getNotificationDeliverySummary,
     getSystemHealth,
+    listSystemErrors,
+    updateSystemError,
     listNotificationDeliveries,
     listSystemJobRuns,
     retryNotificationDelivery,
@@ -22,6 +24,8 @@ router.use(allowRoles("admin"));
 
 router.get("/health", getSystemHealth);
 router.get("/jobs", listSystemJobRuns);
+router.get("/errors", listSystemErrors);
+router.patch("/errors/:errorId", updateSystemError);
 router.post("/retention-purge", runRetentionPurgeNow);
 router.post("/backups", runBackupNow);
 router.post("/notification-reminders", runNotificationRemindersNow);
