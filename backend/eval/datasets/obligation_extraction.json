@@ -1,0 +1,35 @@
+{
+    "name": "neve-obligation-extraction",
+    "version": "1",
+    "task": "obligation_extraction",
+    "description": "Live-only. The documents of neve-agreement-extraction with the obligations a careful reader expects, labelled responsibleParty:category, where category is compliance.service guessCategory() of the obligation description (payment, maintenance, notice, property, other). Labels are a set, so several payments by the renter count once. All text is invented for testing.",
+    "cases": [
+        {
+            "id": "standard-agreement",
+            "documentText": "--- Page 1 ---\nRENTAL AGREEMENT\nThis agreement is made on 1 January 2026 between Landlord A (owner) and Tenant B (tenant) for Flat 4C, Road 12, Dhanmondi, Dhaka.\n1. Term: The tenancy starts on 1 January 2026 and ends on 31 December 2026.\n2. Rent: The tenant shall pay monthly rent of Tk 25,000 by the 5th day of each month.\n3. Advance: The tenant has paid two months' rent, Tk 50,000, as advance, refundable at the end of the tenancy after deductions for unpaid bills.\n4. Utilities: Electricity and gas bills are paid by the tenant.\n5. Repairs: The landlord is responsible for structural repairs.\n6. Notice: Either party must give two months' written notice to end this agreement.",
+            "expected": [
+                "renter:payment",
+                "landlord:payment",
+                "landlord:maintenance",
+                "shared:notice"
+            ]
+        },
+        {
+            "id": "short-agreement",
+            "documentText": "--- Page 1 ---\nTenancy agreement for a room in Mirpur 10, Dhaka.\nRent: Tk 8,000 per month, paid in cash before the 10th.\nSecurity deposit: Tk 8,000, returned when the room is handed back in good condition.\nThe tenancy begins on 15 March 2026 for 11 months.\nOne month's notice is required from either side.",
+            "expected": [
+                "renter:payment",
+                "landlord:payment",
+                "shared:notice"
+            ]
+        },
+        {
+            "id": "missing-amounts",
+            "documentText": "--- Page 1 ---\nAgreement between the owner and the tenant of House 7, Uttara.\nThe tenant will pay rent as agreed verbally.\nThe tenant is responsible for keeping the house clean and for minor repairs.\nThe owner may increase the rent each year.",
+            "expected": [
+                "renter:payment",
+                "renter:maintenance"
+            ]
+        }
+    ]
+}

@@ -1,14 +1,25 @@
 import { createHash, randomBytes } from "node:crypto";
 
-// The first six are model-backed tasks. The last four are deterministic
-// features. backend/eval holds test sets and a runner (npm run eval) for
-// agreement_extraction, legal_citation and missing_information.
+// Model-backed and retrieval tasks first, then deterministic features.
+// backend/eval holds test sets and a runner (npm run eval) for
+// agreement_extraction, obligation_extraction, missing_information,
+// risk_detection, legal_citation, source_retrieval and copilot_answer_quality.
+// Every task except ocr is scored on label sets (precision/recall/F1):
+// - obligation_extraction: responsibleParty:category of each obligation
+// - risk_detection: risk types found (rules, plus the AI review when live)
+// - source_retrieval: section numbers in the top k retrieved (read recall@k)
+// - copilot_answer_quality: sections cited, or "abstain" when the question
+//   isn't covered; false positives are unsupported (hallucinated) citations
 export const AI_EVALUATION_TASKS = [
     "ocr",
     "agreement_extraction",
+    "obligation_extraction",
     "evidence_link_accuracy",
     "missing_information",
+    "risk_detection",
     "legal_citation",
+    "source_retrieval",
+    "copilot_answer_quality",
     "suspicious_listing",
     "cost_calculation",
     "distance_calculation",
