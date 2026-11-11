@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
-import { notifyLegalSourceFlagged, notifyLegalSourceSubmitted } from "../services/notificationEvents.service.js";
+import {
+    notifyLegalSourceDecided,
+    notifyLegalSourceFlagged,
+    notifyLegalSourcePublished,
+    notifyLegalSourceSubmitted,
+} from "../services/notificationEvents.service.js";
 
 import LegalSource, { FLAG_REASONS } from "../models/LegalSource.js";
 import UploadedFile from "../models/UploadedFile.js";
@@ -305,15 +310,17 @@ export async function transitionLegalSource(req, res, next) {
         }
 
         const now = new Date();
+        let replacedVersions = 0;
         if (action === "approve") {
             // Retire the version this one replaces, then approve.
-            await LegalSource.updateMany(
+            const replaced = await LegalSource.updateMany(
                 { sourceKey: source.sourceKey, status: "approved", _id: { $ne: source._id } },
                 {
                     $set: { status: "retired", retiredAt: now },
                     $push: { history: { actor: req.neveUser._id, action: "retired", note: `Replaced by version ${source.version}.`, createdAt: now } },
                 }
             );
+            replacedVersions = replaced?.modifiedCount ?? 0;
             source.reviewedBy = req.neveUser._id;
             source.reviewedAt = now;
             source.reviewNote = note.trim();
@@ -345,6 +352,12 @@ export async function transitionLegalSource(req, res, next) {
 
         if (action === "submit") {
             await notifyLegalSourceSubmitted({ source, actorId: req.neveUser._id });
+        }
+        if (["approve", "reject", "request_changes"].includes(action)) {
+            await notifyLegalSourceDecided({ source, action, note, actorId: req.neveUser._id });
+        }
+        if (action === "approve") {
+            await notifyLegalSourcePublished({ source, replacedVersions, actorId: req.neveUser._id });
         }
 
         if (req.neveUser.role === "admin") {

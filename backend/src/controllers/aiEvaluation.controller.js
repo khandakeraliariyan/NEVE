@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import AIEvaluationRun from "../models/AIEvaluationRun.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
+import { notifyAIEvaluationRecorded } from "../services/notificationEvents.service.js";
 import {
     AI_EVALUATION_TASKS as tasks,
     calculateEvaluationMetrics,
@@ -36,6 +37,7 @@ export async function createAIEvaluationRun(req, res, next) {
                 failureCount: run.failureCount,
             },
         });
+        await notifyAIEvaluationRecorded({ run, actorId: req.neveUser._id });
         setPrivateResponse(res);
         return res.status(201).json({
             success: true,
