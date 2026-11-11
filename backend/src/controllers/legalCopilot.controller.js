@@ -15,6 +15,7 @@ import {
 import { findAccessibleAgreement } from "../services/tenancyAgreement.service.js";
 import { notifyCopilotAnswerReported } from "../services/notificationEvents.service.js";
 import { maskPersonalIdentifiers } from "../services/piiMasking.service.js";
+import { annotateConversationCitations } from "../services/legalCitationCurrency.service.js";
 
 export const REVIEW_VERDICTS = ["accurate", "unsupported_claim", "misleading", "wrong_citation", "applicability_issue", "outdated_source"];
 
@@ -107,8 +108,10 @@ export async function getConversation(req, res, next) {
         const conversation = await findOwnConversation(req, res);
         if (!conversation) return;
         await conversation.populate("agreement", "title");
+        // Mark citations whose source version has since been replaced or withdrawn.
+        const data = await annotateConversationCitations(conversation.toObject());
         noStore(res);
-        return res.json({ success: true, data: conversation, aiAvailable: isExtractionConfigured(), disclaimer: COPILOT_DISCLAIMER });
+        return res.json({ success: true, data, aiAvailable: isExtractionConfigured(), disclaimer: COPILOT_DISCLAIMER });
     } catch (error) {
         next(error);
     }

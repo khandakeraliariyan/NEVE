@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { flagOutdatedCitations, listOutdatedCitationSources } from "../services/legalCitationCurrency.service.js";
 import {
     notifyLegalSourceDecided,
     notifyLegalSourceFlagged,
@@ -311,7 +312,11 @@ export async function transitionLegalSource(req, res, next) {
 
         const now = new Date();
         let replacedVersions = 0;
+        let retiredSources = [];
         if (action === "approve") {
+            retiredSources = await LegalSource.find({ sourceKey: source.sourceKey, status: "approved", _id: { $ne: source._id } })
+                .select("_id sourceKey version title citation jurisdiction")
+                .lean();
             // Retire the version this one replaces, then approve.
             const replaced = await LegalSource.updateMany(
                 { sourceKey: source.sourceKey, status: "approved", _id: { $ne: source._id } },
@@ -359,6 +364,11 @@ export async function transitionLegalSource(req, res, next) {
         if (action === "approve") {
             await notifyLegalSourcePublished({ source, replacedVersions, actorId: req.neveUser._id });
         }
+        // Whatever still cites a version that just left the knowledge base needs a reviewer's check.
+        if (action === "retire") retiredSources = [source];
+        if (retiredSources.length) {
+            await flagOutdatedCitations({ retiredSources, actorId: req.neveUser._id });
+        }
 
         if (req.neveUser.role === "admin") {
             await recordAdminAction({
@@ -371,6 +381,23 @@ export async function transitionLegalSource(req, res, next) {
         }
         privateResponse(res);
         return res.json({ success: true, data: source });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/v1/legal-review/citations/outdated?limit=50
+// GET /api/v1/admin/legal-sources/outdated-citations?limit=50
+// Retired source versions that Copilot answers or agreements still cite.
+export async function getOutdatedCitations(req, res, next) {
+    try {
+        const limit = req.query.limit === undefined ? 50 : Number(req.query.limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+            return res.status(400).json({ success: false, message: "limit must be a whole number from 1 to 200." });
+        }
+        const data = await listOutdatedCitationSources({ limit });
+        privateResponse(res);
+        return res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
