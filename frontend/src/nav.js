@@ -100,6 +100,7 @@ const ADMIN_NAV = [
             { to: "/admin/security", label: "Security & incidents" },
             { to: "/admin/data-retention", label: "Data retention" },
             { to: "/admin/system", label: "System jobs & delivery" },
+            { to: "/admin/system-errors", label: "System errors" },
             { to: "/admin/settings", label: "Platform settings" },
             { to: "/admin/ai-evaluations", label: "AI evaluations" },
             { to: "/admin/ai-usage", label: "AI usage & cost" },
