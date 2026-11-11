@@ -150,6 +150,8 @@ export async function submitVerificationRequest(req, res, next) {
             extra.credentialDetails = {
                 barEnrolmentNumber: reviewer.barEnrolmentNumber,
                 jurisdictions: reviewer.jurisdictions ?? [],
+                expertise: reviewer.expertise ?? "",
+                qualifications: reviewer.qualifications ?? [],
             };
         } else {
             property = await Property.findOne({ _id: value.property, status: { $ne: "deleted" } });

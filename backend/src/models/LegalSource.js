@@ -7,6 +7,7 @@ import { CLAUSE_CATEGORIES } from "../services/agreementExtraction.service.js";
 // versions for a jurisdiction form its legal-source pack. Approving a new
 // version retires the previous approved version of the same source.
 
+export const APPLICABILITY_SCOPES = ["residential", "commercial", "shared_accommodation", "mixed_use", "all_tenancies"];
 export const LEGAL_SOURCE_STATUSES = ["draft", "in_review", "approved", "rejected", "retired"];
 export const FLAG_REASONS = ["questionable_authenticity", "outdated", "incorrect_reference", "wrong_jurisdiction", "misleading_text", "other"];
 export const LEGAL_SOURCE_TYPES = ["act", "ordinance", "rule", "regulation", "court_decision", "official_guidance", "other"];
@@ -61,6 +62,15 @@ const legalSourceSchema = new mongoose.Schema(
         effectiveFrom: { type: Date, default: null },
         // What changed from the previous version.
         changeSummary: { type: String, trim: true, maxlength: 2000, default: "" },
+        // Who and what the source covers, so answers are not applied out of scope.
+        applicability: {
+            summary: { type: String, trim: true, maxlength: 2000, default: "" },
+            // Tenancy types the source covers, e.g. residential, commercial.
+            appliesTo: { type: [{ type: String, enum: APPLICABILITY_SCOPES }], default: [] },
+            // Areas within the jurisdiction, e.g. Dhaka City Corporation. Empty = whole jurisdiction.
+            regions: { type: [{ type: String, trim: true, maxlength: 100 }], default: [] },
+            exclusions: { type: String, trim: true, maxlength: 2000, default: "" },
+        },
         sections: {
             type: [sectionSchema],
             validate: {

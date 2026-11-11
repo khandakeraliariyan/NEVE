@@ -82,6 +82,18 @@ const userSchema = new mongoose.Schema(
                 barEnrolmentNumber: { type: String, trim: true, maxlength: 50, default: "" },
                 jurisdictions: { type: [{ type: String, trim: true, maxlength: 100 }], default: [] },
                 expertise: { type: String, trim: true, maxlength: 300, default: "" },
+                // Degrees and professional certificates, e.g. LLB, University of Dhaka, 2015.
+                qualifications: {
+                    type: [
+                        {
+                            _id: false,
+                            title: { type: String, trim: true, maxlength: 150, required: true },
+                            institution: { type: String, trim: true, maxlength: 150, default: "" },
+                            year: { type: Number, min: 1950, max: 2100, default: null },
+                        },
+                    ],
+                    default: [],
+                },
             },
         },
 

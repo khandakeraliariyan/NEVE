@@ -97,7 +97,7 @@ export function validateProfileFields(body, role) {
         const value = body.reviewerProfile;
         const invalid = validateObject(value, "reviewerProfile");
         if (invalid) return { error: invalid };
-        const extra = unknownKeys(value, ["barEnrolmentNumber", "jurisdictions", "expertise"]);
+        const extra = unknownKeys(value, ["barEnrolmentNumber", "jurisdictions", "expertise", "qualifications"]);
         if (extra.length) return { error: `Unsupported reviewerProfile fields: ${extra.join(", ")}` };
         if (value.barEnrolmentNumber !== undefined) {
             if (!text(value.barEnrolmentNumber, 50) || (value.barEnrolmentNumber.trim() && !/^[A-Za-z0-9/.\- ]{2,50}$/.test(value.barEnrolmentNumber.trim()))) {
@@ -114,6 +114,11 @@ export function validateProfileFields(body, role) {
         if (value.expertise !== undefined) {
             if (!text(value.expertise, 300)) return { error: "expertise must be at most 300 characters." };
             updates["profile.reviewer.expertise"] = value.expertise.trim();
+        }
+        if (value.qualifications !== undefined) {
+            const { qualifications, error } = normalizeQualifications(value.qualifications);
+            if (error) return { error };
+            updates["profile.reviewer.qualifications"] = qualifications;
         }
     }
 
@@ -258,7 +263,32 @@ export function buildPublicProfile(user, landlordStats = null) {
         profile.reviewer = {
             jurisdictions: user.profile?.reviewer?.jurisdictions ?? [],
             expertise: user.profile?.reviewer?.expertise ?? "",
+            qualifications: user.profile?.reviewer?.qualifications ?? [],
         };
     }
     return profile;
+}
+
+// Reviewer qualifications: up to 10 entries of { title, institution?, year? }.
+export function normalizeQualifications(input) {
+    const error = "qualifications must list up to 10 entries, each with a title (max 150 characters), an optional institution (max 150) and an optional year.";
+    if (!Array.isArray(input) || input.length > 10) return { error };
+    const currentYear = new Date().getFullYear();
+    const qualifications = [];
+    for (const item of input) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return { error };
+        const extra = Object.keys(item).filter((key) => !["title", "institution", "year"].includes(key));
+        if (extra.length) return { error: `Unsupported qualification fields: ${extra.join(", ")}` };
+        if (typeof item.title !== "string" || !item.title.trim() || item.title.length > 150) return { error };
+        if (item.institution !== undefined && (typeof item.institution !== "string" || item.institution.length > 150)) return { error };
+        if (item.year !== undefined && item.year !== null && (!Number.isInteger(item.year) || item.year < 1950 || item.year > currentYear)) {
+            return { error: `Qualification year must be a whole year from 1950 to ${currentYear}.` };
+        }
+        qualifications.push({
+            title: item.title.trim(),
+            institution: item.institution?.trim() ?? "",
+            year: item.year ?? null,
+        });
+    }
+    return { qualifications };
 }

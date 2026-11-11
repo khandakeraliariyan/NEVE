@@ -62,7 +62,7 @@ export async function getLegalSourcePack(req, res, next) {
     try {
         const jurisdiction = String(req.query.jurisdiction ?? "Bangladesh").trim();
         const sources = await LegalSource.find({ jurisdiction, status: "approved" })
-            .select("sourceKey version jurisdiction sourceType title citation sourceUrl language effectiveFrom sections reviewedAt")
+            .select("sourceKey version jurisdiction sourceType title citation sourceUrl language effectiveFrom applicability sections reviewedAt")
             .sort({ title: 1 })
             .lean();
         return res.json({

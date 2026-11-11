@@ -207,7 +207,7 @@ export async function getCitedSection(req, res, next) {
         const { legalSourceId, sectionId } = req.params;
         if (!validId(legalSourceId) || !validId(sectionId)) return res.status(400).json({ success: false, message: "Invalid ID." });
         const source = await LegalSource.findOne({ _id: legalSourceId, status: { $in: ["approved", "retired"] } })
-            .select("sourceKey version title citation jurisdiction sourceType sourceUrl language effectiveFrom status reviewedAt sections")
+            .select("sourceKey version title citation jurisdiction sourceType sourceUrl language effectiveFrom applicability status reviewedAt sections")
             .lean();
         const section = source?.sections?.find((s) => String(s._id) === String(sectionId));
         if (!section) return res.status(404).json({ success: false, message: "Section not found." });

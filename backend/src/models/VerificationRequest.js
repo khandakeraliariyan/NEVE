@@ -81,6 +81,18 @@ const verificationRequestSchema = new mongoose.Schema(
         credentialDetails: {
             barEnrolmentNumber: { type: String, trim: true, maxlength: 50, default: "" },
             jurisdictions: { type: [String], default: [] },
+            expertise: { type: String, trim: true, maxlength: 300, default: "" },
+            qualifications: {
+                type: [
+                    {
+                        _id: false,
+                        title: { type: String, trim: true, maxlength: 150 },
+                        institution: { type: String, trim: true, maxlength: 150, default: "" },
+                        year: { type: Number, default: null },
+                    },
+                ],
+                default: [],
+            },
         },
         status: {
             type: String,

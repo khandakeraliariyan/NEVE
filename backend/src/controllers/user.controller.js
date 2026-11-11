@@ -381,7 +381,7 @@ export async function getPublicProfile(req, res, next) {
             deletedAt: null,
             role: { $in: ["renter", "landlord", "legal_reviewer"] },
         })
-            .select("displayName role photoURL createdAt verification privacy profile.bio profile.landlord.contactHours profile.reviewer.jurisdictions profile.reviewer.expertise")
+            .select("displayName role photoURL createdAt verification privacy profile.bio profile.landlord.contactHours profile.reviewer.jurisdictions profile.reviewer.expertise profile.reviewer.qualifications")
             .lean();
         if (!user) {
             return res.status(404).json({ success: false, message: "Profile not found." });
