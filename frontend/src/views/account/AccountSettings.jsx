@@ -7,6 +7,7 @@ import { useApi } from "../../hooks/useApi";
 import { date, label } from "../../lib/format";
 import { homePathForRole, useAuth } from "../../context/AuthContext";
 import { Badge, Button, Card, Disclaimer, Empty, ErrorBox, Field, Loading, PageHeader } from "../../components/ui";
+import { AppealsCard } from "./Appeals";
 import { DeleteAccountCard, PasswordCard, PrivacyCard, ProfileDetailsCard, SessionsCard } from "./AccountPanels";
 
 const SWITCHABLE = {
@@ -282,6 +283,7 @@ export default function AccountSettings() {
                     <AccountTypeCard profile={profile} setProfile={setProfile} />
                     <SessionsCard />
                     <DocumentDeletionCard />
+                    {profile.role !== "admin" && <AppealsCard />}
                     {profile.role !== "admin" && <DeleteAccountCard />}
                 </div>
                 <div className="space-y-6">

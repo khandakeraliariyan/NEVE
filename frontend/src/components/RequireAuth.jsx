@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { ErrorBox, Loading } from "./ui";
 import Redirect from "./Redirect";
+import { SuspendedAccount } from "../views/account/Appeals";
 
 // Gates its children on sign-in, a Neve profile, and (optionally) a role.
 export default function RequireAuth({ roles, signInPath, children }) {
@@ -33,7 +34,7 @@ export default function RequireAuth({ roles, signInPath, children }) {
         );
     }
     if (profile && profile.isActive === false) {
-        return <AccessMessage title="Your account is inactive" text="Contact Neve support to reactivate your account." />;
+        return <SuspendedAccount />;
     }
     if (roles && !roles.includes(role)) {
         return <AccessMessage title="Access denied" text="Your role can't open this page." />;

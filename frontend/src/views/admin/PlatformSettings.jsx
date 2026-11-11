@@ -23,8 +23,19 @@ function initialForm(data) {
         reviewersCanSeeAiEvaluations: data.rolePermissions?.reviewersCanSeeAiEvaluations !== false,
         landlordsCanInviteRenters: data.rolePermissions?.landlordsCanInviteRenters !== false,
         privacyPolicy: data.privacyPolicy?.text ?? "",
+        ...Object.fromEntries(DATA_POLICIES.map(([key]) => [key, data.dataPolicies?.[key] ?? ""])),
     };
 }
+
+// [key, label, min, max]. Empty means "use the server's environment default".
+const DATA_POLICIES = [
+    ["accountDeletionFileRetentionDays", "Keep a deleted account's photos and listing media for (days)", 0, 3650],
+    ["verificationDocumentRetentionDays", "Keep identity and ownership documents after review closes for (days)", 1, 3650],
+    ["abandonedUploadHours", "Remove uploads that were never completed after (hours)", 1, 720],
+    ["backupRetentionCount", "Number of database backups to keep", 1, 365],
+];
+
+const policyValue = (value) => (value === "" || value === null || value === undefined ? null : Number(value));
 
 const COPILOT_ROLES = [
     ["renter", "Renters"],
@@ -72,6 +83,7 @@ function SettingsFields({ data, onSaved }) {
                     landlordsCanInviteRenters: form.landlordsCanInviteRenters,
                 },
                 privacyPolicy: { text: form.privacyPolicy.trim() },
+                dataPolicies: Object.fromEntries(DATA_POLICIES.map(([key]) => [key, policyValue(form[key])])),
             });
             setSaved(true);
             onSaved();
@@ -173,6 +185,26 @@ function SettingsFields({ data, onSaved }) {
                     <input type="checkbox" className="h-5 w-5 accent-forest" checked={form.landlordsCanInviteRenters} onChange={set("landlordsCanInviteRenters")} />
                     Landlords can invite renters to tenancy records
                 </label>
+            </Card>
+
+            <Card className="grid gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                    <h2 className="text-xl">Data retention & backups</h2>
+                    <p className="mt-1 text-sm text-muted">
+                        Limits the retention purge and backups apply. Leave a field empty to use the server default. Shortening a period lets the next purge delete more; deleted data can only come back from a backup.
+                    </p>
+                </div>
+                {DATA_POLICIES.map(([key, text, min, max]) => {
+                    const effective = data.effectiveDataPolicies?.[key];
+                    const hint = effective
+                        ? `${min} to ${max}. In force: ${effective.value} (${effective.source === "setting" ? "set here" : "server default"}).`
+                        : `${min} to ${max}.`;
+                    return (
+                        <Field key={key} label={text} hint={hint}>
+                            <input type="number" min={min} max={max} step="1" className="field" placeholder="Server default" value={form[key]} onChange={set(key)} />
+                        </Field>
+                    );
+                })}
             </Card>
 
             <Card className="space-y-3">

@@ -3,7 +3,8 @@ import SystemHealth from "./SystemHealth";
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { dateTime, label, money } from "../../lib/format";
+import Link from "next/link";
+import { dateTime, label, money, percent } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Loading, PageHeader, StatusBadge } from "../../components/ui";
 
@@ -45,6 +46,16 @@ export default function PlatformHealth() {
     const audit = useApi(() => api.get("/admin/audit-logs", { page: 1, limit: 6 }), []);
 
     const o = overview.data?.data;
+    const roles = o?.users?.byRole ?? {};
+    const pendingVerifications = Object.values(o?.verification?.pending ?? {}).reduce((sum, n) => sum + n, 0);
+    const usage = o?.aiUsageLast30Days;
+    const platformTiles = [
+        ["Registered users", o?.users?.total, `${roles.renter ?? 0} renters · ${roles.landlord ?? 0} landlords · ${roles.legal_reviewer ?? 0} reviewers · ${roles.admin ?? 0} admins`],
+        ["Suspended accounts", o?.users?.suspended, "Deactivated by an admin"],
+        ["Active tenancies", o?.tenancies?.active, `${o?.tenancies?.disputed ?? 0} disputed · ${o?.tenancies?.archived ?? 0} archived`],
+        ["Pending verifications", pendingVerifications, `${o?.verification?.pending?.identity ?? 0} identity · ${o?.verification?.pending?.ownership ?? 0} ownership · ${o?.verification?.pending?.credential ?? 0} credentials`],
+        ["AI calls (30 days)", usage?.calls, usage ? `≈ $${(usage.estimatedCostUsd ?? 0).toFixed(2)} estimated · ${percent(usage.failureRate ?? 0)} failed` : "No usage yet"],
+    ];
     const tiles = [
         ["Properties", o?.properties.total, `${o?.properties.published ?? "…"} published`],
         ["Pending listing reports", o?.moderation.pendingReports, "Pending or in review"],
@@ -93,6 +104,45 @@ export default function PlatformHealth() {
             <SystemHealth />
 
             <ErrorBox error={overview.error} onRetry={overview.reload} />
+            <h2 className="mb-3 text-2xl">Platform at a glance</h2>
+            <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                {platformTiles.map(([title, value, hint]) => (
+                    <Card key={title}>
+                        <p className="eyebrow">{title}</p>
+                        <p className="mt-2 text-3xl font-semibold">{overview.loading ? "…" : value ?? 0}</p>
+                        <p className="text-xs text-muted">{hint}</p>
+                    </Card>
+                ))}
+            </div>
+            {o?.aiEvaluation?.latestByTask?.length > 0 && (
+                <Card className="mb-6">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-lg">Latest AI evaluation per task</h3>
+                        <Link href="/admin/ai-evaluations" className="text-sm font-medium text-forest underline">All evaluation runs</Link>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="text-left text-xs text-muted">
+                                <tr><th className="py-1 pr-4">Task</th><th className="pr-4">Dataset</th><th className="pr-4">Precision</th><th className="pr-4">Recall</th><th className="pr-4">F1</th><th className="pr-4">Exact match</th><th>Run</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-line">
+                                {o.aiEvaluation.latestByTask.map((run) => (
+                                    <tr key={run.task}>
+                                        <td className="py-1.5 pr-4 font-medium">{label(run.task)}</td>
+                                        <td className="pr-4 text-muted">{run.datasetName}</td>
+                                        <td className="pr-4">{percent(run.precision, 1)}</td>
+                                        <td className="pr-4">{percent(run.recall, 1)}</td>
+                                        <td className="pr-4">{percent(run.f1, 1)}</td>
+                                        <td className="pr-4">{percent(run.exactMatchRate, 1)}</td>
+                                        <td className="text-xs text-muted">{dateTime(run.createdAt)}{run.status === "failed" && <Badge tone="rose" className="ml-2">Failed</Badge>}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+            <h2 className="mb-3 text-2xl">Listings & moderation</h2>
             <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 {tiles.map(([title, value, hint]) => (
                     <Card key={title}>

@@ -75,6 +75,21 @@ function RequestDetail({ id, onClose, onDecided }) {
                         <dd><StatusBadge status={r.status} /></dd>
                     </dl>
                     {r.note && <p className="rounded-xl bg-mist px-3 py-2 text-muted">“{r.note}”</p>}
+                    {r.type === "credential" && r.credentialDetails && (
+                        <div className="rounded-xl border border-line px-3 py-2">
+                            <p className="eyebrow mb-1">Claimed credentials</p>
+                            <p>Bar Council enrolment: <strong>{r.credentialDetails.barEnrolmentNumber || "—"}</strong></p>
+                            {r.credentialDetails.jurisdictions?.length > 0 && <p>Jurisdictions: {r.credentialDetails.jurisdictions.join(", ")}</p>}
+                            {r.credentialDetails.expertise && <p>Expertise: {r.credentialDetails.expertise}</p>}
+                            {r.credentialDetails.qualifications?.length > 0 && (
+                                <ul className="mt-1 list-disc pl-5">
+                                    {r.credentialDetails.qualifications.map((q, i) => (
+                                        <li key={i}>{[q.title, q.institution, q.year].filter(Boolean).join(", ")}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
 
                     <div>
                         <p className="eyebrow mb-2">Documents</p>

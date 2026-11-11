@@ -15,7 +15,7 @@ import { Button, Card, Disclaimer, Empty, ErrorBox, Loading, Pagination } from "
 
 const FILTER_KEYS = [
     "q", "city", "area", "propertyType", "furnishing", "minRent", "maxRent", "bedrooms", "maxBedrooms",
-    "availableBy", "minLeaseDurationMonths", "maxLeaseDurationMonths", "amenities",
+    "minBathrooms", "availableBy", "minLeaseDurationMonths", "maxLeaseDurationMonths", "amenities",
 ];
 const PROPERTY_TYPES = ["apartment", "house"];
 const FURNISHING = ["furnished", "unfurnished"];
@@ -231,6 +231,21 @@ export default function PropertyDiscovery() {
                                     ))}
                                 </div>
                             </div>
+                            <div>
+                                <p className="mb-2 font-semibold">Bathrooms (minimum)</p>
+                                <div className="grid grid-cols-4 gap-1">
+                                    {["", "1", "2", "3"].map((value) => (
+                                        <button
+                                            key={value || "any"}
+                                            type="button"
+                                            onClick={() => setDraft({ ...draft, minBathrooms: value })}
+                                            className={`rounded-md py-1.5 text-xs ${draft.minBathrooms === value ? "bg-forest text-white" : "bg-mist"}`}
+                                        >
+                                            {value === "" ? "Any" : value === "3" ? "3+" : value}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                             <label className="block">
                                 <span className="mb-2 block font-semibold">Furnishing</span>
                                 <select className="field" value={draft.furnishing} onChange={(e) => setDraft({ ...draft, furnishing: e.target.value })}>
@@ -352,6 +367,7 @@ function SaveSearchCard({ filters }) {
                 maxRent: num(filters.maxRent),
                 minBedrooms: num(filters.bedrooms),
                 maxBedrooms: num(filters.maxBedrooms),
+                minBathrooms: num(filters.minBathrooms),
                 availableBy: filters.availableBy || undefined,
                 minLeaseDurationMonths: num(filters.minLeaseDurationMonths),
                 maxLeaseDurationMonths: num(filters.maxLeaseDurationMonths),

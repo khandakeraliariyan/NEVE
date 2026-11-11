@@ -117,11 +117,18 @@ export default function PublicProfile() {
                         </Card>
                     )}
 
-                    {profile.reviewer && (profile.reviewer.jurisdictions.length > 0 || profile.reviewer.expertise) && (
+                    {profile.reviewer && (profile.reviewer.jurisdictions.length > 0 || profile.reviewer.expertise || profile.reviewer.qualifications?.length > 0) && (
                         <Card>
                             <h2 className="mb-2 text-xl">Practice</h2>
                             {profile.reviewer.jurisdictions.length > 0 && <p className="text-sm">Jurisdictions: {profile.reviewer.jurisdictions.join(", ")}</p>}
                             {profile.reviewer.expertise && <p className="mt-1 text-sm text-muted">{profile.reviewer.expertise}</p>}
+                            {profile.reviewer.qualifications?.length > 0 && (
+                                <ul className="mt-2 space-y-0.5 text-sm">
+                                    {profile.reviewer.qualifications.map((q, i) => (
+                                        <li key={i}>{q.title}{q.institution ? `, ${q.institution}` : ""}{q.year ? ` (${q.year})` : ""}</li>
+                                    ))}
+                                </ul>
+                            )}
                         </Card>
                     )}
 
