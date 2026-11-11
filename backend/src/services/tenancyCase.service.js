@@ -188,3 +188,89 @@ export async function findSharedCaseForEvidenceFile(fileId, userId, userRole) {
 
     return tenancyCase ?? null;
 }
+
+const idOf = (value) => (value?._id ?? value ? String(value?._id ?? value) : null);
+const nameOf = (person) => (person && typeof person === "object" ? person.displayName ?? null : null);
+
+// A dispute case report: what one viewer may see of a case, in the order a
+// mediator reads it. `tenancyCase` has authors and files populated and its
+// statements already filtered with visibleStatements().
+export function buildCaseReport({ tenancyCase, viewerId, isSharedReviewer = false, agreement = null, generatedAt = new Date() }) {
+    const evidence = (tenancyCase.evidence ?? []).filter((entry) => !isSharedReviewer || entry.removedAt === null);
+    const issues = (tenancyCase.issues ?? []).map((issue) => ({
+        title: issue.title,
+        description: issue.description ?? "",
+        amountBdt: issue.amountBdt ?? null,
+        addedBy: nameOf(issue.addedBy),
+        addedByRole: issue.addedBy?.role ?? null,
+        addedAt: issue.addedAt ?? null,
+    }));
+    const statements = (tenancyCase.statements ?? []).map((statement) => ({
+        title: statement.title ?? "",
+        body: statement.body,
+        authorRole: statement.authorRole,
+        author: nameOf(statement.author),
+        visibility: statement.visibility,
+        ownPrivateDraft: statement.visibility !== "shared" && idOf(statement.author) === String(viewerId),
+        sharedAt: statement.sharedAt ?? null,
+        createdAt: statement.createdAt ?? null,
+        edits: (statement.previousVersions ?? []).length,
+    }));
+    const files = evidence.map((entry) => ({
+        name: entry.file?.originalName ?? "File",
+        mimeType: entry.file?.mimeType ?? null,
+        sizeBytes: entry.file?.sizeBytes ?? null,
+        sha256: entry.file?.sha256 ?? null,
+        addedAt: entry.addedAt ?? null,
+        removedAt: entry.removedAt ?? null,
+    }));
+    const reviewEntries = (tenancyCase.reviewEntries ?? []).map((entry) => ({
+        kind: entry.kind,
+        body: entry.body,
+        author: nameOf(entry.author),
+        authorRole: entry.authorRole,
+        createdAt: entry.createdAt ?? null,
+    }));
+
+    const events = [
+        { at: tenancyCase.createdAt, text: "Case opened." },
+        ...issues.map((issue) => ({ at: issue.addedAt, text: `Issue added: ${issue.title}${issue.addedByRole ? ` (by the ${issue.addedByRole})` : ""}.` })),
+        ...files.map((file) => ({ at: file.addedAt, text: `Evidence added: ${file.name}.` })),
+        ...files.filter((file) => file.removedAt).map((file) => ({ at: file.removedAt, text: `Evidence withdrawn: ${file.name}.` })),
+        ...statements.filter((s) => s.sharedAt).map((s) => ({ at: s.sharedAt, text: `The ${s.authorRole} shared a statement${s.title ? `: ${s.title}` : ""}.` })),
+        ...reviewEntries.map((entry) => ({ at: entry.createdAt, text: `${entry.authorRole === "legal_reviewer" ? "Legal reviewer" : `The ${entry.authorRole}`} added a ${String(entry.kind).replace(/_/g, " ")}.` })),
+    ]
+        .filter((event) => event.at && Number.isFinite(new Date(event.at).getTime()))
+        .sort((a, b) => new Date(a.at) - new Date(b.at));
+
+    const claimed = issues.map((issue) => issue.amountBdt).filter((amount) => typeof amount === "number");
+    return {
+        generatedAt,
+        scope: {
+            caseId: idOf(tenancyCase._id),
+            agreementId: idOf(tenancyCase.agreement),
+            title: tenancyCase.title,
+            status: tenancyCase.status,
+            summary: tenancyCase.summary ?? "",
+            openedBy: nameOf(tenancyCase.createdBy),
+            openedByRole: tenancyCase.createdBy?.role ?? null,
+            createdAt: tenancyCase.createdAt ?? null,
+            viewer: isSharedReviewer ? "shared_reviewer" : "party",
+        },
+        agreement: agreement
+            ? { title: agreement.title ?? null, propertyTitle: agreement.propertyTitle ?? null, renterName: agreement.renterName ?? null, landlordName: agreement.landlordName ?? null }
+            : null,
+        totals: {
+            issues: issues.length,
+            claimedBdt: claimed.length ? claimed.reduce((sum, amount) => sum + amount, 0) : null,
+            sharedStatements: statements.filter((s) => s.visibility === "shared").length,
+            evidenceFiles: files.filter((file) => !file.removedAt).length,
+        },
+        issues,
+        statements,
+        evidence: files,
+        reviewEntries,
+        chronology: events,
+        disclaimer: "This report lists what was recorded on Neve for this case. Neve does not decide who is right, verify claims or give legal advice.",
+    };
+}

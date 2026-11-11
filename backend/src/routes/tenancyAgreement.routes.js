@@ -84,6 +84,7 @@ import {
     addCaseEvidence,
     createTenancyCase,
     getTenancyCase,
+    getTenancyCaseReport,
     listSharedTenancyCases,
     listTenancyCases,
     removeCaseEvidence,
@@ -150,6 +151,7 @@ router.get(
     listSharedTenancyCases
 );
 router.get("/cases/:caseId", getTenancyCase);
+router.get("/cases/:caseId/report", getTenancyCaseReport);
 router.post("/cases/:caseId/evidence", addCaseEvidence);
 router.delete("/cases/:caseId/evidence/:fileId", removeCaseEvidence);
 router.post(
