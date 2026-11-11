@@ -34,6 +34,10 @@ function CitedSection({ citation }) {
                 {citation.title}, section {citation.sectionNumber}
                 {citation.heading ? ` (${citation.heading})` : ""} · version {citation.version}
             </button>
+            {citation.currency?.status === "superseded" && (
+                <Badge tone="amber" className="ml-2">Outdated: version {citation.currency.currentVersion} is now in force</Badge>
+            )}
+            {citation.currency?.status === "withdrawn" && <Badge tone="rose" className="ml-2">Source withdrawn</Badge>}
             {open && (
                 <div className="mt-2 space-y-2 text-xs">
                     {section.loading && <p className="text-muted">Loading section…</p>}
@@ -224,6 +228,11 @@ function Conversation({ conversationId, onChanged }) {
                     Export summary
                 </Button>
             </div>
+            {data.outdatedCitationCount > 0 && (
+                <p className="rounded-lg bg-amber px-3 py-2 text-xs text-amber-ink">
+                    {data.outdatedCitationCount === 1 ? "One source cited below has" : `${data.outdatedCitationCount} sources cited below have`} since been replaced or withdrawn. Earlier answers may no longer be accurate; ask again to get an answer based on the current sources.
+                </p>
+            )}
             {conversation.data?.aiAvailable === false && (
                 <p className="rounded-lg bg-amber px-3 py-2 text-xs text-amber-ink">AI answers aren&apos;t set up on this Neve site. You&apos;ll get matching legal-source sections instead.</p>
             )}
