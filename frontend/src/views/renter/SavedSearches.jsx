@@ -23,6 +23,7 @@ function searchUrl(s) {
     set("maxRent", s.maxRent);
     set("bedrooms", s.minBedrooms);
     set("maxBedrooms", s.maxBedrooms);
+    set("minBathrooms", s.minBathrooms);
     set("availableBy", s.availableBy ? String(s.availableBy).slice(0, 10) : null);
     set("minLeaseDurationMonths", s.minLeaseDurationMonths);
     set("maxLeaseDurationMonths", s.maxLeaseDurationMonths);
@@ -45,6 +46,7 @@ function summary(s) {
         s.furnishing && label(s.furnishing),
         range(s.minRent, s.maxRent, money) && `Rent ${range(s.minRent, s.maxRent, money)}`,
         range(s.minBedrooms, s.maxBedrooms) && `${range(s.minBedrooms, s.maxBedrooms)} bedrooms`,
+        range(s.minBathrooms, s.maxBathrooms) && `${range(s.minBathrooms, s.maxBathrooms)} bathrooms`,
         s.availableBy && `Available by ${date(s.availableBy)}`,
         range(s.minLeaseDurationMonths, s.maxLeaseDurationMonths) && `${range(s.minLeaseDurationMonths, s.maxLeaseDurationMonths)} month lease`,
         s.amenities?.length && s.amenities.map(label).join(", "),
