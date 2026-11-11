@@ -11,6 +11,14 @@ process.on("unhandledRejection", (reason) => {
     recordSystemError({ error: reason instanceof Error ? reason : new Error(String(reason)), source: "process" });
 });
 
+// After an uncaught exception the process state can't be trusted, so record
+// it (waiting at most 3 seconds) and exit for the process manager to restart.
+process.on("uncaughtException", (error) => {
+    console.error("Uncaught exception:", error);
+    const timeout = new Promise((resolve) => setTimeout(resolve, 3000).unref());
+    Promise.race([recordSystemError({ error, source: "process", status: null }), timeout]).finally(() => process.exit(1));
+});
+
 async function startServer() {
     try {
         await connectDatabase();
