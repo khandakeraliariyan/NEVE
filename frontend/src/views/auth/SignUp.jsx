@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import AuthShell, { firebaseMessage, GoogleButton, OrDivider } from "./AuthShell";
 import { auth, firebaseConfigured } from "../../lib/firebase";
 import { homePathForRole, useAuth } from "../../context/AuthContext";
@@ -27,7 +27,9 @@ export default function SignUp() {
         setBusy(true);
         setError(null);
         try {
-            await createUserWithEmailAndPassword(auth, email.trim(), password);
+            const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+            // The account exists either way; the link can be sent again from Verification.
+            sendEmailVerification(credential.user).catch((err) => console.error("Verification email error:", err));
         } catch (err) {
             setError(firebaseMessage(err));
         } finally {
