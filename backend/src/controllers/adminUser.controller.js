@@ -1,11 +1,12 @@
 import mongoose from "mongoose";
+import Property from "../models/Property.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import User from "../models/User.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
 import {
     buildAdminUserFilter,
     validateAccountStatusChange,
-    validateReviewerRoleChange,
+    validateRoleChange,
 } from "../services/adminUser.service.js";
 import { createNotification } from "../services/notification.service.js";
 
@@ -54,7 +55,15 @@ export async function listUsers(req, res, next) {
     }
 }
 
-// PATCH /api/v1/admin/users/:userId/role  { action: "grant_reviewer" | "revoke_reviewer" }
+const ROLE_NOTICES = {
+    grant_reviewer: ["You are now a legal reviewer", "Renters and landlords can now share dispute cases with you for review."],
+    revoke_reviewer: ["Your legal reviewer access has ended", "Your account is back to a renter account. Cases shared with you are no longer accessible."],
+    make_landlord: ["Your account is now a landlord account", "An admin changed your role. You can now list and manage properties."],
+    make_renter: ["Your account is now a renter account", "An admin changed your role. You can search for homes, but can no longer list properties."],
+};
+
+// PATCH /api/v1/admin/users/:userId/role
+// { action: "grant_reviewer" | "revoke_reviewer" | "make_landlord" | "make_renter" }
 export async function changeReviewerRole(req, res, next) {
     try {
         const { userId } = req.params;
@@ -64,17 +73,23 @@ export async function changeReviewerRole(req, res, next) {
         const action = req.body?.action;
         const target = await User.findById(userId);
         const isAgreementParty =
-            action === "grant_reviewer" && target
+            ["grant_reviewer", "make_landlord", "make_renter"].includes(action) && target
                 ? Boolean(await TenancyAgreement.exists({
                     $or: [{ renter: target._id }, { landlord: target._id }],
                 }))
                 : false;
 
-        const { value, error, status } = validateReviewerRoleChange({
+        const hasListings =
+            action === "make_renter" && target
+                ? Boolean(await Property.exists({ landlord: target._id }))
+                : false;
+
+        const { value, error, status } = validateRoleChange({
             action,
             target,
             actorId: req.neveUser._id,
             isAgreementParty,
+            hasListings,
         });
         if (error) {
             return res.status(status).json({ success: false, message: error });
@@ -106,12 +121,8 @@ export async function changeReviewerRole(req, res, next) {
             await createNotification({
                 recipient: updated._id,
                 type: "staff_role_changed",
-                title: action === "grant_reviewer"
-                    ? "You are now a legal reviewer"
-                    : "Your legal reviewer access has ended",
-                message: action === "grant_reviewer"
-                    ? "Renters and landlords can now share dispute cases with you for review."
-                    : "Your account is back to a renter account. Cases shared with you are no longer accessible.",
+                title: ROLE_NOTICES[action][0],
+                message: ROLE_NOTICES[action][1],
             });
         } catch (notifyError) {
             console.error("Create role change notification error:", notifyError);
