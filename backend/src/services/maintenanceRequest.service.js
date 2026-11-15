@@ -34,6 +34,7 @@ export function buildMaintenanceSearchFilter(query) {
             $or: [
                 { title: search },
                 { description: search },
+                { location: search },
                 { category: search },
                 { "history.message": search },
             ],

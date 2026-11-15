@@ -66,6 +66,13 @@ const maintenanceRequestSchema = new mongoose.Schema(
             trim: true,
             maxlength: 4000,
         },
+        // Where in the property the problem is, e.g. "Kitchen" or "Master bathroom".
+        location: {
+            type: String,
+            trim: true,
+            maxlength: 150,
+            default: "",
+        },
         category: {
             type: String,
             enum: [

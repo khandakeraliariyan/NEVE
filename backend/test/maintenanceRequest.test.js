@@ -23,6 +23,12 @@ test("maintenance requests validate repair status and responsibility fields", ()
     });
 
     assert.equal(request.validateSync(), undefined);
+    assert.equal(request.location, "");
+    request.location = "  Kitchen  ";
+    assert.equal(request.location, "Kitchen");
+    request.location = "x".repeat(151);
+    assert.ok(request.validateSync().errors.location);
+    request.location = "Kitchen";
     request.status = "unverified";
     assert.ok(request.validateSync().errors.status);
 });
@@ -53,9 +59,10 @@ test("maintenance status transitions prevent reopening cancelled tickets", () =>
 test("maintenance search covers request details and progress history with literal matching", () => {
     const { filter } = buildMaintenanceSearchFilter("leak.");
     assert.deepEqual(Object.keys(filter.$or[0]), ["title"]);
-    assert.equal(filter.$or.length, 4);
-    assert.equal(filter.$or[3]["history.message"].test("A leak. was fixed"), true);
-    assert.equal(filter.$or[3]["history.message"].test("A leak was fixed"), false);
+    assert.equal(filter.$or.length, 5);
+    assert.ok(filter.$or.some((clause) => clause.location));
+    assert.equal(filter.$or[4]["history.message"].test("A leak. was fixed"), true);
+    assert.equal(filter.$or[4]["history.message"].test("A leak was fixed"), false);
 });
 
 test("maintenance search rejects invalid and oversized queries", () => {
