@@ -70,7 +70,7 @@ const tenancyEvidenceLinkSchema = new mongoose.Schema(
             required: true,
         },
         history: { type: [relationshipEventSchema], default: [] },
-        // "ai_proposed" links come from Claude and stay "proposed" until a
+        // "ai_proposed" links come from the AI model and stay "proposed" until a
         // participant accepts or rejects them. Participant links are accepted.
         origin: { type: String, enum: ["user", "ai_proposed"], default: "user" },
         reviewStatus: {

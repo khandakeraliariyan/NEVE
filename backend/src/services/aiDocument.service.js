@@ -68,11 +68,10 @@ export function readingLimitations(prepared) {
     return notes;
 }
 
-// A text document block for the Anthropic API.
+// A document's text, delimited so the model can tell it apart from the
+// instructions around it.
 export function textDocumentBlock(text, title) {
-    return {
-        type: "document",
-        source: { type: "text", media_type: "text/plain", data: text },
-        title,
-    };
+    return `<document title="${title}">
+${text}
+</document>`;
 }

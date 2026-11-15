@@ -1,14 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
 import { textDocumentBlock } from "./aiDocument.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
-import { trackAIUsage } from "./aiUsage.service.js";
+import { AIServiceError, createAIClient } from "./aiClient.service.js";
 
-// Claude reads one evidence file and proposes how it relates to the
+// The AI model reads one evidence file and proposes how it relates to the
 // agreement's clauses, obligations and payment records. Proposals are stored
 // as "proposed" links that a participant must accept before they count.
 
@@ -51,7 +49,7 @@ Rules:
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= trackAIUsage(new Anthropic(), "evidence_link_suggestion");
+    defaultClient ??= createAIClient({ feature: "evidence_link_suggestion" });
     return defaultClient;
 };
 
@@ -97,66 +95,44 @@ export async function requestEvidenceLinkSuggestions({
     const startedAt = Date.now();
     let response;
     try {
-        response = await client.beta.messages.parse({
+        response = await client.generate({
             model,
-            max_tokens: 8000,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            output_config: {
-                effort: "medium",
-                format: betaZodOutputFormat(EvidenceLinkSuggestionSchema),
-            },
+            maxTokens: 16000,
+            effort: "medium",
+            schema: EvidenceLinkSuggestionSchema,
+            schemaName: "evidence_link_suggestions",
             system: SYSTEM_PROMPT,
-            messages: [
-                {
-                    role: "user",
-                    content: [
-                        textDocumentBlock(documentText, "Evidence file"),
-                        {
-                            type: "text",
-                            text: `Agreement records:\n${records}\n\nPropose how the file above relates to these records.`,
-                        },
-                    ],
-                },
+            user: [
+                textDocumentBlock(documentText, "Evidence file"),
+                `Agreement records:\n${records}\n\nPropose how the file above relates to these records.`,
             ],
         });
     } catch (error) {
-        if (error instanceof ExtractionError) throw error;
-        if (error instanceof Anthropic.AuthenticationError) {
+        if (!(error instanceof AIServiceError)) throw error;
+        if (error.kind === "auth") {
             throw new ExtractionError(error.message, 503, { publicMessage: "Link suggestions are not configured." });
         }
-        if (error instanceof Anthropic.RateLimitError) {
+        if (error.kind === "rate_limit") {
             throw new ExtractionError(error.message, 503, { publicMessage: "Link suggestions are busy. Please try again shortly." });
         }
-        if (error instanceof Anthropic.BadRequestError) {
+        if (error.kind === "bad_request") {
             throw new ExtractionError(error.message, 422, {
                 publicMessage: "The file could not be analyzed. It may be too large or unreadable.",
             });
         }
-        if (error instanceof Anthropic.APIError) {
-            throw new ExtractionError(error.message, 502, { publicMessage: "Link suggestions failed. Please try again later." });
-        }
-        throw error;
+        throw new ExtractionError(error.message, 502, { publicMessage: "Link suggestions failed. Please try again later." });
     }
 
-    if (response.stop_reason === "refusal") {
-        throw new ExtractionError("Suggestion request was declined.", 422, {
-            publicMessage: "The file could not be analyzed automatically.",
-        });
-    }
-    if (!response.parsed_output) {
-        throw new ExtractionError("Suggestion output did not match the schema.", 502, {
+    if (!response.parsed) {
+        throw new ExtractionError("Suggestion output was incomplete or did not match the schema.", 502, {
             publicMessage: "Link suggestions failed. Please try again later.",
         });
     }
 
     return {
-        suggestions: response.parsed_output,
+        suggestions: response.parsed,
         model: response.model,
-        usage: {
-            inputTokens: response.usage?.input_tokens ?? null,
-            outputTokens: response.usage?.output_tokens ?? null,
-        },
+        usage: response.usage,
         latencyMs: Date.now() - startedAt,
     };
 }

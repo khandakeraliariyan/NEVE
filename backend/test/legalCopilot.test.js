@@ -70,7 +70,7 @@ test("messages mask personal data, keep alternation, and carry the sections", ()
         agreement,
     });
     assert.deepEqual(messages.map((m) => m.role), ["user", "assistant", "user"]);
-    const last = messages.at(-1).content[0].text;
+    const last = messages.at(-1).content;
     assert.ok(last.includes(`sectionId ${depositSection}`));
     assert.ok(last.includes(`clauseId ${clauseId}`));
     assert.ok(!last.includes("Rejected clause"));
@@ -111,28 +111,24 @@ test("without AI the matching sections are listed", () => {
 test("the model is asked with structured output and the answer comes back parsed", async () => {
     let request;
     const client = {
-        beta: {
-            messages: {
-                parse: async (params) => {
-                    request = params;
-                    return {
-                        stop_reason: "end_turn",
-                        model: "claude-opus-5-5",
-                        usage: { input_tokens: 10, output_tokens: 20 },
-                        parsed_output: { answer: "ok", citedSectionIds: [], citedClauseIds: [], terms: [], followUpQuestions: [], coverage: "not_covered", suggestProfessional: false },
-                    };
-                },
-            },
+        generate: async (params) => {
+            request = params;
+            return {
+                stopReason: "end",
+                model: "openai/gpt-oss-120b",
+                usage: { inputTokens: 10, outputTokens: 20 },
+                parsed: { answer: "ok", citedSectionIds: [], citedClauseIds: [], terms: [], followUpQuestions: [], coverage: "not_covered", suggestProfessional: false },
+            };
         },
     };
-    const result = await requestCopilotAnswer({ question: "q", history: [], sections: [], agreement: null, client, model: "claude-opus-5-5" });
+    const result = await requestCopilotAnswer({ question: "q", history: [], sections: [], agreement: null, client, model: "openai/gpt-oss-120b" });
     assert.equal(result.result.answer, "ok");
     assert.equal(result.usage.outputTokens, 20);
-    assert.ok(request.output_config.format);
-    assert.equal(request.fallbacks, "default");
+    assert.ok(request.schema);
+    assert.equal(request.messages.at(-1).role, "user");
 
-    const refusing = { beta: { messages: { parse: async () => ({ stop_reason: "refusal", parsed_output: null }) } } };
-    await assert.rejects(requestCopilotAnswer({ question: "q", history: [], sections: [], agreement: null, client: refusing }), (error) => error.status === 422);
+    const unparsed = { generate: async () => ({ stopReason: "end", parsed: null }) };
+    await assert.rejects(requestCopilotAnswer({ question: "q", history: [], sections: [], agreement: null, client: unparsed }), (error) => error.status === 502);
 });
 
 test("exports include a summary, the sources and the full conversation", () => {

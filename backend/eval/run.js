@@ -2,7 +2,7 @@
 //
 //   npm run eval                         deterministic tasks, offline
 //   npm run eval -- --task legal_citation
-//   npm run eval -- --live               also run model-backed tasks (calls the Claude API; costs money)
+//   npm run eval -- --live               also run model-backed tasks (calls the Groq API; costs money)
 //   npm run eval -- --check              exit 1 if a score drops below eval/baseline.json
 //   npm run eval -- --save               store each run as an AI evaluation run (needs MongoDB and an admin)
 //

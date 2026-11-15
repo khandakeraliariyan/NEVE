@@ -30,6 +30,7 @@ const EMPTY = {
     securityDeposit: "",
     advanceRent: "",
     monthlyServiceCharge: "",
+    monthlyMaintenanceCharge: "",
     utilities: [],
     otherFees: [],
     availabilityDate: "",
@@ -57,6 +58,7 @@ function fromProperty(p) {
         securityDeposit: num(p.pricing?.securityDeposit),
         advanceRent: num(p.pricing?.advanceRent),
         monthlyServiceCharge: num(p.pricing?.monthlyServiceCharge),
+        monthlyMaintenanceCharge: num(p.pricing?.monthlyMaintenanceCharge),
         utilities: utilitiesFromApi(p.pricing?.utilities),
         otherFees: feesFromApi(p.pricing?.otherFees),
         availabilityDate: p.availabilityDate ? p.availabilityDate.slice(0, 10) : "",
@@ -89,6 +91,7 @@ function toBody(f) {
             securityDeposit: num(f.securityDeposit),
             advanceRent: num(f.advanceRent),
             monthlyServiceCharge: num(f.monthlyServiceCharge),
+            monthlyMaintenanceCharge: num(f.monthlyMaintenanceCharge),
             utilities: utilitiesToApi(f.utilities),
             otherFees: feesToApi(f.otherFees),
         },
@@ -364,6 +367,9 @@ export default function PropertyForm() {
                                 </Field>
                                 <Field label="Monthly service charge (৳)">
                                     <input type="number" min="0" className="field" value={form.monthlyServiceCharge} onChange={set("monthlyServiceCharge")} />
+                                </Field>
+                                <Field label="Monthly maintenance charge (৳)" hint="Only if charged separately from the service charge.">
+                                    <input type="number" min="0" className="field" value={form.monthlyMaintenanceCharge} onChange={set("monthlyMaintenanceCharge")} />
                                 </Field>
                                 <Field label="Available from">
                                     <input type="date" className="field" value={form.availabilityDate} onChange={set("availabilityDate")} />

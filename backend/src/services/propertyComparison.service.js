@@ -48,6 +48,8 @@ export function buildPropertyComparison(properties) {
                 monthlyRent: item.pricing?.monthlyRent ?? null,
                 monthlyServiceCharge:
                     item.pricing?.monthlyServiceCharge ?? null,
+                monthlyMaintenanceCharge:
+                    item.pricing?.monthlyMaintenanceCharge ?? null,
                 upfrontCosts: getKnownUpfrontCosts(item.pricing)
             }
         };

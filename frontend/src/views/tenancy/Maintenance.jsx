@@ -48,7 +48,7 @@ function Files({ files }) {
 }
 
 function NewRequestForm({ agreementId, isLandlord, onDone, onCancel }) {
-    const [form, setForm] = useState({ title: "", description: "", category: "other", priority: "normal", responsibility: "" });
+    const [form, setForm] = useState({ title: "", description: "", location: "", category: "other", priority: "normal", responsibility: "" });
     const [files, setFiles] = useState([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
@@ -63,6 +63,7 @@ function NewRequestForm({ agreementId, isLandlord, onDone, onCancel }) {
             await api.post(`/tenancy/agreements/${agreementId}/maintenance-requests`, {
                 title: form.title.trim(),
                 description: form.description.trim(),
+                location: form.location.trim(),
                 category: form.category,
                 priority: form.priority,
                 responsibility: isLandlord && form.responsibility ? form.responsibility : null,
@@ -84,7 +85,10 @@ function NewRequestForm({ agreementId, isLandlord, onDone, onCancel }) {
                     <input className="field" required maxLength={150} placeholder="Kitchen tap is leaking" value={form.title} onChange={set("title")} />
                 </Field>
                 <Field label="Details">
-                    <textarea className="field min-h-24" required maxLength={4000} placeholder="When did it start, where exactly, anything already tried…" value={form.description} onChange={set("description")} />
+                    <textarea className="field min-h-24" required maxLength={4000} placeholder="When did it start, anything already tried…" value={form.description} onChange={set("description")} />
+                </Field>
+                <Field label="Where in the property?" hint="Room or area, e.g. Kitchen, Master bathroom, Balcony.">
+                    <input className="field" maxLength={150} placeholder="Kitchen" value={form.location} onChange={set("location")} />
                 </Field>
                 <div className="grid gap-4 md:grid-cols-3">
                     <Field label="Category">
@@ -342,6 +346,11 @@ function RequestDetail({ request, agreement, isLandlord, me, canEdit, onDone }) 
                     <Badge tone="gray">{label(request.category)}</Badge>
                 </div>
             </div>
+            {request.location && (
+                <p className="text-sm">
+                    <span className="font-semibold">Location:</span> {request.location}
+                </p>
+            )}
             <p className="whitespace-pre-wrap text-sm leading-relaxed">{request.description}</p>
             <Files files={request.evidenceFiles} />
             <p className="text-sm">
@@ -463,7 +472,7 @@ export default function Maintenance() {
                                         <StatusBadge status={r.status} />
                                     </div>
                                     <p className="mt-1 text-xs text-muted">
-                                        {label(r.category)} · {label(r.priority)} · updated {relativeTime(r.updatedAt)}
+                                        {r.location ? `${r.location} · ` : ""}{label(r.category)} · {label(r.priority)} · updated {relativeTime(r.updatedAt)}
                                     </p>
                                 </button>
                             </li>

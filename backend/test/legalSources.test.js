@@ -108,18 +108,14 @@ test("rewrite keeps only citations to provided sections", () => {
 test("rewrite request sends the clause and approved sections", async () => {
     let request;
     const client = {
-        beta: {
-            messages: {
-                parse: async (params) => {
-                    request = params;
-                    return { stop_reason: "end_turn", model: "claude-test", parsed_output: { rewrite: "x", rationale: "y", changes: [], citedSectionIds: [], concerns: [] }, usage: {} };
-                },
-            },
+        generate: async (params) => {
+            request = params;
+            return { stopReason: "end", model: "test-model", parsed: { rewrite: "x", rationale: "y", changes: [], citedSectionIds: [], concerns: [] }, usage: {} };
         },
     };
     const sections = searchSections(sources, { query: "advance", category: "deposit" });
-    await requestClauseRewrite({ clause: { category: "deposit", heading: "Advance", text: "Three months advance." }, sections, jurisdiction: "Bangladesh", client, model: "claude-test" });
-    const prompt = request.messages[0].content[0].text;
+    await requestClauseRewrite({ clause: { category: "deposit", heading: "Advance", text: "Three months advance." }, sections, jurisdiction: "Bangladesh", client, model: "test-model" });
+    const prompt = request.user;
     assert.match(prompt, /Three months advance/);
     assert.match(prompt, /sectionId sec10/);
 });

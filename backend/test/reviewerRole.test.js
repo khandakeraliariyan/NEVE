@@ -87,6 +87,23 @@ test("revoking only applies to legal reviewers and returns them to renter", () =
     );
 });
 
+test("admins can switch an account between renter and landlord when nothing ties it to a side", () => {
+    const actorId = objectId();
+    const renter = { _id: objectId(), role: "renter", isActive: true };
+    const landlord = { ...renter, role: "landlord" };
+    const change = (action, target, extra = {}) => validateReviewerRoleChange({ action, target, actorId, ...extra });
+
+    assert.deepEqual(change("make_landlord", renter).value, { from: "renter", to: "landlord" });
+    assert.deepEqual(change("make_renter", landlord).value, { from: "landlord", to: "renter" });
+
+    assert.equal(change("make_landlord", landlord).status, 409);
+    assert.equal(change("make_renter", renter).status, 409);
+    assert.equal(change("make_landlord", { ...renter, isActive: false }).status, 409);
+    assert.equal(change("make_landlord", renter, { isAgreementParty: true }).status, 409);
+    assert.equal(change("make_renter", landlord, { hasListings: true }).status, 409);
+    assert.equal(change("make_renter", { ...landlord, _id: actorId }).status, 403);
+});
+
 test("admin user search filters by role and escapes the text search", () => {
     assert.deepEqual(buildAdminUserFilter({}).filter, {});
     assert.equal(buildAdminUserFilter({ role: "legal_reviewer" }).filter.role, "legal_reviewer");

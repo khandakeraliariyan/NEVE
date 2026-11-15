@@ -76,6 +76,75 @@ function DuplicateCheck({ propertyId }) {
 }
 
 // Approve or revoke the neutral summary renters see on the listing.
+// Suspend a listing (hides it from renters) or restore it after review.
+function ListingSuspension({ propertyId }) {
+    const listing = useApi(() => api.get(`/admin/moderation/listings/${propertyId}`), [propertyId], { enabled: Boolean(propertyId) });
+    const [open, setOpen] = useState(false);
+    const [reason, setReason] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const [current, setCurrent] = useState(null);
+    if (!propertyId) return null;
+    const data = current ?? listing.data?.data;
+    if (!data) return null;
+    const suspended = data.moderation?.suspended;
+
+    async function change(action) {
+        setBusy(true);
+        setError(null);
+        try {
+            const payload = await api.patch(`/admin/moderation/listings/${propertyId}/suspension`, { action, reason: reason.trim() });
+            setCurrent(payload.data);
+            setReason("");
+            setOpen(false);
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div className="mt-3 rounded-xl border border-line bg-mist p-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-ink">
+                    Listing {suspended ? <Badge tone="rose">Suspended</Badge> : <Badge tone="gray">{label(data.status)}</Badge>}
+                    {suspended && data.moderation.suspendedAt && <span className="ml-2 text-muted">since {dateTime(data.moderation.suspendedAt)}</span>}
+                </p>
+                {!open && (
+                    <Button variant={suspended ? "secondary" : "danger"} className="px-3 py-1 text-xs" onClick={() => setOpen(true)}>
+                        {suspended ? "Restore listing" : "Suspend listing"}
+                    </Button>
+                )}
+            </div>
+            {suspended && data.moderation.reason && <p className="mt-1 text-muted">Reason: {data.moderation.reason}</p>}
+            {open && (
+                <div className="mt-2 space-y-2">
+                    <textarea
+                        className="field min-h-14 text-sm"
+                        maxLength={1000}
+                        placeholder={suspended ? "Note to the landlord (optional)" : "Reason shown to the landlord (required)"}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                        <Button variant={suspended ? "secondary" : "danger"} className="px-3 py-1 text-xs" disabled={busy || (!suspended && !reason.trim())} onClick={() => change(suspended ? "restore" : "suspend")}>
+                            {suspended ? "Restore listing" : "Suspend listing"}
+                        </Button>
+                        <Button variant="ghost" className="px-3 py-1 text-xs" disabled={busy} onClick={() => setOpen(false)}>
+                            Cancel
+                        </Button>
+                    </div>
+                    <p className="text-muted">
+                        {suspended ? "The listing goes back to how the landlord left it." : "Renters stop seeing the listing and the landlord can't republish it until it is restored."} The landlord is notified.
+                    </p>
+                </div>
+            )}
+            <ErrorBox error={error} />
+        </div>
+    );
+}
+
 function PublicSummary({ kind, record, reviewed, onChanged }) {
     const [text, setText] = useState(record.publicSummary ?? "");
     const [busy, setBusy] = useState(false);
@@ -174,6 +243,7 @@ function ReportItem({ r, onDone }) {
             <p className="mt-1 text-xs text-muted">Reported {dateTime(r.createdAt)}</p>
             {r.reviewNote && <p className="mt-1 text-xs text-muted">Note: {r.reviewNote}</p>}
             <DuplicateCheck propertyId={idOf(r.property)} />
+            <ListingSuspension propertyId={idOf(r.property)} />
             <Decision
                 options={["in_review", "resolved", "dismissed"]}
                 current={r.status}
@@ -269,6 +339,7 @@ function WarningItem({ w, onDone }) {
             )}
             <AppealReview w={w} onDone={onDone} />
             <DuplicateCheck propertyId={idOf(w.property)} />
+            <ListingSuspension propertyId={idOf(w.property)} />
             <Decision
                 options={["open", "reviewed", "resolved", "dismissed"]}
                 current={w.status}

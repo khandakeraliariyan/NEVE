@@ -51,21 +51,17 @@ test("copilot answer quality scores hallucinated support as false positives", as
     // Answers in-scope questions correctly; for out-of-scope ones it cites the
     // first retrieved section anyway instead of saying the question isn't covered.
     const client = {
-        beta: {
-            messages: {
-                parse: async ({ messages }) => {
-                    const prompt = messages.at(-1).content.map((block) => block.text ?? "").join(" ");
-                    const match = dataset.cases.find((c) => prompt.includes(c.question));
-                    const retrieved = [...prompt.matchAll(/sectionId ([a-f0-9]{24})/g)].map((m) => m[1]);
-                    const cited = match.expected[0] === "abstain" ? retrieved.slice(0, 1) : match.expected.map(sectionId);
-                    return {
-                        model: "fake",
-                        stop_reason: "end_turn",
-                        usage: { input_tokens: 10, output_tokens: 5 },
-                        parsed_output: { answer: "x", citedSectionIds: cited, citedClauseIds: [], coverage: cited.length ? "sourced" : "not_covered", terms: [], followUpQuestions: [], suggestProfessional: false },
-                    };
-                },
-            },
+        generate: async ({ messages }) => {
+            const prompt = messages.at(-1).content;
+            const match = dataset.cases.find((c) => prompt.includes(c.question));
+            const retrieved = [...prompt.matchAll(/sectionId ([a-f0-9]{24})/g)].map((m) => m[1]);
+            const cited = match.expected[0] === "abstain" ? retrieved.slice(0, 1) : match.expected.map(sectionId);
+            return {
+                model: "fake",
+                stopReason: "end",
+                usage: { inputTokens: 10, outputTokens: 5 },
+                parsed: { answer: "x", citedSectionIds: cited, citedClauseIds: [], coverage: cited.length ? "sourced" : "not_covered", terms: [], followUpQuestions: [], suggestProfessional: false },
+            };
         },
     };
     const { metrics, cases } = await runTask("copilot_answer_quality", { live: true, client });

@@ -302,6 +302,14 @@ const propertySchema = new mongoose.Schema(
                 min: 0,
             },
 
+            // Optional: a maintenance charge billed separately from the
+            // service charge. Null means it is not charged separately.
+            monthlyMaintenanceCharge: {
+                type: Number,
+                default: null,
+                min: 0,
+            },
+
             // How each utility is paid. An empty list means the landlord has
             // not described utilities; it does not mean they are free.
             utilities: {
@@ -362,6 +370,18 @@ const propertySchema = new mongoose.Schema(
         deletedAt: {
             type: Date,
             default: null,
+        },
+
+        // Set only by an admin. A suspended listing is paused, and its landlord
+        // cannot publish it again until an admin restores it.
+        moderation: {
+            suspended: { type: Boolean, default: false, index: true },
+            reason: { type: String, trim: true, maxlength: 1000, default: "" },
+            suspendedAt: { type: Date, default: null },
+            suspendedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, select: false },
+            statusBefore: { type: String, enum: ["draft", "published", "paused", null], default: null },
+            restoredAt: { type: Date, default: null },
+            restoredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, select: false },
         },
 
         // Set only by an admin after reviewing ownership documents.

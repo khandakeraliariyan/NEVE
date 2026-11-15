@@ -1,10 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { textDocumentBlock } from "./aiDocument.service.js";
-import { settingsSnapshot } from "./platformSettings.service.js";
-import { trackAIUsage } from "./aiUsage.service.js";
+import { AIServiceError, createAIClient, isAIConfigured } from "./aiClient.service.js";
 
 export const CLAUSE_CATEGORIES = [
     "rent",
@@ -103,18 +100,18 @@ export class ExtractionError extends Error {
 
 // AI features need an API key, and an admin can switch them off.
 export function isExtractionConfigured() {
-    return Boolean(env.ANTHROPIC_API_KEY) && settingsSnapshot().integrations?.aiEnabled !== false;
+    return isAIConfigured();
 }
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= trackAIUsage(new Anthropic(), "agreement_extraction");
+    defaultClient ??= createAIClient({ feature: "agreement_extraction" });
     return defaultClient;
 };
 
-// Calls Claude with the agreement's masked text (see aiDocument.service.js)
-// and returns the schema-validated extraction. `client` is injectable so
-// tests can run without network access.
+// Sends the agreement's masked text (see aiDocument.service.js) to the AI
+// model and returns the schema-validated extraction. `client` is injectable
+// so tests can run without network access.
 export async function requestAgreementExtraction({
     documentText,
     client = getDefaultClient(),
@@ -124,83 +121,57 @@ export async function requestAgreementExtraction({
     let response;
 
     try {
-        response = await client.beta.messages.parse({
+        response = await client.generate({
             model,
-            max_tokens: 16000,
-            // Re-runs a declined request on a fallback model inside the same call.
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            output_config: {
-                effort: "high",
-                format: betaZodOutputFormat(AgreementExtractionSchema),
-            },
+            maxTokens: 32000,
+            effort: "high",
+            schema: AgreementExtractionSchema,
+            schemaName: "agreement_extraction",
             system: SYSTEM_PROMPT,
-            messages: [
-                {
-                    role: "user",
-                    content: [
-                        textDocumentBlock(documentText, "Rental agreement"),
-                        { type: "text", text: USER_INSTRUCTION },
-                    ],
-                },
-            ],
+            user: [textDocumentBlock(documentText, "Rental agreement"), USER_INSTRUCTION],
         });
     } catch (error) {
-        if (error instanceof ExtractionError) {
-            throw error;
-        }
-        if (error instanceof Anthropic.AuthenticationError) {
+        if (!(error instanceof AIServiceError)) throw error;
+        if (error.kind === "auth") {
             throw new ExtractionError(error.message, 503, {
                 publicMessage: "Agreement extraction is not configured.",
             });
         }
-        if (error instanceof Anthropic.RateLimitError) {
+        if (error.kind === "rate_limit") {
             throw new ExtractionError(error.message, 503, {
                 publicMessage:
                     "Agreement extraction is busy. Please try again shortly.",
             });
         }
-        if (error instanceof Anthropic.BadRequestError) {
+        if (error.kind === "bad_request") {
             throw new ExtractionError(error.message, 422, {
                 publicMessage:
                     "The agreement file could not be analyzed. It may be too large, encrypted, or unreadable.",
             });
         }
-        if (error instanceof Anthropic.APIError) {
-            throw new ExtractionError(error.message, 502, {
-                publicMessage:
-                    "Agreement extraction failed. Please try again later.",
-            });
-        }
-        throw error;
-    }
-
-    if (response.stop_reason === "refusal") {
-        throw new ExtractionError("Extraction request was declined.", 422, {
-            publicMessage: "The agreement could not be analyzed automatically.",
+        throw new ExtractionError(error.message, 502, {
+            publicMessage:
+                "Agreement extraction failed. Please try again later.",
         });
     }
 
-    if (response.stop_reason === "max_tokens") {
+    if (response.stopReason === "max_tokens") {
         throw new ExtractionError("Extraction output was truncated.", 422, {
             publicMessage:
                 "The agreement is too long to extract in one pass. Add clauses manually or split the document.",
         });
     }
 
-    if (!response.parsed_output) {
+    if (!response.parsed) {
         throw new ExtractionError("Extraction output did not match the schema.", 502, {
             publicMessage: "Agreement extraction failed. Please try again later.",
         });
     }
 
     return {
-        extraction: response.parsed_output,
+        extraction: response.parsed,
         model: response.model,
-        usage: {
-            inputTokens: response.usage?.input_tokens ?? null,
-            outputTokens: response.usage?.output_tokens ?? null,
-        },
+        usage: response.usage,
         latencyMs: Date.now() - startedAt,
     };
 }

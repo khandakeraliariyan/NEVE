@@ -50,6 +50,7 @@ const TENANCY_NAV = [
         items: [
             { to: "/agreements", label: "Tenancy dashboard", end: true },
             { to: "/copilot", label: "Legal Copilot" },
+            { to: "/legal-library", label: "Legal library" },
         ],
     },
 ];
@@ -62,6 +63,7 @@ const PARTY_TENANCY_NAV = (invitationsLabel) => [
             { to: "/compliance", label: "Obligations & deadlines" },
             { to: "/invitations", label: invitationsLabel },
             { to: "/copilot", label: "Legal Copilot" },
+            { to: "/legal-library", label: "Legal library" },
         ],
     },
 ];

@@ -65,7 +65,6 @@ export function previewText(text, length = 200) {
 export function verificationBadges(user) {
     const badges = [];
     if (user?.verification?.email?.verified) badges.push("Email verified");
-    if (user?.verification?.phone?.verified) badges.push("Phone verified");
     if (user?.verification?.identity?.status === "verified") badges.push("Identity verified");
     return badges;
 }

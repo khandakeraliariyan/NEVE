@@ -261,7 +261,7 @@ export const getAdminClaims = async (req, res, next) => {
 };
 
 // GET /api/v1/admin/dashboard/ai-usage?days=30
-// Claude API calls, tokens, latency and estimated cost by feature, model and day.
+// AI model calls, tokens, latency and estimated cost by feature, model and day.
 export const getAIUsage = async (req, res, next) => {
     try {
         const days = req.query.days === undefined ? 30 : Number(req.query.days);

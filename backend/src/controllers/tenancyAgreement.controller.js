@@ -1568,7 +1568,7 @@ export async function removeAgreementRecordLink(req, res, next) {
 const suggestionsInProgress = new Set();
 
 // POST /api/v1/tenancy/agreements/:agreementId/evidence-links/suggest  { fileId }
-// Claude proposes how one evidence file relates to the agreement's records.
+// The AI model proposes how one evidence file relates to the agreement's records.
 // Proposals are saved as "proposed" links for a participant to accept.
 export async function suggestAgreementEvidenceLinks(req, res, next) {
     let key = null;
@@ -1868,7 +1868,7 @@ export async function addAgreementLegalLink(req, res, next) {
 const rewritesInProgress = new Set();
 
 // POST /api/v1/tenancy/agreements/:agreementId/clauses/:clauseId/rewrite-suggestions
-// Claude suggests balanced wording, citing only approved legal sources it
+// The AI model suggests balanced wording, citing only approved legal sources it
 // was given for this clause.
 export async function suggestClauseRewrite(req, res, next) {
     let key = null;

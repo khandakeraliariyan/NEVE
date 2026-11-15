@@ -1,12 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
 import { searchSections } from "./legalSource.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
-import { trackAIUsage } from "./aiUsage.service.js";
+import { AIServiceError, createAIClient } from "./aiClient.service.js";
 
 // Legal Copilot: answers questions about rental law and about one agreement,
 // using only legal-source sections a legal reviewer approved and the
@@ -48,7 +46,7 @@ How to answer:
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= trackAIUsage(new Anthropic(), "legal_copilot");
+    defaultClient ??= createAIClient({ feature: "legal_copilot" });
     return defaultClient;
 };
 
@@ -115,7 +113,7 @@ export function describeSections(sections) {
 export function buildMessages({ question, history = [], sections, agreement }) {
     const earlier = history.slice(-HISTORY_MESSAGES).map((message) => ({
         role: message.role,
-        content: [{ type: "text", text: message.content }],
+        content: message.content,
     }));
     // The API needs the conversation to start with a user turn and alternate.
     while (earlier.length && earlier[0].role !== "user") earlier.shift();
@@ -124,44 +122,39 @@ export function buildMessages({ question, history = [], sections, agreement }) {
         `Approved legal-source sections for this question:\n${describeSections(sections)}`,
         `Question: ${maskPersonalIdentifiers(question).text}`,
     ].join("\n\n");
-    return [...earlier, { role: "user", content: [{ type: "text", text: context }] }];
+    return [...earlier, { role: "user", content: context }];
 }
 
 export async function requestCopilotAnswer({ question, history, sections, agreement, client = getDefaultClient(), model = env.AGREEMENT_EXTRACTION_MODEL }) {
     const startedAt = Date.now();
     let response;
     try {
-        response = await client.beta.messages.parse({
+        response = await client.generate({
             model,
-            max_tokens: 8000,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            output_config: { effort: "medium", format: betaZodOutputFormat(CopilotAnswerSchema) },
+            maxTokens: 16000,
+            effort: "medium",
+            schema: CopilotAnswerSchema,
+            schemaName: "copilot_answer",
             system: SYSTEM_PROMPT,
             messages: buildMessages({ question, history, sections, agreement }),
         });
     } catch (error) {
-        if (error instanceof Anthropic.AuthenticationError) {
+        if (!(error instanceof AIServiceError)) throw error;
+        if (error.kind === "auth") {
             throw new ExtractionError(error.message, 503, { publicMessage: "Legal Copilot is not configured." });
         }
-        if (error instanceof Anthropic.RateLimitError) {
+        if (error.kind === "rate_limit") {
             throw new ExtractionError(error.message, 503, { publicMessage: "Legal Copilot is busy. Please try again shortly." });
         }
-        if (error instanceof Anthropic.APIError) {
-            throw new ExtractionError(error.message, 502, { publicMessage: "Legal Copilot couldn't answer. Please try again later." });
-        }
-        throw error;
+        throw new ExtractionError(error.message, 502, { publicMessage: "Legal Copilot couldn't answer. Please try again later." });
     }
-    if (response.stop_reason === "refusal") {
-        throw new ExtractionError("Copilot request was declined.", 422, { publicMessage: "Legal Copilot can't help with this question." });
-    }
-    if (!response.parsed_output) {
-        throw new ExtractionError("Copilot output did not match the schema.", 502, { publicMessage: "Legal Copilot couldn't answer. Please try again later." });
+    if (!response.parsed) {
+        throw new ExtractionError("Copilot output was incomplete or did not match the schema.", 502, { publicMessage: "Legal Copilot couldn't answer. Please try again later." });
     }
     return {
-        result: response.parsed_output,
+        result: response.parsed,
         model: response.model,
-        usage: { inputTokens: response.usage?.input_tokens ?? null, outputTokens: response.usage?.output_tokens ?? null },
+        usage: response.usage,
         latencyMs: Date.now() - startedAt,
     };
 }

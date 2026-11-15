@@ -631,6 +631,7 @@ export async function createMaintenanceRequest(req, res, next) {
         const {
             title,
             description,
+            location = "",
             category = "other",
             priority = "normal",
             responsibility = null,
@@ -643,6 +644,8 @@ export async function createMaintenanceRequest(req, res, next) {
             typeof description !== "string" ||
             !description.trim() ||
             description.trim().length > 4000 ||
+            typeof location !== "string" ||
+            location.trim().length > 150 ||
             ![
                 "plumbing",
                 "electrical",
@@ -677,6 +680,7 @@ export async function createMaintenanceRequest(req, res, next) {
             property: agreement.property,
             title: title.trim(),
             description: description.trim(),
+            location: location.trim(),
             category,
             priority,
             responsibility,
@@ -710,7 +714,7 @@ export async function createMaintenanceRequest(req, res, next) {
             actorId: actorId(req),
             type: "maintenance_request_submitted",
             title: `New ${priority === "urgent" ? "urgent " : ""}maintenance request: ${request.title}`,
-            message: `The ${actorLabel(agreement, actorId(req))} reported a ${category.replace(/_/g, " ")} problem: "${request.description.slice(0, 200)}"`,
+            message: `The ${actorLabel(agreement, actorId(req))} reported a ${category.replace(/_/g, " ")} problem${request.location ? ` in ${request.location}` : ""}: "${request.description.slice(0, 200)}"`,
             link: `/agreements/${agreement._id}/maintenance`,
         });
         privateResponse(res);

@@ -95,6 +95,23 @@ const renterPreferenceSchema = new mongoose.Schema(
             ),
             default: null,
         },
+
+        // The last AI ranking of this renter's shortlist. Reused while
+        // inputHash still matches the preferences and shortlisted listings.
+        aiRanking: {
+            type: new mongoose.Schema(
+                {
+                    inputHash: { type: String, required: true },
+                    model: { type: String, default: null },
+                    rankedAt: { type: Date, required: true },
+                    overallNote: { type: String, default: null },
+                    rankings: { type: [mongoose.Schema.Types.Mixed], default: [] },
+                },
+                { _id: false }
+            ),
+            default: null,
+            select: false,
+        },
     },
     { timestamps: true }
 );

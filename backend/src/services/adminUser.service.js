@@ -1,14 +1,24 @@
 // Admins appoint legal reviewers from existing renter accounts and can take
-// the role away again. Other staff roles stay a direct database change.
+// the role away again, and can switch an account between renter and landlord.
+// Admin accounts are only created through "Add staff".
 export const ROLE_CHANGES = {
     grant_reviewer: { from: "renter", to: "legal_reviewer" },
     revoke_reviewer: { from: "legal_reviewer", to: "renter" },
+    make_landlord: { from: "renter", to: "landlord" },
+    make_renter: { from: "landlord", to: "renter" },
 };
 
-export function validateReviewerRoleChange({ action, target, actorId, isAgreementParty }) {
+const WRONG_ROLE = {
+    grant_reviewer: "Only renter accounts can be made legal reviewers.",
+    revoke_reviewer: "This user isn't a legal reviewer.",
+    make_landlord: "Only renter accounts can be made landlords.",
+    make_renter: "This user isn't a landlord.",
+};
+
+export function validateRoleChange({ action, target, actorId, isAgreementParty, hasListings }) {
     const change = Object.hasOwn(ROLE_CHANGES, action) ? ROLE_CHANGES[action] : null;
     if (!change) {
-        return { error: "action must be grant_reviewer or revoke_reviewer.", status: 400 };
+        return { error: `action must be one of ${Object.keys(ROLE_CHANGES).join(", ")}.`, status: 400 };
     }
     if (!target) {
         return { error: "User not found.", status: 404 };
@@ -17,12 +27,26 @@ export function validateReviewerRoleChange({ action, target, actorId, isAgreemen
         return { error: "You can't change your own role.", status: 403 };
     }
     if (target.role !== change.from) {
-        return {
-            error: action === "grant_reviewer"
-                ? "Only renter accounts can be made legal reviewers."
-                : "This user isn't a legal reviewer.",
-            status: 409,
-        };
+        return { error: WRONG_ROLE[action], status: 409 };
+    }
+    if (["make_landlord", "make_renter"].includes(action)) {
+        if (!target.isActive) {
+            return { error: "Inactive accounts can't change role.", status: 409 };
+        }
+        // Their records are tied to the side they are on.
+        if (isAgreementParty) {
+            return {
+                error: "This user is a party to a tenancy agreement, so their role can't be switched.",
+                status: 409,
+            };
+        }
+        if (action === "make_renter" && hasListings) {
+            return {
+                error: "This landlord still has listings. They must delete them before becoming a renter.",
+                status: 409,
+            };
+        }
+        return { value: change };
     }
     if (action === "grant_reviewer" && !target.isActive) {
         return { error: "Inactive accounts can't be made legal reviewers.", status: 409 };
@@ -36,6 +60,8 @@ export function validateReviewerRoleChange({ action, target, actorId, isAgreemen
     }
     return { value: change };
 }
+
+export const validateReviewerRoleChange = validateRoleChange;
 
 const LISTABLE_ROLES = ["renter", "landlord", "legal_reviewer", "admin"];
 

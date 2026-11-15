@@ -1,5 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { env } from "../config/env.js";
@@ -10,7 +8,7 @@ import TenancyRecordLink from "../models/TenancyRecordLink.js";
 import { isExtractionConfigured } from "./agreementExtraction.service.js";
 import { searchSections } from "./legalSource.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
-import { trackAIUsage } from "./aiUsage.service.js";
+import { createAIClient } from "./aiClient.service.js";
 
 // Finds approved legal-source sections relevant to each clause of an
 // agreement. Retrieval ranks approved sections by topic and shared words;
@@ -50,7 +48,7 @@ For each clause you get a short list of candidate sections, each with an ID. Cho
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= trackAIUsage(new Anthropic(), "legal_suggestion");
+    defaultClient ??= createAIClient({ feature: "legal_suggestion" });
     return defaultClient;
 };
 
@@ -91,17 +89,17 @@ export async function requestLegalSuggestions({ items, client = getDefaultClient
                 `Candidate sections:\n${describeCandidates(item.candidates)}`
         )
         .join("\n\n");
-    const response = await client.beta.messages.parse({
+    const response = await client.generate({
         model,
-        max_tokens: 8000,
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-        output_config: { effort: "medium", format: betaZodOutputFormat(SuggestionSchema) },
+        maxTokens: 16000,
+        effort: "medium",
+        schema: SuggestionSchema,
+        schemaName: "legal_suggestions",
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: [{ type: "text", text: `${body}\n\nChoose the relevant sections for each clause.` }] }],
+        user: `${body}\n\nChoose the relevant sections for each clause.`,
     });
-    if (response.stop_reason === "refusal" || !response.parsed_output) return { suggestions: [], model: response.model };
-    return { suggestions: response.parsed_output.suggestions, model: response.model };
+    if (!response.parsed) return { suggestions: [], model: response.model };
+    return { suggestions: response.parsed.suggestions, model: response.model };
 }
 
 // Keeps only suggestions that point at one of that clause's candidates.

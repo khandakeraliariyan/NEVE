@@ -112,6 +112,24 @@ export default function UserManagement() {
         }
     }
 
+    async function switchRole(user) {
+        const toLandlord = user.role === "renter";
+        const next = toLandlord ? "landlord" : "renter";
+        if (!window.confirm(`Change ${user.displayName} from ${user.role} to ${next}? They will be notified.`)) return;
+        setBusyId(user._id);
+        setError(null);
+        setMessage(null);
+        try {
+            await api.patch(`/admin/users/${user._id}/role`, { action: toLandlord ? "make_landlord" : "make_renter" });
+            setMessage(`${user.displayName} is now a ${next}.`);
+            list.reload();
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusyId(null);
+        }
+    }
+
     async function setActive(user, isActive) {
         let reason;
         if (!isActive) {
@@ -221,6 +239,16 @@ export default function UserManagement() {
                                                 New setup link
                                             </button>
                                         )}
+                                        {["renter", "landlord"].includes(u.role) && u.isActive && !isSelf(u) && (
+                                            <button
+                                                type="button"
+                                                className="mr-3 text-xs text-forest underline"
+                                                disabled={busyId === u._id}
+                                                onClick={() => switchRole(u)}
+                                            >
+                                                Make {u.role === "renter" ? "landlord" : "renter"}
+                                            </button>
+                                        )}
                                         {u.role !== "admin" && !isSelf(u) &&
                                             (u.isActive ? (
                                                 <Button variant="danger" disabled={busyId === u._id} onClick={() => setActive(u, false)}>Deactivate</Button>
@@ -236,7 +264,7 @@ export default function UserManagement() {
             )}
             <Pagination page={page} totalPages={list.data?.pagination?.totalPages} onChange={setPage} />
             <Disclaimer className="mt-6" title="Limits">
-                Admin accounts and your own account can't be deactivated here. The user is notified of every change, and each one is written to the audit trail.
+                Admin accounts and your own account can't be deactivated here. A renter or landlord can switch role only while they have no tenancy agreements, and a landlord only once their listings are deleted. Legal reviewers are appointed from the Legal reviewers page. The user is notified of every change, and each one is written to the audit trail.
             </Disclaimer>
         </div>
     );

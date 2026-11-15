@@ -234,9 +234,6 @@ export default function Verification() {
                             </Button>
                         )}
                     </CheckRow>
-                    <CheckRow title="Phone number" verified={v.phone?.verified} at={v.phone?.verifiedAt}>
-                        {v.phone?.phoneNumber && <span className="text-xs text-muted">{v.phone.phoneNumber}</span>}
-                    </CheckRow>
                     {!isReviewer && (
                         <CheckRow title="Identity" status={identityStatus} at={v.identity?.verifiedAt}>
                             {identityDocument?.maskedNumber && (

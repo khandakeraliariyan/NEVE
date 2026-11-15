@@ -53,6 +53,11 @@ export default function CompleteProfile() {
     return (
         <AuthShell title="Complete your profile" subtitle={`Signed in as ${firebaseUser?.email ?? ""}. This name is shown to landlords and renters.`}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {firebaseUser?.email && firebaseUser.emailVerified === false && (
+                    <p className="rounded-xl bg-mist px-3 py-2 text-sm text-muted">
+                        We sent a verification link to {firebaseUser.email}. Open it to verify your email. You can send it again later from Verification.
+                    </p>
+                )}
                 <Field label="Display name">
                     <input required maxLength={100} className="field" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                 </Field>

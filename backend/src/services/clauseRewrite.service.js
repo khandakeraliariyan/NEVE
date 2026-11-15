@@ -1,13 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
 
 import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
-import { trackAIUsage } from "./aiUsage.service.js";
+import { AIServiceError, createAIClient } from "./aiClient.service.js";
 
-// Claude suggests balanced wording for one clause, grounded only in approved
+// The AI model suggests balanced wording for one clause, grounded only in approved
 // legal-source sections that were retrieved for it. A suggestion is a draft
 // for the parties to discuss, not legal advice.
 
@@ -34,7 +32,7 @@ Rules:
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= trackAIUsage(new Anthropic(), "clause_rewrite");
+    defaultClient ??= createAIClient({ feature: "clause_rewrite" });
     return defaultClient;
 };
 
@@ -57,63 +55,40 @@ export async function requestClauseRewrite({
     const startedAt = Date.now();
     let response;
     try {
-        response = await client.beta.messages.parse({
+        response = await client.generate({
             model,
-            max_tokens: 6000,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            output_config: {
-                effort: "high",
-                format: betaZodOutputFormat(ClauseRewriteSchema),
-            },
+            maxTokens: 16000,
+            effort: "high",
+            schema: ClauseRewriteSchema,
+            schemaName: "clause_rewrite",
             system: SYSTEM_PROMPT,
-            messages: [
-                {
-                    role: "user",
-                    content: [
-                        {
-                            type: "text",
-                            text:
-                                `Jurisdiction: ${jurisdiction}\n\n` +
-                                `Clause (${clause.category}${clause.heading ? `, "${clause.heading}"` : ""}):\n${maskPersonalIdentifiers(clause.text).text}\n\n` +
-                                `Approved legal-source sections:\n${sections.length ? describeSections(sections) : "(none found for this clause)"}\n\n` +
-                                "Suggest a balanced version of this clause.",
-                        },
-                    ],
-                },
-            ],
+            user:
+                `Jurisdiction: ${jurisdiction}\n\n` +
+                `Clause (${clause.category}${clause.heading ? `, "${clause.heading}"` : ""}):\n${maskPersonalIdentifiers(clause.text).text}\n\n` +
+                `Approved legal-source sections:\n${sections.length ? describeSections(sections) : "(none found for this clause)"}\n\n` +
+                "Suggest a balanced version of this clause.",
         });
     } catch (error) {
-        if (error instanceof Anthropic.AuthenticationError) {
+        if (!(error instanceof AIServiceError)) throw error;
+        if (error.kind === "auth") {
             throw new ExtractionError(error.message, 503, { publicMessage: "Clause suggestions are not configured." });
         }
-        if (error instanceof Anthropic.RateLimitError) {
+        if (error.kind === "rate_limit") {
             throw new ExtractionError(error.message, 503, { publicMessage: "Clause suggestions are busy. Please try again shortly." });
         }
-        if (error instanceof Anthropic.APIError) {
-            throw new ExtractionError(error.message, 502, { publicMessage: "Clause suggestion failed. Please try again later." });
-        }
-        throw error;
+        throw new ExtractionError(error.message, 502, { publicMessage: "Clause suggestion failed. Please try again later." });
     }
 
-    if (response.stop_reason === "refusal") {
-        throw new ExtractionError("Rewrite request was declined.", 422, {
-            publicMessage: "This clause couldn't be rewritten automatically.",
-        });
-    }
-    if (!response.parsed_output) {
-        throw new ExtractionError("Rewrite output did not match the schema.", 502, {
+    if (!response.parsed) {
+        throw new ExtractionError("Rewrite output was incomplete or did not match the schema.", 502, {
             publicMessage: "Clause suggestion failed. Please try again later.",
         });
     }
 
     return {
-        result: response.parsed_output,
+        result: response.parsed,
         model: response.model,
-        usage: {
-            inputTokens: response.usage?.input_tokens ?? null,
-            outputTokens: response.usage?.output_tokens ?? null,
-        },
+        usage: response.usage,
         latencyMs: Date.now() - startedAt,
     };
 }

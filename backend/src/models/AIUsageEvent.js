@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-// One Claude API call: which feature made it, the model that answered,
+// One AI model call: which feature made it, the model that answered,
 // tokens, latency and an estimated cost. Append-only, so re-running an
 // analysis never hides what earlier runs cost. Holds no prompt or answer text.
 
@@ -11,6 +11,7 @@ export const AI_FEATURES = [
     "legal_suggestion",
     "clause_rewrite",
     "evidence_link_suggestion",
+    "property_ranking",
 ];
 
 const aiUsageEventSchema = new mongoose.Schema(

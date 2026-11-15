@@ -280,11 +280,6 @@ export async function updateMyProfile(req, res, next) {
                 });
             }
             user.phoneNumber = phone || null;
-            // A different number than the verified one isn't verified.
-            const verifiedNumber = user.verification?.phone?.phoneNumber;
-            if (user.verification?.phone?.verified && verifiedNumber && verifiedNumber !== user.phoneNumber) {
-                user.set("verification.phone", { verified: false, phoneNumber: null, verifiedAt: null, method: null });
-            }
         }
 
         if (body.role !== undefined && body.role !== user.role) {

@@ -266,6 +266,13 @@ export async function updatePropertyStatus(req, res, next) {
             });
         }
 
+        if (property.moderation?.suspended) {
+            return res.status(403).json({
+                success: false,
+                message: "This listing was suspended by an admin and cannot be published or paused until it is restored.",
+            });
+        }
+
         const wasPublished = property.status === "published";
         const before = favoriteSnapshot(property);
         // A paused listing can be republished; a draft can be published.

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { label } from "../../lib/format";
+import PinPicker from "../../components/PinPicker";
 import { Button, ErrorBox, Field } from "../../components/ui";
 
 const PROPERTY_TYPES = ["apartment", "house"];
@@ -25,6 +26,10 @@ export default function PreferencesForm({ initial, onSave, onCancel }) {
         furnishing: initial.furnishing ?? "",
         amenities: (initial.amenities ?? []).join(", "),
         alertsEnabled: initial.alertsEnabled ?? true,
+        commutePin: initial.commute ? { latitude: initial.commute.latitude, longitude: initial.commute.longitude } : null,
+        commuteLabel: initial.commute?.label ?? "",
+        commuteMaxKm: initial.commute?.maxDistanceKm ?? 5,
+        commuteMode: initial.commute?.mode ?? "driving",
     }));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
@@ -38,10 +43,18 @@ export default function PreferencesForm({ initial, onSave, onCancel }) {
             setError("Minimum rent can't be more than maximum rent.");
             return;
         }
+        const maxKm = Number(form.commuteMaxKm);
+        if (form.commutePin && !(maxKm > 0 && maxKm <= 100)) {
+            setError("Commute distance must be more than 0 and at most 100 km.");
+            return;
+        }
         setBusy(true);
         setError(null);
         try {
             await onSave({
+                commute: form.commutePin
+                    ? { ...form.commutePin, label: form.commuteLabel.trim(), maxDistanceKm: maxKm, mode: form.commuteMode }
+                    : null,
                 cities: toList(form.cities),
                 areas: toList(form.areas),
                 minRent: form.minRent === "" ? null : Number(form.minRent),
@@ -119,6 +132,39 @@ export default function PreferencesForm({ initial, onSave, onCancel }) {
                 <Field label="Must-have amenities" hint="Comma separated">
                     <input className="field" value={form.amenities} onChange={(e) => setForm({ ...form, amenities: e.target.value })} />
                 </Field>
+            </div>
+            <div>
+                <p className="mb-1 font-semibold">Commute destination</p>
+                <p className="mb-2 text-xs text-muted">
+                    Click the map to pin your workplace, campus or another place you travel to often. Listings are scored on straight-line distance to it.
+                </p>
+                <PinPicker value={form.commutePin} onChange={(pin) => setForm((f) => ({ ...f, commutePin: pin }))} className="h-64" />
+                {form.commutePin ? (
+                    <>
+                        <p className="mt-2 text-xs text-muted">
+                            Pinned at {form.commutePin.latitude}, {form.commutePin.longitude}.
+                            <button type="button" className="ml-2 underline" onClick={() => setForm((f) => ({ ...f, commutePin: null }))}>
+                                Remove destination
+                            </button>
+                        </p>
+                        <div className="mt-3 grid gap-4 md:grid-cols-3">
+                            <Field label="Name" hint="e.g. Office, University">
+                                <input className="field" maxLength={100} value={form.commuteLabel} onChange={(e) => setForm({ ...form, commuteLabel: e.target.value })} />
+                            </Field>
+                            <Field label="Maximum distance (km)">
+                                <input type="number" min="0.1" max="100" step="0.1" className="field" value={form.commuteMaxKm} onChange={(e) => setForm({ ...form, commuteMaxKm: e.target.value })} />
+                            </Field>
+                            <Field label="Travel mode">
+                                <select className="field" value={form.commuteMode} onChange={(e) => setForm({ ...form, commuteMode: e.target.value })}>
+                                    <option value="driving">Driving</option>
+                                    <option value="walking">Walking</option>
+                                </select>
+                            </Field>
+                        </div>
+                    </>
+                ) : (
+                    <p className="mt-2 text-xs text-muted">No commute destination set.</p>
+                )}
             </div>
             <label className="flex items-start gap-3 rounded-xl bg-mist p-3">
                 <input type="checkbox" className="mt-0.5 accent-forest" checked={form.alertsEnabled} onChange={(e) => setForm({ ...form, alertsEnabled: e.target.checked })} />
