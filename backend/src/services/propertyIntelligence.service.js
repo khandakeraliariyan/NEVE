@@ -30,6 +30,9 @@ export function buildRentalCostSummary(pricing = {}) {
 
     const monthlyRent = pricing.monthlyRent ?? null;
     const monthlyServiceCharge = pricing.monthlyServiceCharge ?? null;
+    // Optional. When it isn't listed, maintenance is taken to be part of the
+    // service charge, so it never makes the estimate incomplete.
+    const monthlyMaintenanceCharge = pricing.monthlyMaintenanceCharge ?? null;
     const advanceRent = pricing.advanceRent ?? null;
     const refundableDeposit = pricing.securityDeposit ?? null;
     const utilities = Array.from(pricing.utilities ?? []);
@@ -54,8 +57,22 @@ export function buildRentalCostSummary(pricing = {}) {
             ? []
             : [
                   {
-                      name: "Service and maintenance charge",
+                      name:
+                          monthlyMaintenanceCharge === null
+                              ? "Service and maintenance charge"
+                              : "Service charge",
                       amount: monthlyServiceCharge,
+                      type: "monthly",
+                      source: "landlord_provided",
+                      required: true,
+                  },
+              ]),
+        ...(monthlyMaintenanceCharge === null
+            ? []
+            : [
+                  {
+                      name: "Maintenance charge",
+                      amount: monthlyMaintenanceCharge,
                       type: "monthly",
                       source: "landlord_provided",
                       required: true,
@@ -166,7 +183,10 @@ export function buildRentalCostSummary(pricing = {}) {
         monthlyComplete && upfrontMissingComponents.length === 0;
 
     const assumptions = [
-        "Monthly totals add the listed rent, service charge, utility charges, and other monthly fees.",
+        "Monthly totals add the listed rent, service charge, maintenance charge, utility charges, and other monthly fees.",
+        monthlyMaintenanceCharge === null
+            ? "No separate maintenance charge is listed; any regular maintenance cost is taken to be part of the service charge."
+            : "The maintenance charge is listed separately from the service charge.",
         "The move-in estimate includes one month of recurring costs, advance rent, the security deposit, and any one-time fees.",
         "A missing amount makes the complete estimate unavailable; known subtotals are shown separately and do not imply that undisclosed costs are zero.",
     ];
@@ -193,6 +213,7 @@ export function buildRentalCostSummary(pricing = {}) {
         pricing: {
             monthlyRent,
             monthlyServiceCharge,
+            monthlyMaintenanceCharge,
             advanceRent,
             securityDeposit: refundableDeposit,
             utilities: utilities.map((utility) => ({

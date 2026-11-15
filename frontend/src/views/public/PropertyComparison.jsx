@@ -152,6 +152,11 @@ export default function PropertyComparison() {
                                     />
                                     <Row title="Service charge" hint="Per month, from the listing" cells={items.map((p) => money(p.pricing.monthlyServiceCharge))} />
                                     <Row
+                                        title="Maintenance charge"
+                                        hint="Per month, when charged separately"
+                                        cells={items.map((p) => money(p.pricing.monthlyMaintenanceCharge, { unknown: "Not separate" }))}
+                                    />
+                                    <Row
                                         highlight
                                         title="Estimated monthly total"
                                         hint="Rent plus recurring charges"

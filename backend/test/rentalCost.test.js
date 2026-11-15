@@ -170,3 +170,21 @@ test("pricing schema rejects inconsistent utility and fee entries", async () => 
         assert.ok((await errorsFor(pricing)).length > 0, JSON.stringify(pricing));
     }
 });
+
+test("a separate maintenance charge is its own line and is optional", () => {
+    const base = { monthlyRent: 20000, monthlyServiceCharge: 1500, advanceRent: 20000, securityDeposit: 40000 };
+
+    const combined = buildRentalCostSummary(base);
+    assert.ok(combined.monthly.breakdown.some((item) => item.name === "Service and maintenance charge"));
+    assert.equal(combined.pricing.monthlyMaintenanceCharge, null);
+    assert.equal(combined.monthly.complete, true);
+
+    const separate = buildRentalCostSummary({ ...base, monthlyMaintenanceCharge: 800 });
+    const names = separate.monthly.breakdown.map((item) => item.name);
+    assert.deepEqual(names, ["Monthly rent", "Service charge", "Maintenance charge"]);
+    assert.equal(separate.monthly.breakdown[2].amount, 800);
+    assert.equal(separate.monthly.breakdown[2].source, "landlord_provided");
+    assert.equal(separate.monthly.estimatedTotal, 22300);
+    assert.equal(separate.moveIn.estimatedTotal, 82300);
+    assert.equal(separate.pricing.monthlyMaintenanceCharge, 800);
+});

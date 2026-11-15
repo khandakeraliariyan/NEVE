@@ -302,6 +302,14 @@ const propertySchema = new mongoose.Schema(
                 min: 0,
             },
 
+            // Optional: a maintenance charge billed separately from the
+            // service charge. Null means it is not charged separately.
+            monthlyMaintenanceCharge: {
+                type: Number,
+                default: null,
+                min: 0,
+            },
+
             // How each utility is paid. An empty list means the landlord has
             // not described utilities; it does not mean they are free.
             utilities: {
