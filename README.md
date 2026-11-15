@@ -75,7 +75,7 @@ The current platform includes a strong set of implemented functionality, especia
 ## Known limitations
 
 - AI cost figures are estimates from list prices.
-- The evaluation datasets in `backend/eval/datasets` are small and synthetic. Model-backed tasks (agreement and obligation extraction, Copilot answer quality, AI risk review) only run with `npm run eval -- --live`, which calls the Claude API.
+- The evaluation datasets in `backend/eval/datasets` are small and synthetic. Model-backed tasks (agreement and obligation extraction, Copilot answer quality, AI risk review) only run with `npm run eval -- --live`, which calls the Groq API.
 
 Earlier project notes also list these refinements (not re-checked against the current code):
 
@@ -111,7 +111,7 @@ Earlier project notes also list these refinements (not re-checked against the cu
 - MongoDB + Mongoose
 - Firebase Authentication
 - Cloudflare R2 object storage
-- Anthropic Claude for AI-powered agreement support
+- Groq (`openai/gpt-oss-120b`) for AI-powered agreement support, Legal Copilot and AI ranking
 - Tesseract.js for OCR
 - Sharp and PDF processing libraries
 - Zod validation

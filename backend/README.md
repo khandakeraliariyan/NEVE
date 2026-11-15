@@ -40,7 +40,7 @@ The backend is organized in a modular layered structure:
 - MongoDB + Mongoose
 - Firebase Admin SDK
 - Cloudflare R2 for private object storage
-- Anthropic Claude for agreement extraction and legal features
+- Groq (`openai/gpt-oss-120b` by default) for agreement extraction, legal features and AI ranking
 - Tesseract.js for OCR
 - Sharp and PDF utilities for image and document processing
 - Zod for validation
@@ -144,7 +144,7 @@ The backend includes deterministic matching based on:
 - location preferences
 - furnishing and amenity suitability
 - explainable reasons and shortfall reporting
-- optional AI ranking: on request, Claude re-ranks a renter's top 15 matches within budget and explains each with strengths, concerns and questions to ask the landlord (`GET`/`POST /recommendations/ai-ranking`). It uses listing data only, sends no renter identity or commute coordinates, and is saved until the preferences or listings change. The model is set by `RECOMMENDATION_MODEL` (default `claude-opus-5-5`)
+- optional AI ranking: on request, the AI model re-ranks a renter's top 15 matches within budget and explains each with strengths, concerns and questions to ask the landlord (`GET`/`POST /recommendations/ai-ranking`). It uses listing data only, sends no renter identity or commute coordinates, and is saved until the preferences or listings change. The model is set by `RECOMMENDATION_MODEL` (default: `AI_MODEL`)
 
 ### 8. Communication and listing interaction
 
@@ -215,7 +215,7 @@ Evaluation tasks include agreement and obligation extraction, missing-informatio
 ### 14. Platform administration
 
 - dashboard statistics: users by role, suspended accounts, active tenancies, verification queues, latest evaluation per task and AI usage
-- AI usage and cost monitoring for every Claude call, by feature, model and day (`GET /admin/dashboard/ai-usage`)
+- AI usage and cost monitoring for every AI model call, by feature, model and day (`GET /admin/dashboard/ai-usage`)
 - account appeals and complaints, including suspension appeals that suspended users can still submit (`/users/me/appeals`, `/admin/users/appeals`)
 - grouped server-error review (`/admin/system/errors`)
 - admin-editable retention and backup limits that override the environment defaults (`dataPolicies` in `/admin/settings`)
@@ -224,7 +224,7 @@ Evaluation tasks include agreement and obligation extraction, missing-informatio
 ## Known limitations
 
 - AI cost figures are estimates from list prices.
-- The evaluation datasets are small and synthetic; model-backed tasks only run with `npm run eval -- --live`, which calls the Claude API.
+- The evaluation datasets are small and synthetic; model-backed tasks only run with `npm run eval -- --live`, which calls the Groq API.
 
 Earlier project notes also list these refinements (not re-checked against the current code):
 
@@ -301,9 +301,12 @@ MAX_TENANCY_EVIDENCE_SIZE_MB=15
 MAX_PROPERTY_VIDEO_SIZE_MB=50
 MAX_FLOOR_PLAN_SIZE_MB=10
 
-ANTHROPIC_API_KEY=
-AGREEMENT_EXTRACTION_MODEL=claude-opus-5-5
-RECOMMENDATION_MODEL=claude-opus-5-5
+# AI features run on Groq. AI_MODEL must support strict JSON-schema output.
+GROQ_API_KEY=
+AI_MODEL=openai/gpt-oss-120b
+# Optional per-feature overrides (default: AI_MODEL)
+# AGREEMENT_EXTRACTION_MODEL=
+# RECOMMENDATION_MODEL=
 
 OVERPASS_API_URL=https://overpass-api.de/api/interpreter
 NEVE_API_BASE_URL=http://localhost:5000/api/v1
