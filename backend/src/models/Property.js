@@ -364,6 +364,18 @@ const propertySchema = new mongoose.Schema(
             default: null,
         },
 
+        // Set only by an admin. A suspended listing is paused, and its landlord
+        // cannot publish it again until an admin restores it.
+        moderation: {
+            suspended: { type: Boolean, default: false, index: true },
+            reason: { type: String, trim: true, maxlength: 1000, default: "" },
+            suspendedAt: { type: Date, default: null },
+            suspendedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, select: false },
+            statusBefore: { type: String, enum: ["draft", "published", "paused", null], default: null },
+            restoredAt: { type: Date, default: null },
+            restoredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, select: false },
+        },
+
         // Set only by an admin after reviewing ownership documents.
         ownershipVerification: {
             status: {

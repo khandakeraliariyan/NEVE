@@ -26,6 +26,7 @@ const adminAuditLogSchema = new mongoose.Schema(
                 "property_report",
                 "listing_warning",
                 "property_claim",
+                "property",
                 "communication_report",
                 "ai_evaluation",
                 "user",

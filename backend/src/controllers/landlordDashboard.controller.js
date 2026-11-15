@@ -37,7 +37,7 @@ export async function getLandlordDashboard(req, res, next) {
         const [properties, total, statusCounts] = await Promise.all([
             Property.find(filter)
                 .select(
-                    "title propertyType address bedrooms bathrooms areaSqft images pricing status availabilityDate ownershipVerification createdAt updatedAt"
+                    "title propertyType address bedrooms bathrooms areaSqft images pricing status moderation.suspended moderation.reason availabilityDate ownershipVerification createdAt updatedAt"
                 )
                 .sort({ updatedAt: -1 })
                 .skip((page - 1) * limit)

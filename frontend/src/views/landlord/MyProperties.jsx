@@ -6,7 +6,7 @@ import { api } from "../../lib/api";
 import { date, label, money } from "../../lib/format";
 import { useApi } from "../../hooks/useApi";
 import { PropertyImage } from "../../components/PropertyCard";
-import { Button, ButtonLink, Card, Empty, ErrorBox, Loading, PageHeader, Pagination, StatusBadge } from "../../components/ui";
+import { Badge, Button, ButtonLink, Card, Empty, ErrorBox, Loading, PageHeader, Pagination, StatusBadge } from "../../components/ui";
 
 const PAGE_SIZE = 9;
 const STATUSES = [
@@ -112,7 +112,7 @@ export default function MyProperties() {
                     <Card key={property._id} className="flex flex-col overflow-hidden p-0">
                         <PropertyImage property={property} className="h-40">
                             <div className="relative flex w-full items-start justify-between self-start p-3">
-                                <StatusBadge status={property.status} />
+                                {property.moderation?.suspended ? <Badge tone="rose">Suspended</Badge> : <StatusBadge status={property.status} />}
                                 <span className="rounded-md bg-white/90 px-2 py-0.5 text-xs">{label(property.propertyType)}</span>
                             </div>
                         </PropertyImage>
@@ -130,6 +130,11 @@ export default function MyProperties() {
                                     {property.images?.length ?? 0} photo{property.images?.length === 1 ? "" : "s"} · available {date(property.availabilityDate)}
                                 </span>
                             </div>
+                            {property.moderation?.suspended && (
+                                <p className="rounded-xl bg-rose/40 px-3 py-2 text-xs text-rose-ink">
+                                    An admin suspended this listing, so renters can't see it{property.moderation.reason ? `: "${property.moderation.reason}"` : "."} It can be published again once an admin restores it.
+                                </p>
+                            )}
                             <div className="flex flex-wrap gap-2 text-xs">
                                 <Link href={`/listings/${property._id}/media`} className="rounded-md bg-sage px-2 py-1 text-forest">
                                     Media & floor plans
@@ -142,7 +147,7 @@ export default function MyProperties() {
                                 <ButtonLink to={`/listings/${property._id}/edit`} variant="secondary" className="flex-1">
                                     Edit
                                 </ButtonLink>
-                                {property.status === "published" ? (
+                                {property.moderation?.suspended ? null : property.status === "published" ? (
                                     <Button variant="outline" className="flex-1" disabled={busyId === property._id} onClick={() => changeStatus(property, "paused")}>
                                         Pause
                                     </Button>

@@ -17,6 +17,11 @@ import { decideListingAppeal } from "../controllers/listingAppeal.controller.js"
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
+import {
+    changeListingSuspension,
+    getListingModeration,
+} from "../controllers/listingSuspension.controller.js";
+
 const router = express.Router();
 
 router.use(authenticateUser);
@@ -40,5 +45,9 @@ router.patch(
     "/claims/:claimId/public-visibility",
     updateClaimPublicSummary
 );
+
+// Suspend a suspicious listing, or restore one after review.
+router.get("/listings/:propertyId", getListingModeration);
+router.patch("/listings/:propertyId/suspension", changeListingSuspension);
 
 export default router;

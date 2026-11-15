@@ -40,6 +40,7 @@ export const NOTIFICATION_TYPES = [
     "listing_flagged",
     "listing_appeal_submitted",
     "listing_appeal_decided",
+    "listing_suspension_changed",
     "legal_source_submitted",
     "legal_source_flagged",
     "copilot_answer_reported",
