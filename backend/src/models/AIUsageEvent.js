@@ -11,6 +11,7 @@ export const AI_FEATURES = [
     "legal_suggestion",
     "clause_rewrite",
     "evidence_link_suggestion",
+    "property_ranking",
 ];
 
 const aiUsageEventSchema = new mongoose.Schema(

@@ -638,6 +638,42 @@ export async function getMatchedProperties(
         };
     }
 
+    const { properties, eligible, budgetExcluded } = await rankCandidates(preferences);
+    const total = eligible.length;
+    const start = (page - 1) * limit;
+
+    return {
+        hasPreferences: true,
+        results: eligible.slice(start, start + limit),
+        outsideBudget: budgetExcluded.slice(0, Math.min(limit, 10)),
+        evaluatedCandidates: properties.length,
+        candidateLimit: MAX_CANDIDATES,
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        },
+        note:
+            "Scores are deterministic preference matches, not guarantees of property suitability. Listings above or below your selected rent range are excluded from results and listed separately as outsideBudget. Only the newest 500 published listings are evaluated.",
+    };
+}
+
+// The renter's preferences and their best rule-based matches within budget,
+// which the AI ranking re-orders. Returns null when no preferences are set.
+export async function getRecommendationShortlist(renterId, size) {
+    const preferences = await RenterPreference.findOne({ renter: renterId })
+        .select("+aiRanking")
+        .lean();
+    if (!preferences) return null;
+    const { eligible } = await rankCandidates(preferences);
+    return {
+        preferences,
+        shortlist: eligible.filter((result) => result.matchScore !== null).slice(0, size),
+    };
+}
+
+async function rankCandidates(preferences) {
     const properties = await Property.find({ status: "published" })
         .sort({ createdAt: -1 })
         .limit(MAX_CANDIDATES)
@@ -692,22 +728,5 @@ export async function getMatchedProperties(
     const eligible = ranked.filter(
         (result) => result.withinBudget !== false
     );
-    const total = eligible.length;
-    const start = (page - 1) * limit;
-
-    return {
-        hasPreferences: true,
-        results: eligible.slice(start, start + limit),
-        outsideBudget: budgetExcluded.slice(0, Math.min(limit, 10)),
-        evaluatedCandidates: properties.length,
-        candidateLimit: MAX_CANDIDATES,
-        pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-        },
-        note:
-            "Scores are deterministic preference matches, not guarantees of property suitability. Listings above or below your selected rent range are excluded from results and listed separately as outsideBudget. Only the newest 500 published listings are evaluated.",
-    };
+    return { properties, eligible, budgetExcluded };
 }

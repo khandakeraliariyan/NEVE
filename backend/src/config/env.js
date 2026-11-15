@@ -68,6 +68,8 @@ const envSchema = z.object({
     // missing key can be reported as "extraction not configured".
     ANTHROPIC_API_KEY: z.string().optional(),
     AGREEMENT_EXTRACTION_MODEL: z.string().min(1).default("claude-opus-5-5"),
+    // Model for the AI ranking of a renter's recommendation shortlist.
+    RECOMMENDATION_MODEL: z.string().min(1).default("claude-opus-5-5"),
     // Email delivery through an HTTP email API. All three are needed.
     EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).optional(),
     EMAIL_API_KEY: z.string().optional(),
