@@ -22,6 +22,7 @@ function constraintChips(p) {
     if (p.propertyTypes?.length) chips.push(p.propertyTypes.map(label).join(", "));
     if (p.furnishing) chips.push(label(p.furnishing));
     if (p.amenities?.length) chips.push(p.amenities.join(", "));
+    if (p.commute) chips.push(`Within ${p.commute.maxDistanceKm} km of ${p.commute.label || "commute destination"}`);
     return chips;
 }
 
@@ -224,7 +225,7 @@ export default function Recommendations() {
             <Disclaimer title="About these scores" className="mt-8">
                 {data?.note ??
                     "Scores are deterministic preference matches, not guarantees of property suitability."}{" "}
-                Matching compares your stated preferences with listing data. It isn't AI, and it doesn't consider commute times or walking distance.
+                Matching compares your stated preferences with listing data. It isn't AI. Commute is scored on straight-line distance to your destination, not travel time.
             </Disclaimer>
         </div>
     );
