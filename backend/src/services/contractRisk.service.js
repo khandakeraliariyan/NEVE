@@ -1,5 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { env } from "../config/env.js";
@@ -7,7 +5,7 @@ import { RISK_SEVERITIES, RISK_TYPES } from "../models/ContractRiskAnalysis.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
 import { searchSections } from "./legalSource.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
-import { trackAIUsage } from "./aiUsage.service.js";
+import { AIServiceError, createAIClient } from "./aiClient.service.js";
 
 // Contract Risk Intelligence: finds wording the parties should look at
 // again (ambiguous, missing, contradictory or one-sided terms). Rule checks
@@ -295,7 +293,7 @@ Rules:
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= trackAIUsage(new Anthropic(), "contract_risk");
+    defaultClient ??= createAIClient({ feature: "contract_risk" });
     return defaultClient;
 };
 
@@ -327,28 +325,28 @@ export async function requestRiskReview({ agreement, rules, sections, client = g
     const startedAt = Date.now();
     let response;
     try {
-        response = await client.beta.messages.parse({
+        response = await client.generate({
             model,
-            max_tokens: 12000,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            output_config: { effort: "high", format: betaZodOutputFormat(RiskReviewSchema) },
+            maxTokens: 24000,
+            effort: "high",
+            schema: RiskReviewSchema,
+            schemaName: "risk_review",
             system: SYSTEM_PROMPT,
-            messages: [{ role: "user", content: [{ type: "text", text }] }],
+            user: text,
         });
     } catch (error) {
-        if (error instanceof Anthropic.AuthenticationError) throw new ExtractionError(error.message, 503, { publicMessage: "AI risk review is not configured." });
-        if (error instanceof Anthropic.RateLimitError) throw new ExtractionError(error.message, 503, { publicMessage: "AI risk review is busy. Please try again shortly." });
-        if (error instanceof Anthropic.APIError) throw new ExtractionError(error.message, 502, { publicMessage: "AI risk review failed." });
-        throw error;
+        if (!(error instanceof AIServiceError)) throw error;
+        if (error.kind === "auth") throw new ExtractionError(error.message, 503, { publicMessage: "AI risk review is not configured." });
+        if (error.kind === "rate_limit") throw new ExtractionError(error.message, 503, { publicMessage: "AI risk review is busy. Please try again shortly." });
+        throw new ExtractionError(error.message, 502, { publicMessage: "AI risk review failed." });
     }
-    if (response.stop_reason === "refusal" || !response.parsed_output) {
+    if (!response.parsed) {
         throw new ExtractionError("Risk review returned no output.", 502, { publicMessage: "AI risk review failed." });
     }
     return {
-        findings: response.parsed_output.findings,
+        findings: response.parsed.findings,
         model: response.model,
-        usage: { inputTokens: response.usage?.input_tokens ?? null, outputTokens: response.usage?.output_tokens ?? null },
+        usage: response.usage,
         latencyMs: Date.now() - startedAt,
     };
 }

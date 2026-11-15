@@ -82,13 +82,9 @@ const rawExtraction = (overrides = {}) => ({
 });
 
 const fakeClient = (response, captured = {}) => ({
-    beta: {
-        messages: {
-            parse: async (params) => {
-                captured.params = params;
-                return response;
-            },
-        },
+    generate: async (params) => {
+        captured.params = params;
+        return response;
     },
 });
 
@@ -144,42 +140,38 @@ test("valid ISO dates become Date values", () => {
     assert.equal(normalized.facts.startAt.value.toISOString(), "2026-01-01T00:00:00.000Z");
 });
 
-test("extraction request sends only the masked text, with schema output and fallbacks", async () => {
+test("extraction request sends only the masked text, with the extraction schema", async () => {
     const captured = {};
     const result = await requestAgreementExtraction({
         documentText: `--- Page 1 ---\n${AGREEMENT_TEXT}`,
-        model: "claude-opus-5-5",
+        model: "openai/gpt-oss-120b",
         client: fakeClient(
             {
-                stop_reason: "end_turn",
-                model: "claude-opus-5-5",
-                usage: { input_tokens: 900, output_tokens: 400 },
-                parsed_output: rawExtraction(),
+                stopReason: "end",
+                model: "openai/gpt-oss-120b",
+                usage: { inputTokens: 900, outputTokens: 400 },
+                parsed: rawExtraction(),
             },
             captured
         ),
     });
 
-    assert.equal(captured.params.model, "claude-opus-5-5");
-    assert.equal(captured.params.fallbacks, "default");
-    assert.deepEqual(captured.params.betas, ["server-side-fallback-2026-07-01"]);
-    assert.ok(captured.params.output_config.format);
+    assert.equal(captured.params.model, "openai/gpt-oss-120b");
+    assert.equal(captured.params.schema, AgreementExtractionSchema);
     assert.match(captured.params.system, /untrusted/);
     assert.match(captured.params.system, /\[NID removed\]/);
-    const block = captured.params.messages[0].content[0];
-    assert.equal(block.type, "document");
-    assert.equal(block.source.type, "text");
-    assert.match(block.source.data, /^--- Page 1 ---/);
+    const [document] = captured.params.user;
+    assert.match(document, /^<document title="Rental agreement">\n--- Page 1 ---/);
+    assert.match(document, /<\/document>$/);
     assert.equal(result.usage.inputTokens, 900);
     assert.equal(result.extraction.clauses.length, 2);
 });
 
-test("refusals, truncation, and unparsed output are reported as errors", async () => {
-    const base = { model: "claude-opus-5-5", usage: {} };
+test("truncation and unparsed output are reported as errors", async () => {
+    const base = { model: "openai/gpt-oss-120b", usage: {} };
     for (const response of [
-        { ...base, stop_reason: "refusal", parsed_output: null },
-        { ...base, stop_reason: "max_tokens", parsed_output: null },
-        { ...base, stop_reason: "end_turn", parsed_output: null },
+        { ...base, stopReason: "max_tokens", parsed: null },
+        { ...base, stopReason: "end", parsed: null },
     ]) {
         await assert.rejects(
             requestAgreementExtraction({

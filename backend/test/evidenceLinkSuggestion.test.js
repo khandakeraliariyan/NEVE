@@ -45,23 +45,18 @@ test("keeps only real, new targets and clamps confidence", () => {
     assert.equal(normalized.links[0].sourceQuote, "Tk 20,000");
 });
 
-test("calls Claude with the file's masked text and the masked record list", async () => {
+test("asks the AI model with the file's masked text and the masked record list", async () => {
     let params;
     const client = {
-        beta: {
-            messages: {
-                parse: async (request) => {
-                    params = request;
-                    return { stop_reason: "end_turn", model: "claude-test", parsed_output: { fileSummary: "x", links: [], limitations: null }, usage: { input_tokens: 10, output_tokens: 5 } };
-                },
-            },
+        generate: async (request) => {
+            params = request;
+            return { stopReason: "end", model: "test-model", parsed: { fileSummary: "x", links: [], limitations: null }, usage: { inputTokens: 10, outputTokens: 5 } };
         },
     };
-    const result = await requestEvidenceLinkSuggestions({ agreement, documentText: "--- Page 1 ---\nPaid Tk 20,000", client, model: "claude-test" });
-    assert.equal(result.model, "claude-test");
-    assert.equal(params.messages[0].content[0].type, "document");
-    assert.equal(params.messages[0].content[0].source.type, "text");
-    assert.match(params.messages[0].content[1].text, /Agreement records/);
+    const result = await requestEvidenceLinkSuggestions({ agreement, documentText: "--- Page 1 ---\nPaid Tk 20,000", client, model: "test-model" });
+    assert.equal(result.model, "test-model");
+    assert.match(params.user[0], /^<document title="Evidence file">\n--- Page 1 ---/);
+    assert.match(params.user[1], /Agreement records/);
 });
 
 test("proposed links don't count until accepted", () => {

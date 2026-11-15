@@ -15,7 +15,6 @@ import {
     estimateCostUsd,
     recordAIUsage,
     summarizeAIUsage,
-    trackAIUsage,
     usageTokens,
 } from "../src/services/aiUsage.service.js";
 import { countsByKey, getAdminOverview, getAIUsage } from "../src/controllers/adminDashboard.controller.js";
@@ -38,38 +37,6 @@ test("cost estimate uses list prices, including cache reads and writes", () => {
     assert.equal(estimateCostUsd("claude-opus-5-5", tokens), 7.1);
     assert.equal(estimateCostUsd("some-unknown-model", tokens), null);
     assert.deepEqual(usageTokens(undefined), { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
-});
-
-test("tracked client records successful and failed calls without changing results", async () => {
-    const records = [];
-    let clock = 1000;
-    const response = { model: "claude-sonnet-5-5", stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 5 } };
-    const client = {
-        other: "kept",
-        beta: {
-            models: "kept-too",
-            messages: {
-                parse: async (params) => {
-                    clock += 250;
-                    if (params.fail) throw new RangeError("boom");
-                    return response;
-                },
-            },
-        },
-    };
-    const tracked = trackAIUsage(client, "legal_copilot", { record: async (entry) => records.push(entry), now: () => clock });
-
-    assert.equal(await tracked.beta.messages.parse({ model: "claude-opus-5-5" }), response);
-    await assert.rejects(tracked.beta.messages.parse({ model: "claude-opus-5-5", fail: true }), RangeError);
-    assert.equal(tracked.other, "kept");
-    assert.equal(tracked.beta.models, "kept-too");
-
-    assert.equal(records.length, 2);
-    assert.equal(records[0].feature, "legal_copilot");
-    assert.equal(records[0].response, response);
-    assert.equal(records[0].latencyMs, 250);
-    assert.ok(records[1].error instanceof RangeError);
-    assert.throws(() => trackAIUsage(client, "not_a_feature"));
 });
 
 test("recording stores the served model and never throws", async () => {

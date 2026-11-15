@@ -89,7 +89,7 @@ export default function AIRanking({ version }) {
                     <p className="eyebrow">AI ranking</p>
                     <h2 className="text-xl">Your top {info.shortlistSize} matches, ranked by AI</h2>
                     <p className="mt-1 text-sm text-muted">
-                        Claude compares your best rule-based matches using the full listing details, including total costs, house rules and lease terms, and explains the order.
+                        AI compares your best rule-based matches using the full listing details, including total costs, house rules and lease terms, and explains the order.
                     </p>
                 </div>
                 {info.available ? (

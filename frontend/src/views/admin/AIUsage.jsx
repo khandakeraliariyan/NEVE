@@ -81,7 +81,7 @@ export default function AIUsage() {
             <PageHeader
                 eyebrow="System governance"
                 title="AI usage & cost"
-                description="Every Claude call Neve makes (agreement extraction, risk review, Legal Copilot, legal suggestions, clause rewrites and evidence-link suggestions), with tokens, response time and an estimated cost."
+                description="Every AI model call Neve makes (agreement extraction, risk review, Legal Copilot, legal suggestions, clause rewrites and evidence-link suggestions), with tokens, response time and an estimated cost."
             />
             <Tabs tabs={WINDOWS} active={days} onChange={setDays} />
             <ErrorBox error={usage.error} onRetry={usage.reload} />

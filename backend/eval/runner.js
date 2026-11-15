@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
 import mongoose from "mongoose";
 
+import { env } from "../src/config/env.js";
 import { calculateEvaluationMetrics } from "../src/services/aiEvaluation.service.js";
+import { estimateCostUsd } from "../src/services/aiUsage.service.js";
 import { normalizeExtraction, requestAgreementExtraction } from "../src/services/agreementExtraction.service.js";
 import { guessCategory } from "../src/services/compliance.service.js";
 import { normalizeAiFindings, requestRiskReview, ruleFindings, sectionsForAgreement } from "../src/services/contractRisk.service.js";
@@ -9,7 +11,7 @@ import { normalizeAnswer, requestCopilotAnswer, retrieveSections } from "../src/
 
 // Runs Neve's evaluation datasets and scores them with the same metrics the
 // admin AI evaluation page uses. Deterministic tasks run offline; model-backed
-// tasks run only when live is true (they call the Claude API and cost money).
+// tasks run only when live is true (they call the AI model and cost money).
 
 export const DATASETS = {
     missing_information: new URL("./datasets/missing_information.json", import.meta.url),
@@ -22,10 +24,12 @@ export const DATASETS = {
 };
 export const LIVE_ONLY = new Set(["agreement_extraction", "obligation_extraction", "copilot_answer_quality"]);
 
-// Claude Opus 5.5 list prices, USD per token, for rough cost figures.
-const PRICE = { input: 4 / 1e6, output: 20 / 1e6 };
-const cost = (usage) =>
-    usage?.inputTokens == null ? undefined : usage.inputTokens * PRICE.input + (usage.outputTokens ?? 0) * PRICE.output;
+// Rough cost from the prices in aiUsage.service.js; undefined when the
+// model has no listed price.
+const cost = (usage, model = env.AGREEMENT_EXTRACTION_MODEL) =>
+    usage?.inputTokens == null
+        ? undefined
+        : estimateCostUsd(model, { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens ?? 0, cacheReadTokens: 0, cacheWriteTokens: 0 }) ?? undefined;
 
 export async function loadDataset(task) {
     return JSON.parse(await readFile(DATASETS[task], "utf8"));
@@ -222,8 +226,8 @@ export async function runTask(task, { live = false, client, modelName } = {}) {
     const cases = await RUNNERS[task](dataset, { live, client });
     const metrics = calculateEvaluationMetrics({
         task: dataset.task,
-        modelName: modelName ?? (live ? "claude" : "neve-rules"),
-        modelVersion: live ? process.env.AGREEMENT_EXTRACTION_MODEL ?? "claude-opus-5-5" : "deterministic",
+        modelName: modelName ?? (live ? "groq" : "neve-rules"),
+        modelVersion: live ? env.AGREEMENT_EXTRACTION_MODEL : "deterministic",
         datasetName: dataset.name,
         datasetVersion: dataset.version,
         cases: cases.map(({ error, ...rest }) => rest),

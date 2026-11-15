@@ -70,7 +70,7 @@ export async function getAIRanking(req, res, next) {
 }
 
 // POST /api/v1/recommendations/ai-ranking  { refresh?: boolean }
-// Ranks the renter's top matches with Claude. A ranking made from the same
+// Ranks the renter's top matches with the AI model. A ranking made from the same
 // preferences and listings is reused unless refresh is true.
 export async function runAIRanking(req, res, next) {
     try {

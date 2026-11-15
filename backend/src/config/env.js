@@ -64,12 +64,15 @@ const envSchema = z.object({
         .string()
         .url()
         .default("https://routing.openstreetmap.de/routed-car"),
-    // The Anthropic SDK reads ANTHROPIC_API_KEY itself; it is listed here so a
-    // missing key can be reported as "extraction not configured".
-    ANTHROPIC_API_KEY: z.string().optional(),
-    AGREEMENT_EXTRACTION_MODEL: z.string().min(1).default("claude-opus-5-5"),
-    // Model for the AI ranking of a renter's recommendation shortlist.
-    RECOMMENDATION_MODEL: z.string().min(1).default("claude-opus-5-5"),
+    // AI features run on Groq. Without a key they report "not configured".
+    GROQ_API_KEY: z.string().optional(),
+    // The Groq model every AI feature uses unless overridden below. It must
+    // support strict JSON-schema output.
+    AI_MODEL: z.string().min(1).default("openai/gpt-oss-120b"),
+    // Optional overrides: agreement and legal features, and the AI ranking of
+    // a renter's recommendation shortlist.
+    AGREEMENT_EXTRACTION_MODEL: z.string().min(1).optional(),
+    RECOMMENDATION_MODEL: z.string().min(1).optional(),
     // Email delivery through an HTTP email API. All three are needed.
     EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).optional(),
     EMAIL_API_KEY: z.string().optional(),
@@ -137,4 +140,8 @@ if (!parsed.success) {
     throw new Error("Environment configuration is invalid.");
 }
 
-export const env = parsed.data;
+export const env = {
+    ...parsed.data,
+    AGREEMENT_EXTRACTION_MODEL: parsed.data.AGREEMENT_EXTRACTION_MODEL ?? parsed.data.AI_MODEL,
+    RECOMMENDATION_MODEL: parsed.data.RECOMMENDATION_MODEL ?? parsed.data.AI_MODEL,
+};

@@ -1,14 +1,11 @@
 import { createHash } from "node:crypto";
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { env } from "../config/env.js";
-import { settingsSnapshot } from "./platformSettings.service.js";
-import { trackAIUsage } from "./aiUsage.service.js";
+import { AIServiceError, createAIClient, isAIConfigured } from "./aiClient.service.js";
 
 // AI ranking of a renter's shortlist. The deterministic matcher
-// (propertyMatching.service.js) picks the shortlist; Claude re-orders it and
+// (propertyMatching.service.js) picks the shortlist; the AI model re-orders it and
 // explains each choice from the listing data only. The ranking is advice for
 // the renter: it never hides a listing and never replaces the match score.
 
@@ -62,12 +59,12 @@ export class AIRankingError extends Error {
 
 // AI ranking needs an API key, and an admin can switch AI features off.
 export function isAIRankingConfigured() {
-    return Boolean(env.ANTHROPIC_API_KEY) && settingsSnapshot().integrations?.aiEnabled !== false;
+    return isAIConfigured();
 }
 
 let defaultClient = null;
 const getDefaultClient = () => {
-    defaultClient ??= trackAIUsage(new Anthropic(), "property_ranking");
+    defaultClient ??= createAIClient({ feature: "property_ranking" });
     return defaultClient;
 };
 
@@ -213,7 +210,7 @@ export function normalizeRanking(parsed, keyToId) {
     return { rankings, overallNote: clip(parsed.overallNote, 600) };
 }
 
-// Calls Claude to rank the shortlist. `client` is injectable for tests.
+// Asks the AI model to rank the shortlist. `client` is injectable for tests.
 export async function requestAIRanking({
     preferences,
     shortlist,
@@ -239,45 +236,34 @@ export async function requestAIRanking({
 
     let response;
     try {
-        response = await client.beta.messages.parse({
+        response = await client.generate({
             model,
-            max_tokens: 16000,
-            // Re-runs a declined request on a fallback model inside the same call.
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            output_config: {
-                effort: "medium",
-                format: betaZodOutputFormat(AIRankingSchema),
-            },
+            maxTokens: 16000,
+            effort: "medium",
+            schema: AIRankingSchema,
+            schemaName: "property_ranking",
             system: SYSTEM_PROMPT,
-            messages: [{ role: "user", content: userText }],
+            user: userText,
         });
     } catch (error) {
-        if (error instanceof Anthropic.AuthenticationError) {
+        if (!(error instanceof AIServiceError)) throw error;
+        if (error.kind === "auth") {
             throw new AIRankingError(error.message, 503, { publicMessage: "AI ranking is not configured." });
         }
-        if (error instanceof Anthropic.RateLimitError) {
+        if (error.kind === "rate_limit") {
             throw new AIRankingError(error.message, 503, { publicMessage: "AI ranking is busy. Please try again shortly." });
         }
-        if (error instanceof Anthropic.APIError) {
-            throw new AIRankingError(error.message, 502, { publicMessage: "AI ranking failed. Please try again later." });
-        }
-        throw error;
+        throw new AIRankingError(error.message, 502, { publicMessage: "AI ranking failed. Please try again later." });
     }
 
-    if (response.stop_reason === "refusal") {
-        throw new AIRankingError("Ranking request was declined.", 422, {
-            publicMessage: "These listings could not be ranked automatically.",
-        });
-    }
-    if (response.stop_reason === "max_tokens" || !response.parsed_output) {
-        throw new AIRankingError("Ranking output was incomplete.", 502, {
+    if (!response.parsed) {
+        throw new AIRankingError("Ranking output was incomplete or did not match the schema.", 502, {
             publicMessage: "AI ranking failed. Please try again later.",
         });
     }
 
     return {
-        ...normalizeRanking(response.parsed_output, keyToId),
+        ...normalizeRanking(response.parsed, keyToId),
         model: response.model,
     };
 }

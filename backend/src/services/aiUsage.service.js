@@ -1,10 +1,12 @@
 import AIUsageEvent, { AI_FEATURES } from "../models/AIUsageEvent.js";
 
-// Records every Claude API call and summarises usage, latency and cost for
+// Records every AI model call and summarises usage, latency and cost for
 // the admin AI monitoring view.
 
-// First-party API prices in USD per million tokens. Cache writes are
-// billed at 1.25x input (5-minute cache). Update when prices change.
+// Prices in USD per million tokens. Models not listed (including the Groq
+// models now in use) are counted as unpriced rather than given a guessed
+// price; add a row here to estimate their cost. The Claude rows price
+// calls recorded before the move to Groq. Cache writes are billed at 1.25x input.
 export const MODEL_PRICING = {
     "claude-fable-5-1": { input: 10, output: 50, cacheRead: 0.25 },
     "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2 },
@@ -59,34 +61,6 @@ export async function recordAIUsage({ feature, model = null, response = null, er
     } catch (recordError) {
         console.error("AI usage record error:", recordError.message);
     }
-}
-
-// Wraps an Anthropic client so each beta.messages.parse call is recorded
-// under `feature`. Everything else on the client is passed through.
-export function trackAIUsage(client, feature, deps = {}) {
-    if (!AI_FEATURES.includes(feature)) throw new TypeError(`Unknown AI feature: ${feature}`);
-    const record = deps.record ?? recordAIUsage;
-    const now = deps.now ?? (() => Date.now());
-    const parse = async (params, options) => {
-        const startedAt = now();
-        try {
-            const response = await client.beta.messages.parse(params, options);
-            await record({ feature, model: params?.model, response, latencyMs: now() - startedAt });
-            return response;
-        } catch (error) {
-            await record({ feature, model: params?.model, error, latencyMs: now() - startedAt });
-            throw error;
-        }
-    };
-    const messages = new Proxy(client.beta.messages, {
-        get: (target, key) => (key === "parse" ? parse : Reflect.get(target, key)),
-    });
-    const beta = new Proxy(client.beta, {
-        get: (target, key) => (key === "messages" ? messages : Reflect.get(target, key)),
-    });
-    return new Proxy(client, {
-        get: (target, key) => (key === "beta" ? beta : Reflect.get(target, key)),
-    });
 }
 
 const round = (value, digits = 4) => (value == null ? null : Math.round(value * 10 ** digits) / 10 ** digits);
