@@ -73,15 +73,14 @@ export async function getMyVerification(req, res, next) {
 }
 
 // POST /api/v1/verification/contact/sync
-// Re-reads the verified email and phone from Firebase after the user finishes
-// Firebase's email-link or phone-auth flow in the app.
+// Re-reads email verification from Firebase after the user follows the
+// verification link.
 export async function syncContactVerification(req, res, next) {
     try {
         const record = await firebaseAuth.getUser(req.user.uid);
         const user = req.neveUser;
         const contact = buildContactVerification(record, user.verification ?? {});
         user.set("verification.email", contact.email);
-        user.set("verification.phone", contact.phone);
         await user.save();
 
         return res.json({

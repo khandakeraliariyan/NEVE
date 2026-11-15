@@ -56,27 +56,14 @@ export const OWNERSHIP_DOCUMENT_TYPES = [
     "other",
 ];
 
-// Firebase is the source of truth for contact verification: emailVerified is
-// set by its email link flow and phoneNumber only exists after phone auth.
+// Firebase is the source of truth for email verification: emailVerified is
+// set by its email-link flow. Phone numbers are not verified.
 export function buildContactVerification(firebaseRecord, current = {}, now = new Date()) {
     const emailVerified = Boolean(firebaseRecord?.email && firebaseRecord?.emailVerified);
-    const phoneNumber = firebaseRecord?.phoneNumber || null;
-    const email = {
-        verified: emailVerified,
-        verifiedAt: emailVerified ? current.email?.verifiedAt ?? now : null,
-    };
-
     return {
-        email,
-        phone: {
-            verified: Boolean(phoneNumber),
-            phoneNumber,
-            verifiedAt: phoneNumber
-                ? current.phone?.phoneNumber === phoneNumber
-                    ? current.phone?.verifiedAt ?? now
-                    : now
-                : null,
-            method: phoneNumber ? "firebase" : null,
+        email: {
+            verified: emailVerified,
+            verifiedAt: emailVerified ? current.email?.verifiedAt ?? now : null,
         },
     };
 }
@@ -174,7 +161,6 @@ export function publicVerificationSummary(user, property = null) {
     const verification = user?.verification ?? {};
     const summary = {
         emailVerified: Boolean(verification.email?.verified),
-        phoneVerified: Boolean(verification.phone?.verified),
         identityVerified: verification.identity?.status === "verified",
     };
     if (user?.role === "legal_reviewer") {

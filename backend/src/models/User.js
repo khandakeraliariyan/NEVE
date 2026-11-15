@@ -243,20 +243,13 @@ const userSchema = new mongoose.Schema(
             },
         },
 
-        // Email and phone come from Firebase (verified sign-in email, phone
-        // number confirmed by Firebase phone auth). Identity is reviewed by an
-        // admin from submitted documents.
+        // Email verification comes from Firebase's email-link flow. Identity is
+        // reviewed by an admin from submitted documents. Neve does not verify
+        // phone numbers.
         verification: {
             email: {
                 verified: { type: Boolean, default: false },
                 verifiedAt: { type: Date, default: null },
-            },
-            phone: {
-                verified: { type: Boolean, default: false },
-                phoneNumber: { type: String, default: null },
-                verifiedAt: { type: Date, default: null },
-                // How the number was verified: "firebase" (Firebase phone sign-in).
-                method: { type: String, enum: ["firebase", null], default: null },
             },
             identity: {
                 status: {

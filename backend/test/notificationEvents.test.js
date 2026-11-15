@@ -210,7 +210,7 @@ test("a new inquiry notifies the landlord and confirms to the renter", async () 
     const toRenter = docs.find((doc) => doc.type === "inquiry_sent");
     assert.equal(String(toLandlord.recipient), String(landlord));
     assert.equal(String(toRenter.recipient), String(renter._id));
-    assert.deepEqual(toLandlord.data.renterBadges, ["Email verified", "Phone verified", "Identity verified"]);
+    assert.deepEqual(toLandlord.data.renterBadges, ["Email verified", "Identity verified"]);
     assert.equal(toLandlord.data.messagePreview, "Is it available?");
     assert.ok(toLandlord.data.requestedViewingAt instanceof Date);
     assert.match(toLandlord.data.thumbnailUrl, /\/property-images\/.+\/thumbnail$/);

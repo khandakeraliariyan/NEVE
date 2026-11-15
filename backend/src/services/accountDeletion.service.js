@@ -205,7 +205,6 @@ export async function deleteAccount(user, deps = {}) {
                 notificationPreferences: { email: false, digest: "off", mutedTypes: [], emailMutedTypes: [] },
                 verification: {
                     email: { verified: false, verifiedAt: null },
-                    phone: { verified: false, phoneNumber: null, verifiedAt: null, method: null },
                     identity: { status: "unverified", verifiedAt: null },
                     credential: { status: "unverified", verifiedAt: null },
                 },

@@ -146,7 +146,6 @@ export function publicBadges(user, ownership = null) {
     const verification = user.verification ?? {};
     const badges = [];
     if (verification.email?.verified) badges.push({ type: "email", label: "Email verified", verifiedAt: verification.email.verifiedAt ?? null });
-    if (verification.phone?.verified) badges.push({ type: "phone", label: "Phone verified", verifiedAt: verification.phone.verifiedAt ?? null });
     if (verification.identity?.status === "verified") {
         badges.push({ type: "identity", label: "Identity verified", verifiedAt: verification.identity.verifiedAt ?? null });
     }

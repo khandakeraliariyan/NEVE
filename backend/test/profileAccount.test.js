@@ -281,7 +281,7 @@ test("the public profile shows dated badges and never private details", () => {
     };
     const stats = { activeListings: 2, ownership: { count: 1, latestVerifiedAt: verifiedAt }, responseRate: 90, typicalResponseTime: "Usually replies within 3 hours" };
     const profile = buildPublicProfile(user, stats);
-    assert.deepEqual(profile.badges.map((badge) => badge.type), ["email", "phone", "identity", "ownership"]);
+    assert.deepEqual(profile.badges.map((badge) => badge.type), ["email", "identity", "ownership"]);
     assert.ok(profile.badges.every((badge) => badge.verifiedAt));
     assert.equal(profile.landlord.responseRate, 90);
     assert.equal(profile.landlord.contactHours, "Weekdays 10-6");

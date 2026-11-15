@@ -14,23 +14,20 @@ const propertyId = "507f1f77bcf86cd799439012";
 test("contact verification follows Firebase", () => {
     const now = new Date("2026-01-01");
     const result = buildContactVerification({ email: "a@b.c", emailVerified: true, phoneNumber: "+8801711000000" }, {}, now);
-    assert.deepEqual(result.email, { verified: true, verifiedAt: now });
-    assert.equal(result.phone.verified, true);
-    assert.equal(result.phone.phoneNumber, "+8801711000000");
+    assert.deepEqual(result, { email: { verified: true, verifiedAt: now } });
 
     const none = buildContactVerification({ email: "a@b.c", emailVerified: false }, {}, now);
     assert.equal(none.email.verified, false);
-    assert.equal(none.phone.verified, false);
 });
 
-test("keeps the original verifiedAt for an unchanged phone number", () => {
+test("keeps the original verifiedAt while the email stays verified", () => {
     const earlier = new Date("2025-01-01");
     const result = buildContactVerification(
-        { phoneNumber: "+880171" },
-        { phone: { phoneNumber: "+880171", verifiedAt: earlier } },
+        { email: "a@b.c", emailVerified: true },
+        { email: { verified: true, verifiedAt: earlier } },
         new Date()
     );
-    assert.equal(result.phone.verifiedAt, earlier);
+    assert.equal(result.email.verifiedAt, earlier);
 });
 
 test("validates identity and ownership submissions", () => {
@@ -63,5 +60,5 @@ test("public summary shows only booleans", () => {
         { verification: { email: { verified: true }, phone: { verified: false, phoneNumber: "+880" }, identity: { status: "verified" } } },
         { ownershipVerification: { status: "pending" } }
     );
-    assert.deepEqual(summary, { emailVerified: true, phoneVerified: false, identityVerified: true, ownershipVerified: false });
+    assert.deepEqual(summary, { emailVerified: true, identityVerified: true, ownershipVerified: false });
 });
