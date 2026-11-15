@@ -62,7 +62,7 @@ The current platform includes a strong set of implemented functionality, especia
 - true cost breakdowns and transparent rent calculations
 - room-by-room condition and meter record workflows
 - maintenance request management
-- recommendation and explainable matching logic
+- recommendation and explainable matching logic, with an optional AI ranking of a renter's top matches
 - evidence graph and record-linking system
 - tenancy agreement extraction, risk analysis and obligation tracking
 - Legal Copilot with source-backed citations, flagged when a cited source version is outdated

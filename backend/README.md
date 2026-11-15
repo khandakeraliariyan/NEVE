@@ -144,6 +144,7 @@ The backend includes deterministic matching based on:
 - location preferences
 - furnishing and amenity suitability
 - explainable reasons and shortfall reporting
+- optional AI ranking: on request, Claude re-ranks a renter's top 15 matches within budget and explains each with strengths, concerns and questions to ask the landlord (`GET`/`POST /recommendations/ai-ranking`). It uses listing data only, sends no renter identity or commute coordinates, and is saved until the preferences or listings change. The model is set by `RECOMMENDATION_MODEL` (default `claude-opus-5-5`)
 
 ### 8. Communication and listing interaction
 
@@ -299,6 +300,10 @@ MAX_PROPERTY_IMAGE_SIZE_MB=5
 MAX_TENANCY_EVIDENCE_SIZE_MB=15
 MAX_PROPERTY_VIDEO_SIZE_MB=50
 MAX_FLOOR_PLAN_SIZE_MB=10
+
+ANTHROPIC_API_KEY=
+AGREEMENT_EXTRACTION_MODEL=claude-opus-5-5
+RECOMMENDATION_MODEL=claude-opus-5-5
 
 OVERPASS_API_URL=https://overpass-api.de/api/interpreter
 NEVE_API_BASE_URL=http://localhost:5000/api/v1
