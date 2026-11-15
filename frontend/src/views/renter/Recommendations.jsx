@@ -9,6 +9,7 @@ import { useSaved } from "../../hooks/useSaved";
 import { PropertyImage } from "../../components/PropertyCard";
 import { Button, ButtonLink, Card, Disclaimer, Empty, ErrorBox, Loading, PageHeader, Pagination } from "../../components/ui";
 import PreferencesForm from "./PreferencesForm";
+import AIRanking from "./AIRanking";
 
 const PAGE_SIZE = 5;
 
@@ -126,6 +127,7 @@ function MatchRow({ result, saved }) {
 export default function Recommendations() {
     const [page, setPage] = useState(1);
     const [editing, setEditing] = useState(false);
+    const [prefsVersion, setPrefsVersion] = useState(0);
     const saved = useSaved();
     const prefs = useApi(() => api.get("/renter-preferences"), []);
     const recs = useApi(() => api.get("/recommendations", { page, limit: PAGE_SIZE }), [page]);
@@ -137,6 +139,7 @@ export default function Recommendations() {
         prefs.setData({ preferences: payload.preferences });
         setEditing(false);
         setPage(1);
+        setPrefsVersion((v) => v + 1);
         await recs.reload();
     }
 
@@ -145,7 +148,7 @@ export default function Recommendations() {
             <PageHeader
                 eyebrow="Explainable matching"
                 title="Smart recommendations"
-                description="Published listings ranked against your preferences, with the reasons, shortfalls and missing information behind each score."
+                description="Published listings ranked against your preferences, with the reasons, shortfalls and missing information behind each score. Ask AI to rank your top matches for a second opinion."
                 actions={
                     data?.evaluatedCandidates !== undefined && (
                         <Card className="py-2 text-sm">
@@ -181,6 +184,8 @@ export default function Recommendations() {
                     </div>
                 )}
             </Card>
+
+            <AIRanking version={prefsVersion} />
 
             <ErrorBox error={saved.error} />
             {recs.loading && <Loading text="Ranking listings…" />}
@@ -225,7 +230,7 @@ export default function Recommendations() {
             <Disclaimer title="About these scores" className="mt-8">
                 {data?.note ??
                     "Scores are deterministic preference matches, not guarantees of property suitability."}{" "}
-                Matching compares your stated preferences with listing data. It isn't AI. Commute is scored on straight-line distance to your destination, not travel time.
+                Matching compares your stated preferences with listing data. The rule-based score uses fixed weights; the optional AI ranking above re-orders your top matches and explains why. Commute is scored on straight-line distance to your destination, not travel time.
             </Disclaimer>
         </div>
     );
