@@ -74,7 +74,6 @@ The current platform includes a strong set of implemented functionality, especia
 
 ## Known limitations
 
-- Several backend features added recently (AI usage dashboard, system errors, reviewer assignment, account appeals, outdated-citation review, per-case reports, data-policy settings) have API endpoints but no frontend screens yet.
 - AI cost figures are estimates from list prices.
 - The evaluation datasets in `backend/eval/datasets` are small and synthetic. Model-backed tasks (agreement and obligation extraction, Copilot answer quality, AI risk review) only run with `npm run eval -- --live`, which calls the Claude API.
 

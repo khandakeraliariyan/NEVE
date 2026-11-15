@@ -222,7 +222,6 @@ Evaluation tasks include agreement and obligation extraction, missing-informatio
 
 ## Known limitations
 
-- Several recent backend features have API endpoints but no frontend screens yet: AI usage, system errors, reviewer assignment and activity, account appeals, outdated-citation review, per-case reports and data-policy settings.
 - AI cost figures are estimates from list prices.
 - The evaluation datasets are small and synthetic; model-backed tasks only run with `npm run eval -- --live`, which calls the Claude API.
 
@@ -476,4 +475,4 @@ The strongest implemented areas are:
 - security, privacy, and retention controls
 - property discovery and rental intelligence
 
-The main remaining work is frontend screens for the newer admin and legal-review endpoints (see Known limitations).
+Every module has frontend screens; the remaining limits are listed under Known limitations.
