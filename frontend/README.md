@@ -55,6 +55,23 @@ The app runs at `http://localhost:5173`. Configure the backend's `CLIENT_URL` to
 - `src/lib/` — API, Firebase, and utility modules
 - `public/` — static assets
 
+## Routes
+
+Routes live in `src/app/` in three route groups. The group name in parentheses does not appear in the URL.
+
+| Group | Routes |
+|---|---|
+| `(public)` | `/` (home), `/properties`, `/properties/[id]` with `/neighborhood` and `/true-cost`, `/compare`, `/users/[id]` (public profile), `/privacy` |
+| `(auth)` | `/sign-in`, `/sign-up`, `/complete-profile`, plus `/admin/sign-in` and `/admin/setup` for admins |
+| `(workspace)`: shared | `/dashboard`, `/notifications`, `/settings`, `/verification`, `/invitations`, `/copilot`, `/legal-library`, `/compliance` |
+| `(workspace)`: renter | `/renter`, `/saved`, `/saved-searches`, `/recommendations`, `/inquiries`, `/viewings` |
+| `(workspace)`: landlord | `/listings`, `/listings/new`, `/listings/[id]/edit`, `/listings/[id]/media`, `/listings/[id]/claims`, `/listings/viewings`, `/listings/warnings` |
+| `(workspace)`: tenancy | `/agreements`, `/agreements/[agreementId]` with `/documents`, `/clauses`, `/risks`, `/evidence`, `/condition`, `/maintenance`, `/cases`; `/cases/[caseId]` |
+| `(workspace)`: legal reviewer | `/legal-review`, `/legal-review/ai-oversight`, `/legal-review/ai-evaluations` |
+| `(workspace)`: admin | `/admin` with `/users`, `/verifications`, `/moderation`, `/appeals`, `/reviewers`, `/legal-sources`, `/audit-logs`, `/security`, `/data-retention`, `/settings`, `/system`, `/system-errors`, `/ai-usage`, `/ai-evaluations` |
+
+Workspace navigation is role-aware (see `src/nav.js`). Admins sign in with a password through the admin portal rather than Firebase; admin accounts are created with the backend's `npm run create-admin` script.
+
 ## Integration notes
 
 - API requests use `NEXT_PUBLIC_API_BASE_URL` and send Firebase ID tokens for authenticated users.
