@@ -3,20 +3,19 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "../lib/firebase";
-import { api, ApiError, SESSION_REVOKED_EVENT } from "../lib/api";
+import { api, ApiError, SESSION_REVOKED_EVENT, signOutAdmin } from "../lib/api";
 import {
     ADMIN_SIGNED_OUT_EVENT,
-    adminTokenExpiresAt,
-    clearAdminToken,
+    adminSessionExpiresAt,
     endAdminSession,
-    getAdminToken,
-    setAdminToken,
+    hasAdminSession,
+    setAdminSession,
 } from "../lib/adminSession";
 
 const AuthContext = createContext(null);
 
 // Two kinds of session: Firebase for renters, landlords and legal reviewers,
-// and a Neve-signed JWT for admins (see lib/adminSession.js).
+// and an httpOnly session cookie for admins (see lib/adminSession.js).
 export function AuthProvider({ children }) {
     const [firebaseUser, setFirebaseUser] = useState(null);
     const [profile, setProfile] = useState(null);
@@ -27,7 +26,7 @@ export function AuthProvider({ children }) {
     const [notice, setNotice] = useState(null);
 
     const loadProfile = useCallback(async () => {
-        const usingAdminToken = Boolean(getAdminToken());
+        const usingAdminToken = hasAdminSession();
         try {
             const payload = await api.get("/users/me");
             setProfile(payload.user);
@@ -65,7 +64,7 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         // A saved admin session is restored first; Firebase then has nothing to add.
-        if (getAdminToken()) {
+        if (hasAdminSession()) {
             loadProfile();
         } else if (!auth) {
             setStatus("signed_out");
@@ -74,7 +73,7 @@ export function AuthProvider({ children }) {
         const unsubscribe = auth
             ? onAuthStateChanged(auth, (user) => {
                   setFirebaseUser(user);
-                  if (getAdminToken()) return;
+                  if (hasAdminSession()) return;
                   if (user) {
                       setStatus("loading");
                       loadProfile();
@@ -91,8 +90,8 @@ export function AuthProvider({ children }) {
         }
         async function onSessionRevoked() {
             setNotice("This session was signed out from another device. Sign in again to continue.");
-            if (getAdminToken()) {
-                endAdminSession();
+            if (hasAdminSession()) {
+                await signOutAdmin();
             } else if (auth?.currentUser) {
                 await firebaseSignOut(auth);
             }
@@ -111,7 +110,7 @@ export function AuthProvider({ children }) {
     // Sign the admin out when the token expires, even if the page sits idle.
     useEffect(() => {
         if (profile?.role !== "admin") return undefined;
-        const expiresAt = adminTokenExpiresAt();
+        const expiresAt = adminSessionExpiresAt();
         if (!expiresAt) return undefined;
         const timer = setTimeout(() => {
             setNotice("Your admin session has ended. Please sign in again.");
@@ -121,17 +120,18 @@ export function AuthProvider({ children }) {
     }, [profile]);
 
     // Called by the admin portal after POST /auth/admin/login succeeds.
-    const startAdminSession = useCallback(async (token, user) => {
+    // The API has already set the session cookie; only its expiry is kept here.
+    const startAdminSession = useCallback(async (expiresAt, user) => {
         if (auth?.currentUser) await firebaseSignOut(auth);
-        setAdminToken(token);
+        setAdminSession(expiresAt);
         setProfile(user);
         setNotice(null);
         setStatus("ready");
     }, []);
 
     const signOut = useCallback(async () => {
-        if (getAdminToken()) {
-            clearAdminToken();
+        if (hasAdminSession()) {
+            await signOutAdmin();
             setProfile(null);
             setStatus("signed_out");
         }

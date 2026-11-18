@@ -1,5 +1,5 @@
 import { auth } from "./firebase";
-import { endAdminSession, getAdminToken } from "./adminSession";
+import { ADMIN_REQUEST_HEADER, clearAdminSession, endAdminSession, hasAdminSession } from "./adminSession";
 
 export const SESSION_REVOKED_EVENT = "neve:session-revoked";
 
@@ -35,18 +35,20 @@ const FRIENDLY = {
     500: "Something went wrong on our side. Please try again.",
 };
 
-export async function apiRequest(path, { method = "GET", body, params, auth: needsAuth = true } = {}) {
-    const headers = {};
-    if (body !== undefined) headers["Content-Type"] = "application/json";
-
+// Auth for a request: the admin session cookie (sent by the browser) plus the
+// header the API needs to accept it, or the Firebase ID token.
+async function authHeaders(needsAuth) {
+    if (!needsAuth) return { headers: {}, usingAdmin: false };
     // An admin portal session takes precedence over a Firebase one.
-    const adminToken = needsAuth ? getAdminToken() : null;
+    if (hasAdminSession()) return { headers: { [ADMIN_REQUEST_HEADER]: "1" }, usingAdmin: true };
     const user = auth?.currentUser;
-    if (adminToken) {
-        headers.Authorization = `Bearer ${adminToken}`;
-    } else if (needsAuth && user) {
-        headers.Authorization = `Bearer ${await user.getIdToken()}`;
-    }
+    if (user) return { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, usingAdmin: false };
+    return { headers: {}, usingAdmin: false };
+}
+
+export async function apiRequest(path, { method = "GET", body, params, auth: needsAuth = true } = {}) {
+    const { headers, usingAdmin } = await authHeaders(needsAuth);
+    if (body !== undefined) headers["Content-Type"] = "application/json";
 
     let response;
     try {
@@ -54,6 +56,8 @@ export async function apiRequest(path, { method = "GET", body, params, auth: nee
             method,
             headers,
             body: body === undefined ? undefined : JSON.stringify(body),
+            // Lets the browser store and send the admin session cookie.
+            credentials: "include",
         });
     } catch {
         throw new ApiError(0, "Can't reach the Neve API. Check your connection and try again.");
@@ -63,7 +67,11 @@ export async function apiRequest(path, { method = "GET", body, params, auth: nee
 
     if (!response.ok) {
         // The admin token expired or was revoked (password changed, account deactivated).
-        if (response.status === 401 && adminToken) endAdminSession();
+        // Also clear the now-useless cookie so the browser stops sending it.
+        if (response.status === 401 && usingAdmin) {
+            endAdminSession();
+            signOutAdmin();
+        }
         // This session was signed out from another device.
         if (response.status === 401 && payload?.code === "SESSION_REVOKED" && typeof window !== "undefined") {
             window.dispatchEvent(new Event(SESSION_REVOKED_EVENT));
@@ -121,13 +129,10 @@ export async function uploadFile(file, { purpose, propertyId } = {}) {
 
 // Downloads a non-JSON response (e.g. a PDF) with the signed-in user's token.
 export async function downloadAuthenticated(path, filename) {
-    const headers = {};
-    const adminToken = getAdminToken();
-    if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
-    else if (auth?.currentUser) headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
+    const { headers } = await authHeaders(true);
     let response;
     try {
-        response = await fetch(`${API_BASE_URL}${path}`, { headers });
+        response = await fetch(`${API_BASE_URL}${path}`, { headers, credentials: "include" });
     } catch {
         throw new ApiError(0, "Can't reach the Neve API. Check your connection and try again.");
     }
@@ -151,4 +156,15 @@ export async function openPrivateFile(fileId) {
     const data = unwrap(payload);
     const url = data?.url ?? data?.accessUrl ?? data?.downloadUrl;
     if (url) window.open(url, "_blank", "noopener");
+}
+
+// Ends the admin session on the server (scripts can't remove the httpOnly
+// cookie) and forgets it here. Never throws: signing out always completes.
+export async function signOutAdmin() {
+    clearAdminSession();
+    try {
+        await fetch(`${API_BASE_URL}/auth/admin/logout`, { method: "POST", credentials: "include" });
+    } catch {
+        // Offline: the cookie still expires on its own.
+    }
 }

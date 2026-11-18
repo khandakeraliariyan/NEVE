@@ -46,6 +46,8 @@ The API listens on `http://localhost:5000` by default. Verify it at `http://loca
 
 When the API is deployed behind a reverse proxy or load balancer, set `TRUST_PROXY_HOPS` to the number of proxies in front of it (usually `1`). Otherwise every user shares the proxy's IP address, so rate limits apply to all users at once. Leave it unset when clients reach the API directly, since it makes the API trust the `X-Forwarded-For` header.
 
+Admin portal sessions use an httpOnly cookie, so the frontend and API must share a site (for example `neve.app` and `api.neve.app`, or `localhost` on two ports). If they are on unrelated domains, set `ADMIN_COOKIE_SAMESITE=none` and serve the API over HTTPS.
+
 ## Optional integrations
 
 Add these settings to `backend/.env` only when you need the corresponding integration:

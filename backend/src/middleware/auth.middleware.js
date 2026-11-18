@@ -3,6 +3,8 @@ import User from "../models/User.js";
 import {
     ADMIN_SIGN_IN_PROVIDER,
     isAdminToken,
+    passesAdminCsrfCheck,
+    readAdminSessionCookie,
     verifyAdminToken,
 } from "../services/adminAuth.service.js";
 
@@ -36,6 +38,23 @@ export async function authenticateUser(req, res, next) {
     try {
         const authorization = req.headers.authorization;
 
+        // Admin portal session: only from the httpOnly cookie, and only for
+        // requests the Neve app itself made (see passesAdminCsrfCheck).
+        const adminCookie = authorization ? null : readAdminSessionCookie(req);
+        if (adminCookie) {
+            if (!passesAdminCsrfCheck(req)) {
+                return res.status(403).json({
+                    success: false,
+                    code: "CSRF_CHECK_FAILED",
+                    message: "This request didn't come from the Neve app.",
+                });
+            }
+            const adminUser = await authenticateAdminToken(adminCookie);
+            if (!adminUser) return res.status(401).json(INVALID_TOKEN);
+            req.user = adminUser;
+            return next();
+        }
+
         if (!authorization?.startsWith("Bearer ")) {
             return res.status(401).json({
                 success: false,
@@ -52,11 +71,10 @@ export async function authenticateUser(req, res, next) {
             });
         }
 
+        // Admin tokens are only accepted from the session cookie, so a token
+        // copied out of a browser or a log can't be replayed as a header.
         if (isAdminToken(idToken)) {
-            const adminUser = await authenticateAdminToken(idToken);
-            if (!adminUser) return res.status(401).json(INVALID_TOKEN);
-            req.user = adminUser;
-            return next();
+            return res.status(401).json(INVALID_TOKEN);
         }
 
         const decodedToken = await firebaseAuth.verifyIdToken(idToken);

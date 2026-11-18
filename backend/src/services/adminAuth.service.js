@@ -67,3 +67,59 @@ export function verifyAdminToken(token) {
         issuer: ADMIN_TOKEN_ISSUER,
     });
 }
+
+// The admin session lives in an httpOnly cookie so page scripts (and any XSS)
+// can never read the token. Browsers attach cookies automatically, so every
+// cookie-authenticated request must also prove it came from the Neve app:
+// it carries ADMIN_CSRF_HEADER, which a cross-site page can't add without a
+// CORS preflight that only CLIENT_URL passes, and any Origin must be CLIENT_URL.
+export const ADMIN_SESSION_COOKIE = "neve_admin_session";
+export const ADMIN_CSRF_HEADER = "x-neve-admin";
+
+function adminCookieOptions() {
+    const sameSite = env.ADMIN_COOKIE_SAMESITE;
+    return {
+        httpOnly: true,
+        // SameSite=None is only accepted on Secure cookies.
+        secure: env.NODE_ENV === "production" || sameSite === "none",
+        sameSite,
+        path: "/api/v1",
+    };
+}
+
+export function setAdminSessionCookie(res, token) {
+    const { exp } = jwt.decode(token);
+    res.cookie(ADMIN_SESSION_COOKIE, token, {
+        ...adminCookieOptions(),
+        maxAge: Math.max(0, exp * 1000 - Date.now()),
+    });
+    return exp * 1000;
+}
+
+export function clearAdminSessionCookie(res) {
+    res.clearCookie(ADMIN_SESSION_COOKIE, adminCookieOptions());
+}
+
+export function readAdminSessionCookie(req) {
+    const header = req.headers?.cookie;
+    if (typeof header !== "string") return null;
+    for (const part of header.split(";")) {
+        const index = part.indexOf("=");
+        if (index === -1) continue;
+        if (part.slice(0, index).trim() !== ADMIN_SESSION_COOKIE) continue;
+        const value = part.slice(index + 1).trim();
+        try {
+            return decodeURIComponent(value) || null;
+        } catch {
+            return null;
+        }
+    }
+    return null;
+}
+
+// True when a cookie-authenticated request came from the Neve frontend.
+export function passesAdminCsrfCheck(req) {
+    if (req.headers?.[ADMIN_CSRF_HEADER] !== "1") return false;
+    const origin = req.headers?.origin;
+    return !origin || origin === new URL(env.CLIENT_URL).origin;
+}

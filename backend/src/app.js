@@ -72,7 +72,8 @@ app.use(
         origin: env.CLIENT_URL,
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
+        // X-Neve-Admin marks admin portal requests (CSRF check for the session cookie).
+        allowedHeaders: ["Content-Type", "Authorization", "X-Neve-Admin"],
     })
 );
 

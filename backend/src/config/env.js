@@ -18,6 +18,11 @@ const envSchema = z.object({
     // node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
     ADMIN_JWT_SECRET: z.string().min(32, "ADMIN_JWT_SECRET must be at least 32 characters"),
     ADMIN_JWT_EXPIRES_IN: z.string().min(1).default("8h"),
+    // SameSite for the admin session cookie. "strict" works when the frontend
+    // and API share a site (e.g. neve.app and api.neve.app, or localhost on
+    // two ports). Use "none" only when they are on unrelated domains; the
+    // cookie is then Secure-only, so the API must be served over HTTPS.
+    ADMIN_COOKIE_SAMESITE: z.enum(["strict", "lax", "none"]).default("strict"),
     R2_ACCOUNT_ID: z.string().optional(),
     R2_ACCESS_KEY_ID: z.string().optional(),
     R2_SECRET_ACCESS_KEY: z.string().optional(),
