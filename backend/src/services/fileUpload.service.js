@@ -74,6 +74,54 @@ export function validateUpload({ purpose, mimeType, sizeBytes }) {
     }
 }
 
+// How many leading bytes the content check needs.
+export const CONTENT_SNIFF_BYTES = 512;
+
+const startsWith = (buffer, bytes, offset = 0) =>
+    buffer.length >= offset + bytes.length &&
+    bytes.every((byte, index) => buffer[offset + index] === byte);
+const ascii = (text) => [...text].map((char) => char.charCodeAt(0));
+
+// True when a file's first bytes match the type the uploader declared, so a
+// script or HTML page can't be stored and served as an "image" or "PDF".
+export function contentMatchesMimeType(buffer, mimeType) {
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) return false;
+    switch (mimeType) {
+        case "image/jpeg":
+            return startsWith(buffer, [0xff, 0xd8, 0xff]);
+        case "image/png":
+            return startsWith(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+        case "image/webp":
+            return startsWith(buffer, ascii("RIFF")) && startsWith(buffer, ascii("WEBP"), 8);
+        case "application/pdf":
+            // The PDF header may follow up to 1 KB of leading junk; we read
+            // CONTENT_SNIFF_BYTES, which covers real-world files.
+            return buffer.includes(Buffer.from("%PDF-"));
+        case "video/mp4":
+            return startsWith(buffer, ascii("ftyp"), 4);
+        case "video/webm":
+            return startsWith(buffer, [0x1a, 0x45, 0xdf, 0xa3]);
+        case "text/plain":
+            // Text has no NUL bytes; binaries almost always do.
+            return !buffer.includes(0x00);
+        default:
+            return false;
+    }
+}
+
+// The first `length` bytes of a stored object.
+export async function readStoredObjectPrefix(storageKey, length = CONTENT_SNIFF_BYTES) {
+    const { client, bucket } = requireR2();
+    const response = await client.send(
+        new GetObjectCommand({
+            Bucket: bucket,
+            Key: storageKey,
+            Range: `bytes=0-${length - 1}`,
+        })
+    );
+    return Buffer.from(await response.Body.transformToByteArray());
+}
+
 export async function createUploadUrl({
     storageKey,
     mimeType,
