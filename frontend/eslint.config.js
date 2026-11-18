@@ -2,7 +2,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 
 const config = [
     ...nextVitals,
-    { ignores: [".next/**", "node_modules/**"] },
+    { ignores: [".next/**", "node_modules/**", "dist/**"] },
     {
         rules: {
             "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
