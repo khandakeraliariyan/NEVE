@@ -38,7 +38,7 @@ export const updateReportStatus = async (req, res, next) => {
         const report = await PropertyReport.findByIdAndUpdate(
             reportId,
             { $set: { status } },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
 
         if (!report) {
@@ -110,7 +110,7 @@ export const updateWarningStatus = async (req, res, next) => {
                         : {}),
                 },
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
 
         if (!warning) {
@@ -174,7 +174,7 @@ export const updateWarningPublicSummary = async (req, res, next) => {
                     publicSummary: publiclyVisible ? publicSummary.trim() : null,
                 },
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
 
         if (!warning) {
@@ -242,7 +242,7 @@ export const updateClaimPublicSummary = async (req, res, next) => {
                     publicSummary: publiclyVisible ? publicSummary.trim() : null,
                 },
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
 
         if (!claim) {

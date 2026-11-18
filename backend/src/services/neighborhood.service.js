@@ -453,7 +453,7 @@ export async function findNearbyPlaces({
                 { $set: update },
                 {
                     upsert: true,
-                    new: true,
+                    returnDocument: "after",
                     runValidators: true,
                     setDefaultsOnInsert: true,
                 }
@@ -466,7 +466,7 @@ export async function findNearbyPlaces({
             await NearbyPlaceCache.findOneAndUpdate(
                 { property: propertyId },
                 { $set: update },
-                { new: true, runValidators: true }
+                { returnDocument: "after", runValidators: true }
             );
         }
     }

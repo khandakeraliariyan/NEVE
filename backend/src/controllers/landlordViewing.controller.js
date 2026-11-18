@@ -152,7 +152,7 @@ export const respondToViewingRequest = async (req, res, next) => {
                 },
             },
             {
-                new: true,
+                returnDocument: "after",
                 runValidators: true,
             }
         )

@@ -157,7 +157,7 @@ export async function appealListingWarning(req, res, next) {
         const updated = await ListingWarning.findOneAndUpdate(
             { _id: warning._id, "appeal.status": { $ne: "pending" }, status: { $in: APPEALABLE_STATUSES } },
             update,
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
         if (!updated) {
             return res.status(409).json({ success: false, message: "The warning changed in the meantime. Reload and try again." });
@@ -211,7 +211,7 @@ export async function decideListingAppeal(req, res, next) {
                         : { status: "reviewed" }),
                 },
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
         if (!warning) {
             return res.status(404).json({ success: false, message: "Pending appeal not found." });

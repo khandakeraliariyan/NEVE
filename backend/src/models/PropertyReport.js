@@ -60,12 +60,20 @@ const propertyReportSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+
+        // The landlord's side of the story. Admins see it next to the report;
+        // the landlord never sees who reported them.
+        landlordResponse: {
+            text: { type: String, trim: true, maxlength: 2000, default: "" },
+            respondedAt: { type: Date, default: null },
+        },
     },
     { timestamps: true }
 );
 
 propertyReportSchema.index({ reporter: 1, createdAt: -1 });
 propertyReportSchema.index({ status: 1, createdAt: -1 });
+propertyReportSchema.index({ property: 1, createdAt: -1 });
 
 const PropertyReport = mongoose.model("PropertyReport", propertyReportSchema);
 

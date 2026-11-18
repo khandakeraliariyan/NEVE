@@ -39,7 +39,7 @@ export default function AdminSignIn() {
                 { auth: false }
             );
             setPassword("");
-            await startAdminSession(payload.token, payload.user);
+            await startAdminSession(payload.expiresAt, payload.user);
         } catch (err) {
             setError(err.message);
         } finally {

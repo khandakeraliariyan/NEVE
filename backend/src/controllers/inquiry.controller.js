@@ -194,7 +194,7 @@ export async function updateInquiry(req, res, next) {
         const inquiry = await Inquiry.findOneAndUpdate(
             { _id: id, property: inquiryRecord.property },
             { $set: updates },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
 
         if (!inquiry) {

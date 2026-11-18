@@ -52,14 +52,52 @@ The app runs at `http://localhost:5173`. Configure the backend's `CLIENT_URL` to
 - `src/views/` — page-level UI
 - `src/components/` — reusable UI components
 - `src/context/` and `src/hooks/` — shared state and hooks
-- `src/lib/` — API, Firebase, and utility modules
+- `src/lib/` — API client (`api.js`), admin session (`adminSession.js`), Firebase, and utility modules
 - `public/` — static assets
+- `next.config.mjs` — Next.js configuration, including the security headers
+
+## Routes
+
+Routes live in `src/app/` in three route groups. The group name in parentheses does not appear in the URL.
+
+| Group | Routes |
+|---|---|
+| `(public)` | `/` (home), `/properties`, `/properties/[id]` with `/neighborhood` and `/true-cost`, `/compare`, `/users/[id]` (public profile), `/privacy` |
+| `(auth)` | `/sign-in`, `/sign-up`, `/complete-profile`, plus `/admin/sign-in` and `/admin/setup` for admins |
+| `(workspace)`: shared | `/dashboard`, `/notifications`, `/settings`, `/verification`, `/invitations`, `/copilot`, `/legal-library`, `/compliance` |
+| `(workspace)`: renter | `/renter`, `/saved`, `/saved-searches`, `/recommendations`, `/inquiries`, `/viewings` |
+| `(workspace)`: landlord | `/listings`, `/listings/new`, `/listings/[id]/edit`, `/listings/[id]/media`, `/listings/[id]/claims`, `/listings/viewings`, `/listings/warnings` |
+| `(workspace)`: tenancy | `/agreements`, `/agreements/[agreementId]` with `/documents`, `/clauses`, `/risks`, `/evidence`, `/condition`, `/maintenance`, `/cases`; `/cases/[caseId]` |
+| `(workspace)`: legal reviewer | `/legal-review`, `/legal-review/ai-oversight`, `/legal-review/ai-evaluations` |
+| `(workspace)`: admin | `/admin` with `/users`, `/verifications`, `/moderation`, `/appeals`, `/reviewers`, `/legal-sources`, `/audit-logs`, `/security`, `/data-retention`, `/settings`, `/system`, `/system-errors`, `/ai-usage`, `/ai-evaluations` |
+
+Workspace navigation is role-aware (see `src/nav.js`). Admins sign in with a password through the admin portal rather than Firebase; admin accounts are created with the backend's `npm run create-admin` script.
 
 ## Integration notes
 
-- API requests use `NEXT_PUBLIC_API_BASE_URL` and send Firebase ID tokens for authenticated users.
+- All API calls go through `src/lib/api.js`, using `NEXT_PUBLIC_API_BASE_URL`. Requests for signed-in renters, landlords, and legal reviewers carry a Firebase ID token in the `Authorization` header.
+- Admin sessions use an httpOnly cookie that the API sets at sign-in, so the session token is never available to page scripts. `src/lib/adminSession.js` remembers only when the session expires. Admin requests are sent with credentials and an `X-Neve-Admin: 1` header, which the API requires as CSRF protection. Signing out calls the API to clear the cookie.
+- Because of that cookie, the frontend and API should share a site, for example `neve.app` and `api.neve.app`, or `localhost` on two ports. Otherwise see `ADMIN_COOKIE_SAMESITE` in the [backend guide](../backend/README.md#deployment-settings).
 - `http://localhost:5173` is the frontend origin expected by the local backend CORS configuration.
 - Leaflet map components need a browser environment.
 - Backend authorization remains authoritative; frontend route checks are not a security boundary.
 
-If sign-in is unavailable, check the Firebase web configuration and the backend's Firebase Admin setup. If API calls fail, verify the backend is running, the API base URL is correct, and `CLIENT_URL` matches the frontend origin.
+## Security
+
+- **Response headers** (`next.config.mjs`), sent on every page:
+  - a Content-Security-Policy with `frame-ancestors 'self'`, plus `X-Frame-Options: SAMEORIGIN`, so other sites can't frame Neve (clickjacking);
+  - `X-Content-Type-Options: nosniff`, so browsers don't guess file types;
+  - `Referrer-Policy: strict-origin-when-cross-origin`, since page paths can contain agreement and case IDs;
+  - a `Permissions-Policy` that turns off camera, microphone, geolocation, payment, and USB access;
+  - `Strict-Transport-Security` in production builds.
+
+  The `X-Powered-By` header is not sent. There is no full script CSP yet, because Firebase, map tiles, and signed storage URLs load from several origins. If you add a feature that needs one of the blocked browser features, update the `Permissions-Policy`.
+- **Untrusted HTML**: avoid `dangerouslySetInnerHTML`. The admin email-template preview renders HTML in an `<iframe sandbox="">`, so it can't run scripts.
+- **Dependencies**: `package.json` uses an npm `override` to pin `@grpc/grpc-js` at a patched version, which `firebase` would otherwise pull in at a vulnerable one. Remove it once `firebase` ships a fixed release. Run `npm audit` after changing dependencies.
+- **Environment values**: everything prefixed `NEXT_PUBLIC_` is bundled into browser code. Put only public configuration there.
+
+## Troubleshooting
+
+- **Sign-in is unavailable:** check the Firebase web configuration and the backend's Firebase Admin setup.
+- **API calls fail:** verify the backend is running, the API base URL is correct, and the backend's `CLIENT_URL` matches the frontend origin exactly, including the port.
+- **Admin sign-in succeeds but you are signed straight back out:** the browser isn't keeping the admin cookie. Check `CLIENT_URL`, and see the cookie notes in the [backend guide](../backend/README.md#deployment-settings).

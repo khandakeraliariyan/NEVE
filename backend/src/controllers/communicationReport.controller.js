@@ -176,7 +176,7 @@ export async function updateCommunicationReportStatus(req, res, next) {
                     reviewedAt: new Date(),
                 },
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
         if (!report) {
             return res.status(404).json({

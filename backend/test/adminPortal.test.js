@@ -9,6 +9,7 @@ import {
     ADMIN_SIGN_IN_PROVIDER,
     hashPassword,
     isAdminToken,
+    readAdminSessionCookie,
     signAdminToken,
     verifyPassword,
 } from "../src/services/adminAuth.service.js";
@@ -26,6 +27,11 @@ function createResponse() {
             return this;
         },
     };
+}
+
+// What the admin portal sends: the session cookie plus the CSRF header.
+function adminCookieHeaders(token, extra = {}) {
+    return { cookie: `theme=dark; neve_admin_session=${token}`, "x-neve-admin": "1", origin: process.env.CLIENT_URL ? new URL(process.env.CLIENT_URL).origin : undefined, ...extra };
 }
 
 function mockFindOne(t, user) {
@@ -105,7 +111,7 @@ test("an admin JWT authenticates an active admin", async (t) => {
     const token = signAdminToken(admin);
     assert.equal(isAdminToken(token), true);
 
-    const req = { headers: { authorization: `Bearer ${token}` } };
+    const req = { headers: adminCookieHeaders(token) };
     let nextCalled = false;
     await authenticateUser(req, createResponse(), () => {
         nextCalled = true;
@@ -128,11 +134,50 @@ test("an admin JWT is refused after deactivation, a password change, or tamperin
         t.mock.method(User, "findById", () => ({ select: () => Promise.resolve(user) }));
         const res = createResponse();
         let nextCalled = false;
-        await authenticateUser({ headers: { authorization: `Bearer ${bearer}` } }, res, () => {
+        await authenticateUser({ headers: adminCookieHeaders(bearer) }, res, () => {
             nextCalled = true;
         });
         assert.equal(nextCalled, false);
         assert.equal(res.statusCode, 401);
         t.mock.restoreAll();
     }
+});
+
+test("an admin cookie without the CSRF header, or from another origin, is refused", async (t) => {
+    const admin = { _id: "64b000000000000000000001", firebaseUid: "neve-admin:x", email: "a@neve.test", role: "admin", isActive: true };
+    const lookup = t.mock.method(User, "findById", () => ({ select: () => Promise.resolve(admin) }));
+    const token = signAdminToken(admin);
+    for (const headers of [
+        adminCookieHeaders(token, { "x-neve-admin": undefined }),
+        adminCookieHeaders(token, { "x-neve-admin": "0" }),
+        adminCookieHeaders(token, { origin: "https://evil.example" }),
+    ]) {
+        const res = createResponse();
+        let nextCalled = false;
+        await authenticateUser({ headers }, res, () => {
+            nextCalled = true;
+        });
+        assert.equal(nextCalled, false);
+        assert.equal(res.statusCode, 403);
+        assert.equal(res.body.code, "CSRF_CHECK_FAILED");
+    }
+    assert.equal(lookup.mock.callCount(), 0);
+});
+
+test("an admin JWT sent as a Bearer header is refused", async (t) => {
+    const admin = { _id: "64b000000000000000000001", firebaseUid: "neve-admin:x", email: "a@neve.test", role: "admin", isActive: true };
+    t.mock.method(User, "findById", () => ({ select: () => Promise.resolve(admin) }));
+    const res = createResponse();
+    let nextCalled = false;
+    await authenticateUser({ headers: { authorization: `Bearer ${signAdminToken(admin)}` } }, res, () => {
+        nextCalled = true;
+    });
+    assert.equal(nextCalled, false);
+    assert.equal(res.statusCode, 401);
+});
+
+test("the session cookie is read from among other cookies", () => {
+    assert.equal(readAdminSessionCookie({ headers: { cookie: "a=1; neve_admin_session=abc.def; b=2" } }), "abc.def");
+    assert.equal(readAdminSessionCookie({ headers: { cookie: "neve_admin_session_old=x" } }), null);
+    assert.equal(readAdminSessionCookie({ headers: {} }), null);
 });

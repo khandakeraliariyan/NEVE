@@ -244,7 +244,7 @@ export async function updateSystemError(req, res, next) {
                     resolvedAt: resolving ? new Date() : null,
                 },
             },
-            { new: true }
+            { returnDocument: "after" }
         );
         if (!updated) return res.status(404).json({ success: false, message: "Error not found." });
         await recordAdminAction({

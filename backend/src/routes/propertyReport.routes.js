@@ -3,6 +3,8 @@ import {
     createPropertyReport,
     getMyPropertyReports,
     getPropertyReportsForReview,
+    getReportsAboutMyListings,
+    respondToPropertyReport,
     reviewPropertyReport,
 } from "../controllers/propertyReport.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
@@ -25,6 +27,20 @@ router.get(
     "/my-reports",
     allowRoles("renter", "landlord"),
     getMyPropertyReports
+);
+
+// Reports about the landlord's own listings, without the reporter.
+router.get(
+    "/my-listings",
+    allowRoles("landlord"),
+    getReportsAboutMyListings
+);
+
+// The landlord's reply to a report on their listing.
+router.post(
+    "/:reportId/response",
+    allowRoles("landlord"),
+    respondToPropertyReport
 );
 
 // Administrator-only review queue.

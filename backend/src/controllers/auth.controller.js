@@ -2,6 +2,8 @@ import { z } from "zod";
 import User from "../models/User.js";
 import { checkPasswordChange } from "../services/securityAlerts.service.js";
 import {
+    clearAdminSessionCookie,
+    setAdminSessionCookie,
     signAdminToken,
     verifyAgainstDummy,
     verifyPassword,
@@ -72,16 +74,24 @@ export async function adminLogin(req, res, next) {
             });
         }
 
-        const token = signAdminToken(user);
+        // The token goes only into an httpOnly cookie, never the response body.
+        const expiresAt = setAdminSessionCookie(res, signAdminToken(user));
         const profile = user.toObject();
         delete profile.passwordHash;
 
         return res.status(200).json({
             success: true,
-            token,
+            expiresAt,
             user: profile,
         });
     } catch (error) {
         next(error);
     }
+}
+
+// POST /api/v1/auth/admin/logout
+// Page scripts can't remove an httpOnly cookie, so signing out goes through here.
+export function adminLogout(req, res) {
+    clearAdminSessionCookie(res);
+    return res.status(200).json({ success: true });
 }

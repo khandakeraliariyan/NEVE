@@ -471,7 +471,7 @@ export async function reviewDocumentDeletionRequest(req, res, next) {
                     reviewNote: reviewNote.trim(),
                 },
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
         if (!request) {
             return res.status(404).json({
@@ -545,7 +545,7 @@ export async function reviewDocumentDeletionRequest(req, res, next) {
                     ],
                 },
                 { $set: { status: "deletion_pending" } },
-                { new: true, runValidators: true }
+                { returnDocument: "after", runValidators: true }
             );
             if (!lockedFile) {
                 request.status = "pending";
@@ -642,7 +642,7 @@ export async function updateDocumentRetention(req, res, next) {
                 status: "uploaded",
             },
             { $set: update },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
         if (!file) {
             const exists = await UploadedFile.exists({

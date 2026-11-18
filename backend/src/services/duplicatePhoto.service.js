@@ -107,7 +107,7 @@ export async function checkDuplicatePhotos(property, deps = {}) {
             $set: { severity: "high", message: DUPLICATE_PHOTO_MESSAGE, evidence },
             $setOnInsert: { property: property._id, type: "duplicate_photo", status: "open" },
         },
-        { upsert: true, new: true, includeResultMetadata: true }
+        { upsert: true, returnDocument: "after", includeResultMetadata: true }
     );
     const warning = result.value;
     const isNew = !result.lastErrorObject?.updatedExisting;

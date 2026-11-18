@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import mongoose from "mongoose";
 
 import { env } from "../config/env.js";
 import SystemJobRun, { SystemJobLock } from "../models/SystemJobRun.js";
@@ -38,7 +39,7 @@ async function acquireLock(job) {
         const lock = await SystemJobLock.findOneAndUpdate(
             { _id: job, lockedUntil: { $lte: now } },
             { $set: { lockedUntil: new Date(now.getTime() + LOCK_MS), owner: OWNER } },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: "after" }
         );
         return Boolean(lock);
     } catch (error) {
@@ -79,13 +80,32 @@ export async function runSystemJob(job, { trigger, triggeredBy = null, dryRun = 
 
 const timers = [];
 
+// A dropped or timed-out connection to MongoDB, which the driver recovers
+// from on its own, as opposed to a bug in the job.
+export function isNetworkError(error) {
+    for (let current = error; current; current = current.cause) {
+        if (/MongoNetwork|PoolCleared|MongoServerSelection/.test(current.name ?? "")) return true;
+    }
+    return false;
+}
+
 export function startScheduledJobs() {
     const schedule = (job, enabled, intervalMs) => {
         if (!enabled) return;
         const tick = () => {
-            runSystemJob(job, { trigger: "scheduled" }).catch((error) =>
-                console.error(`Scheduled ${job} error:`, error)
-            );
+            // While the database is down the run would only fail; the next
+            // tick picks it up once the driver has reconnected.
+            if (mongoose.connection.readyState !== 1) {
+                console.warn(`Scheduled ${job} skipped: the database is not connected.`);
+                return;
+            }
+            runSystemJob(job, { trigger: "scheduled" }).catch((error) => {
+                if (isNetworkError(error)) {
+                    console.warn(`Scheduled ${job} skipped: lost the database connection (${error.message}). It will run again next time.`);
+                } else {
+                    console.error(`Scheduled ${job} error:`, error);
+                }
+            });
         };
         const timer = setInterval(tick, intervalMs);
         timer.unref();

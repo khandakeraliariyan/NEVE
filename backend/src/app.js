@@ -57,6 +57,12 @@ const app = express();
 
 app.disable("x-powered-by");
 
+// Behind a proxy, req.ip would otherwise be the proxy's address, so every
+// user would share one rate-limit budget. See TRUST_PROXY_HOPS in env.js.
+if (env.TRUST_PROXY_HOPS > 0) {
+    app.set("trust proxy", env.TRUST_PROXY_HOPS);
+}
+
 app.use(helmet());
 
 // CORS runs first so preflights don't count against the rate limit and browsers
@@ -66,7 +72,8 @@ app.use(
         origin: env.CLIENT_URL,
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
+        // X-Neve-Admin marks admin portal requests (CSRF check for the session cookie).
+        allowedHeaders: ["Content-Type", "Authorization", "X-Neve-Admin"],
     })
 );
 

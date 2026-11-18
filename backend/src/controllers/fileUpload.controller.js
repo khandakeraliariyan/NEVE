@@ -18,6 +18,8 @@ import {
     createDownloadUrl,
     deleteStoredObject,
     hashStoredObject,
+    contentMatchesMimeType,
+    readStoredObjectPrefix,
 } from "../services/fileUpload.service.js";
 import { canManageProperty } from "../services/propertyAccess.service.js";
 import { recordSensitiveAccess } from "../services/sensitiveAccess.service.js";
@@ -191,6 +193,17 @@ export const completeUpload = async (req, res) => {
 
             return res.status(400).json({
                 message: "Uploaded file metadata does not match the upload request.",
+            });
+        }
+
+        // The declared type is only a label; check the bytes really are that kind of file.
+        const prefix = await readStoredObjectPrefix(file.storageKey);
+        if (!contentMatchesMimeType(prefix, file.mimeType)) {
+            await deleteStoredObject(file.storageKey).catch(() => { });
+            await UploadedFile.deleteOne({ _id: file._id }).catch(() => { });
+
+            return res.status(400).json({
+                message: "The file's contents don't match its type. Upload a real JPEG, PNG, WebP, PDF, MP4, WebM or text file.",
             });
         }
 
