@@ -44,6 +44,8 @@ npm run dev
 
 The API listens on `http://localhost:5000` by default. Verify it at `http://localhost:5000/api/v1/health`. Set `CLIENT_URL` to the exact frontend origin; the frontend's default local origin is `http://localhost:5173`.
 
+When the API is deployed behind a reverse proxy or load balancer, set `TRUST_PROXY_HOPS` to the number of proxies in front of it (usually `1`). Otherwise every user shares the proxy's IP address, so rate limits apply to all users at once. Leave it unset when clients reach the API directly, since it makes the API trust the `X-Forwarded-For` header.
+
 ## Optional integrations
 
 Add these settings to `backend/.env` only when you need the corresponding integration:

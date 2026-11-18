@@ -6,6 +6,11 @@ const envSchema = z.object({
         .enum(["development", "test", "production"])
         .default("development"),
     PORT: z.coerce.number().int().min(1).max(65535).default(5000),
+    // Number of reverse proxies in front of the API (e.g. 1 behind a hosting
+    // provider's load balancer). Rate limits and session IPs use the client
+    // address only when this matches the real setup; leave unset when the API
+    // is reached directly, or clients could fake their IP with X-Forwarded-For.
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
     CLIENT_URL: z.string().url(),
     MONGODB_URI: z.string().min(1),
     FIREBASE_SERVICE_ACCOUNT_PATH: z.string().min(1),
