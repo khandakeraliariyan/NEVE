@@ -42,11 +42,16 @@ Start the API:
 npm run dev
 ```
 
-The API listens on `http://localhost:5000` by default. Verify it at `http://localhost:5000/api/v1/health`. Set `CLIENT_URL` to the exact frontend origin; the frontend's default local origin is `http://localhost:5173`.
+The API listens on `http://localhost:5000` by default. Verify it at `http://localhost:5000/api/v1/health`. Set `CLIENT_URL` to the exact frontend origin; the frontend's default local origin is `http://localhost:5173`. CORS allows only this origin, and admin sign-in checks it as well.
 
-When the API is deployed behind a reverse proxy or load balancer, set `TRUST_PROXY_HOPS` to the number of proxies in front of it (usually `1`). Otherwise every user shares the proxy's IP address, so rate limits apply to all users at once. Leave it unset when clients reach the API directly, since it makes the API trust the `X-Forwarded-For` header.
+## Deployment settings
 
-Admin portal sessions use an httpOnly cookie, so the frontend and API must share a site (for example `neve.app` and `api.neve.app`, or `localhost` on two ports). If they are on unrelated domains, set `ADMIN_COOKIE_SAMESITE=none` and serve the API over HTTPS.
+Two settings depend on how the API is hosted:
+
+- **`TRUST_PROXY_HOPS`**: set this to the number of reverse proxies or load balancers in front of the API, usually `1` on hosting platforms. Without it, every user appears to come from the proxy's IP address, so they all share one rate-limit budget and sessions record the wrong IP. Leave it unset (the default, `0`) when clients reach the API directly; otherwise the API would trust an `X-Forwarded-For` header that any client can fake.
+- **`ADMIN_COOKIE_SAMESITE`**: admin sessions live in a cookie, so the frontend and API should share a site, for example `neve.app` and `api.neve.app`, or `localhost` on two ports. The default, `strict`, works for that. If they are on unrelated domains, set it to `none` and serve the API over HTTPS, since browsers accept such cookies only when they are marked `Secure`.
+
+In production (`NODE_ENV=production`), the admin cookie is always `Secure`, so the API must be served over HTTPS.
 
 ## Optional integrations
 
@@ -81,13 +86,14 @@ Other optional settings:
 | Identity-field encryption | `FIELD_ENCRYPTION_KEY`, `FIELD_ENCRYPTION_KEY_VERSION`, `FIELD_ENCRYPTION_OLD_KEYS` | AES-256-GCM key (32 random bytes, base64) for NID/passport numbers and dates of birth. Old keys are kept as `1:base64,2:base64` for reading after a rotation. |
 | Retention jobs | `RETENTION_PURGE_ENABLED`, `RETENTION_PURGE_INTERVAL_MINUTES`, `ABANDONED_UPLOAD_HOURS`, `VERIFICATION_DOCUMENT_RETENTION_DAYS`, `ACCOUNT_DELETION_FILE_RETENTION_DAYS` | The purge job is off unless enabled. |
 | Backups | `BACKUP_ENABLED`, `BACKUP_INTERVAL_HOURS`, `BACKUP_RETENTION_COUNT`, `BACKUP_BUCKET_NAME` | Scheduled backups are off unless enabled. They use R2 and default to `R2_BUCKET_NAME` when no backup bucket is set. |
-| Admin sessions | `ADMIN_JWT_EXPIRES_IN` | Admin session lifetime; default `8h`. |
+| Admin sessions | `ADMIN_JWT_EXPIRES_IN`, `ADMIN_COOKIE_SAMESITE` | Session lifetime (default `8h`) and the cookie's SameSite mode (`strict`, `lax` or `none`; default `strict`). See [Deployment settings](#deployment-settings). |
+| Networking | `TRUST_PROXY_HOPS` | Number of proxies in front of the API; default `0`. See [Deployment settings](#deployment-settings). |
 
 Defaults and validation for all settings are defined in `src/config/env.js`. A blank value such as `EMAIL_PROVIDER=` is treated as unset.
 
 ## Admin accounts
 
-Admins do not use Firebase and cannot sign up through the app. They sign in through the admin portal with a password, and the API issues a session token signed with `ADMIN_JWT_SECRET`. Create an admin, or set a new password for an existing one, with:
+Admins do not use Firebase and cannot sign up through the app. They sign in through the admin portal with a password. The API then sets an httpOnly cookie holding a session token signed with `ADMIN_JWT_SECRET`; page scripts never see the token. `POST /api/v1/auth/admin/logout` clears the cookie. Create an admin, or set a new password for an existing one, with:
 
 ```bash
 npm run create-admin -- --email admin@example.com --name "Neve Admin"
@@ -150,9 +156,25 @@ API routes are mounted under `/api/v1`. The health endpoint is `GET /api/v1/heal
 | Administration | `/admin/dashboard`, `/admin/moderation`, `/admin/audit-logs`, `/admin/users`, `/admin/trust-approval`, `/admin/privacy`, `/admin/ai-evaluations`, `/admin/verifications`, `/admin/system`, `/admin/legal-sources`, `/admin/security`, `/admin` (platform settings), `/review-moderation` |
 | Public platform info | `GET /platform`, `GET /platform/privacy-policy` |
 
-Rate limits apply to the whole API, with stricter limits on `/auth`, `/users`, and `/uploads`.
+Rate limits are counted per client IP over 15-minute windows: 100 requests across the API, 20 on `/auth` and `/users`, and a separate budget of 120 for `/uploads`, enough for a full listing's media. AI endpoints such as agreement extraction, Legal Copilot, and recommendation ranking have their own lower limits.
 
-Firebase ID tokens authenticate renters, landlords, and legal reviewers; admins use the admin session token described above. The backend applies role and resource-level authorization; UI route restrictions are not a substitute for these checks. Private uploads use signed URLs and require a configured object-storage integration.
+Firebase ID tokens authenticate renters, landlords, and legal reviewers; admins use the session cookie described above. The backend applies role and resource-level authorization; UI route restrictions are not a substitute for these checks. Private uploads use signed URLs and require a configured object-storage integration.
+
+## Security
+
+The main protections, and where they live:
+
+- **Authentication** (`src/middleware/auth.middleware.js`): renters, landlords, and legal reviewers send a Firebase ID token as `Authorization: Bearer`. Admins are authenticated only by the session cookie. An admin token sent as a Bearer header is refused, so a token copied from a log or a browser can't be replayed.
+- **CSRF protection for the admin cookie**: browsers send cookies automatically, so a cookie-authenticated request must also carry the `X-Neve-Admin: 1` header. Any `Origin` it has must equal `CLIENT_URL`. Another site can't add that header without a CORS preflight, which only `CLIENT_URL` passes. Failures return `403` with code `CSRF_CHECK_FAILED`.
+- **Admin passwords** (`src/services/adminAuth.service.js`): salted scrypt hashes, compared in constant time. An unknown email takes as long to reject as a wrong password. Setup links are single-use and stored hashed. Changing an admin's password ends their existing sessions.
+- **Authorization** (`src/middleware/role.middleware.js`): each request loads the user's current role from MongoDB, and inactive accounts and revoked sessions are refused. Controllers also check ownership of the record involved, for example whether the user manages this listing or takes part in this agreement.
+- **Input handling**: request data is checked against Zod schemas or explicit allowlists before it reaches the database. Listing edits accept only a fixed set of fields, so ownership, status, and media can't be changed through them. Search text is escaped before it is used in a regular expression.
+- **Uploads** (`src/services/fileUpload.service.js`): each purpose has its own allowlist of file types and size limit, which the signed upload URL enforces. When an upload completes, the API checks the stored size and type, then reads the file's first bytes to confirm it really is a JPEG, PNG, WebP, PDF, MP4, WebM, or text file. Files that don't match are deleted and the upload fails. Listing photos are attached only through `/property-images/:propertyId/:fileId/attach`, which checks that the file was uploaded for that listing.
+- **HTTP hardening** (`src/app.js`): Helmet's security headers, CORS restricted to `CLIENT_URL`, a 1 MB JSON body limit, and rate limits. Server errors are logged for admins, and clients see only a generic message.
+- **Sensitive data**: NID/passport numbers and dates of birth are encrypted with AES-256-GCM when `FIELD_ENCRYPTION_KEY` is set. Access to tenancy records is logged, and private files are served only through signed URLs that expire after 5 minutes.
+- **Dependencies**: `package.json` uses npm `overrides` to pin patched versions of `glob` and `minimatch`, which `firebase-admin` and `nodemon` would otherwise pull in at vulnerable versions. Remove the overrides once those packages ship fixed releases. Run `npm audit` after changing dependencies.
+
+Never commit `.env` or anything in `secrets/`; both are gitignored.
 
 ## Troubleshooting
 
@@ -160,6 +182,9 @@ Firebase ID tokens authenticate renters, landlords, and legal reviewers; admins 
 - **Database connection fails:** ensure MongoDB is running and `MONGODB_URI` points to the intended database.
 - **Firebase initialization fails:** verify the service-account path relative to `backend` and that the JSON file is readable.
 - **Browser API requests fail:** make sure `CLIENT_URL` exactly matches the frontend origin, including its port.
+- **Admin sign-in succeeds but the admin is signed straight back out, or requests fail with `CSRF_CHECK_FAILED`:** the browser isn't storing or sending the admin cookie, or the request's origin differs from `CLIENT_URL`. Check that `CLIENT_URL` is the exact frontend origin. If the frontend and API are on unrelated domains, set `ADMIN_COOKIE_SAMESITE=none` and use HTTPS (see [Deployment settings](#deployment-settings)). In production the cookie is `Secure`, so the API must be served over HTTPS.
+- **Every user gets "Too many requests" in production:** the API is behind a proxy without `TRUST_PROXY_HOPS` set, so all users share the proxy's IP.
+- **An upload fails with "The file's contents don't match its type":** the file isn't really the format its extension claims, for example a renamed HTML or HEIC file. Convert it to a supported format and upload it again.
 - **Uploads or AI features are unavailable:** verify the corresponding optional R2 or Groq credentials and configuration.
 - **Emails are not sent:** `EMAIL_PROVIDER`, `EMAIL_API_KEY`, and `EMAIL_FROM` must all be set.
 - **Nearby places or travel times fail:** the public Overpass and routing services can be slow or rate-limited; list fallback servers in `OVERPASS_API_URL` or point the routing URLs at your own instances.
