@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import Property from "../models/Property.js";
-import { notifyListingReported } from "../services/notificationEvents.service.js";
+import {
+    notifyListingReported,
+    notifyListingReportResponded,
+} from "../services/notificationEvents.service.js";
 import PropertyReport from "../models/PropertyReport.js";
 import { recordAdminAction } from "../services/adminAudit.service.js";
 
@@ -122,6 +125,111 @@ export const getMyPropertyReports = async (req, res, next) => {
                 limit,
                 totalPages: Math.ceil(total / limit),
             },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// What a landlord may see of a report on their listing: never the reporter.
+export function landlordView(report) {
+    return {
+        _id: report._id,
+        property: report.property,
+        reason: report.reason,
+        details: report.details,
+        status: report.status,
+        createdAt: report.createdAt,
+        reviewedAt: report.reviewedAt,
+        landlordResponse: report.landlordResponse?.text
+            ? report.landlordResponse
+            : null,
+        canRespond: ["pending", "in_review"].includes(report.status),
+    };
+}
+
+// Checks a landlord's reply. Returns { value } or { status, message }.
+export function validateLandlordResponse(body) {
+    const text = typeof body?.text === "string" ? body.text.trim() : null;
+    if (text === null || text.length < 10) {
+        return { status: 400, message: "Write at least 10 characters explaining your side." };
+    }
+    if (text.length > 2000) {
+        return { status: 400, message: "Your reply can be at most 2000 characters." };
+    }
+    return { value: { text } };
+}
+
+// GET /api/v1/property-reports/my-listings
+export const getReportsAboutMyListings = async (req, res, next) => {
+    try {
+        const page = Number(req.query.page || 1);
+        const limit = Number(req.query.limit || 20);
+        if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+            return res.status(400).json({ success: false, message: "Invalid pagination values." });
+        }
+
+        const properties = await Property.find({ landlord: req.neveUser._id })
+            .select("_id")
+            .lean();
+        const filter = { property: { $in: properties.map((property) => property._id) } };
+
+        const [reports, total] = await Promise.all([
+            PropertyReport.find(filter)
+                .populate("property", "title address status")
+                .sort({ createdAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .lean(),
+            PropertyReport.countDocuments(filter),
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            data: reports.map(landlordView),
+            pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// POST /api/v1/property-reports/:reportId/response
+export const respondToPropertyReport = async (req, res, next) => {
+    try {
+        const { reportId } = req.params;
+        if (!mongoose.isValidObjectId(reportId)) {
+            return res.status(400).json({ success: false, message: "Invalid report ID." });
+        }
+
+        const checked = validateLandlordResponse(req.body);
+        if (!checked.value) {
+            return res.status(checked.status).json({ success: false, message: checked.message });
+        }
+
+        const report = await PropertyReport.findById(reportId).populate(
+            "property",
+            "title address status landlord"
+        );
+        // Someone else's listing looks the same as a missing report.
+        if (!report || String(report.property?.landlord) !== String(req.neveUser._id)) {
+            return res.status(404).json({ success: false, message: "Property report not found." });
+        }
+        if (!["pending", "in_review"].includes(report.status)) {
+            return res.status(409).json({
+                success: false,
+                message: "This report has already been closed, so it can no longer take a reply.",
+            });
+        }
+
+        report.landlordResponse = { text: checked.value.text, respondedAt: new Date() };
+        await report.save();
+        await notifyListingReportResponded({ property: report.property });
+
+        return res.status(200).json({
+            success: true,
+            message: "Your reply was added to the report.",
+            data: landlordView(report),
         });
     } catch (error) {
         next(error);

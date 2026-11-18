@@ -267,14 +267,41 @@ export function notifyListingFlagged({ property, warnings, actorId = null }) {
 export function notifyListingReported({ property, reason }) {
     return safely("listing reported", async () => {
         const admins = await activeUserIds("admin");
-        return notifyAll(admins.map((admin) => ({
+        const why = String(reason).replace(/_/g, " ");
+        const notifications = admins.map((admin) => ({
             recipient: admin,
             type: "listing_flagged",
             title: `Listing reported: ${property.title}`,
-            message: `A user reported this listing (${String(reason).replace(/_/g, " ")}). It's waiting in the moderation queue.`,
+            message: `A user reported this listing (${why}). It's waiting in the moderation queue.`,
             link: "/admin/moderation",
             relatedProperty: property._id,
-        })), "listing reported");
+        }));
+        // The landlord hears about it too, but never who sent it.
+        if (property.landlord) {
+            notifications.push({
+                recipient: property.landlord,
+                type: "listing_flagged",
+                title: `Your listing ${property.title} was reported`,
+                message: `Someone reported this listing (${why}). An admin will review it; you can reply with your side.`,
+                link: "/listings/warnings",
+                relatedProperty: property._id,
+            });
+        }
+        return notifyAll(notifications, "listing reported");
+    });
+}
+
+export function notifyListingReportResponded({ property }) {
+    return safely("listing report responded", async () => {
+        const admins = await activeUserIds("admin");
+        return notifyAll(admins.map((admin) => ({
+            recipient: admin,
+            type: "listing_flagged",
+            title: `Landlord replied to a report: ${property.title}`,
+            message: "The landlord added their side to a listing report in the moderation queue.",
+            link: "/admin/moderation",
+            relatedProperty: property._id,
+        })), "listing report responded");
     });
 }
 
