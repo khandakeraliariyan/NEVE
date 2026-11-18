@@ -242,6 +242,12 @@ function ReportItem({ r, onDone }) {
             {r.details && <p className="mt-2 text-sm text-muted">“{r.details}”</p>}
             <p className="mt-1 text-xs text-muted">Reported {dateTime(r.createdAt)}</p>
             {r.reviewNote && <p className="mt-1 text-xs text-muted">Note: {r.reviewNote}</p>}
+            {r.landlordResponse?.text && (
+                <div className="mt-2 rounded-xl border border-line p-3 text-sm">
+                    <p className="mb-1 text-xs text-muted">Landlord's reply · {dateTime(r.landlordResponse.respondedAt)}</p>
+                    <p>{r.landlordResponse.text}</p>
+                </div>
+            )}
             <DuplicateCheck propertyId={idOf(r.property)} />
             <ListingSuspension propertyId={idOf(r.property)} />
             <Decision

@@ -139,10 +139,111 @@ function WarningCard({ warning, onChanged }) {
     );
 }
 
+// A report someone filed on the landlord's listing. Who filed it stays hidden.
+function ReportCard({ report, onChanged }) {
+    const [replying, setReplying] = useState(false);
+    const [text, setText] = useState(report.landlordResponse?.text ?? "");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const property = report.property ?? {};
+
+    async function submit(event) {
+        event.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+            await api.post(`/property-reports/${report._id}/response`, { text: text.trim() });
+            setReplying(false);
+            onChanged("Your reply was added. The admin reviewing the report will see it.");
+        } catch (err) {
+            setError(err);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <Card>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <p className="font-semibold text-ink">{label(report.reason)}</p>
+                    <Link href={property._id ? `/listings/${property._id}/edit` : "/listings"} className="text-sm text-forest underline">
+                        {property.title ?? "Listing"}
+                    </Link>
+                </div>
+                <StatusBadge status={report.status} />
+            </div>
+            {report.details && <p className="mt-2 text-sm text-muted">“{report.details}”</p>}
+            <p className="mt-1 text-xs text-muted">Reported {date(report.createdAt)}</p>
+
+            {report.landlordResponse && !replying && (
+                <div className="mt-3 rounded-xl border border-line p-3 text-sm">
+                    <p className="mb-1 text-xs text-muted">Your reply · {dateTime(report.landlordResponse.respondedAt)}</p>
+                    <p>{report.landlordResponse.text}</p>
+                </div>
+            )}
+
+            {report.canRespond && !replying && (
+                <div className="mt-3">
+                    <Button variant="outline" onClick={() => setReplying(true)}>
+                        {report.landlordResponse ? "Edit your reply" : "Reply with your side"}
+                    </Button>
+                </div>
+            )}
+            {replying && (
+                <form onSubmit={submit} className="mt-3 space-y-3 rounded-xl border border-line bg-mist p-3 text-sm">
+                    <Field label="Your side of this report" hint="10 to 2000 characters. Only admins see it.">
+                        <textarea required minLength={10} maxLength={2000} className="field min-h-24" value={text} onChange={(e) => setText(e.target.value)} />
+                    </Field>
+                    <ErrorBox error={error} />
+                    <div className="flex gap-2">
+                        <Button type="submit" disabled={busy || text.trim().length < 10}>
+                            {busy ? "Sending…" : "Send reply"}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setReplying(false)}>
+                            Cancel
+                        </Button>
+                    </div>
+                </form>
+            )}
+        </Card>
+    );
+}
+
+function ReportsList({ onChanged }) {
+    const list = useApi(() => api.get("/property-reports/my-listings"), []);
+    const items = list.data?.data ?? [];
+    return (
+        <>
+            {list.loading && <Loading text="Loading reports…" />}
+            <ErrorBox error={list.error} onRetry={list.reload} />
+            {!list.loading && !list.error && items.length === 0 && (
+                <Empty title="No reports">When someone reports one of your listings, it appears here.</Empty>
+            )}
+            <div className="grid gap-4 xl:grid-cols-2">
+                {items.map((report) => (
+                    <ReportCard
+                        key={report._id}
+                        report={report}
+                        onChanged={(text) => {
+                            onChanged(text);
+                            list.reload();
+                        }}
+                    />
+                ))}
+            </div>
+        </>
+    );
+}
+
 export default function ListingWarnings() {
     const [status, setStatus] = useState("active");
     const [message, setMessage] = useState(null);
-    const list = useApi(() => api.get("/listing-consistency/warnings/mine", { status }), [status]);
+    const showReports = status === "reports";
+    const list = useApi(
+        () => (showReports ? Promise.resolve({ data: [] }) : api.get("/listing-consistency/warnings/mine", { status })),
+        [status]
+    );
     const items = list.data?.data ?? [];
 
     return (
@@ -157,6 +258,7 @@ export default function ListingWarnings() {
                     { value: "active", label: "Open" },
                     { value: "dismissed", label: "Dismissed" },
                     { value: "resolved", label: "Resolved" },
+                    { value: "reports", label: "Reports from users" },
                 ]}
                 active={status}
                 onChange={(value) => {
@@ -165,13 +267,14 @@ export default function ListingWarnings() {
                 }}
             />
             {message && <p className="mb-4 rounded-xl bg-sage/60 px-4 py-3 text-sm text-forest">{message}</p>}
-            {list.loading && <Loading text="Loading warnings…" />}
-            <ErrorBox error={list.error} onRetry={list.reload} />
-            {!list.loading && !list.error && items.length === 0 && (
+            {showReports && <ReportsList onChanged={setMessage} />}
+            {!showReports && list.loading && <Loading text="Loading warnings…" />}
+            {!showReports && <ErrorBox error={list.error} onRetry={list.reload} />}
+            {!showReports && !list.loading && !list.error && items.length === 0 && (
                 <Empty title={status === "active" ? "No open warnings" : "Nothing here"}>Warnings on your listings appear here.</Empty>
             )}
             <div className="grid gap-4 xl:grid-cols-2">
-                {items.map((warning) => (
+                {!showReports && items.map((warning) => (
                     <WarningCard
                         key={warning._id}
                         warning={warning}
