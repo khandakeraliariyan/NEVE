@@ -73,7 +73,7 @@ export async function cancelViewing(req, res, next) {
         const updated = await ViewingRequest.findOneAndUpdate(
             { _id: viewing._id, status: viewing.status },
             { $set: { status: "cancelled", cancelledBy: role, cancellationReason: reason } },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         ).populate("property", "title address");
         if (!updated) {
             return res.status(409).json({
@@ -136,7 +136,7 @@ export async function rescheduleViewing(req, res, next) {
         const updated = await ViewingRequest.findOneAndUpdate(
             { _id: viewing._id, status: viewing.status, requestedDate: viewing.requestedDate },
             { $set: set },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         ).populate("property", "title address");
         if (!updated) {
             return res.status(409).json({

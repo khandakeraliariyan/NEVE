@@ -208,7 +208,7 @@ export const updateRenterPreferences = async (req, res) => {
                 },
             },
             {
-                new: true,
+                returnDocument: "after",
                 upsert: true,
                 runValidators: true,
                 setDefaultsOnInsert: true,

@@ -99,7 +99,7 @@ export async function changeReviewerRole(req, res, next) {
         const updated = await User.findOneAndUpdate(
             { _id: target._id, role: value.from },
             { $set: { role: value.to } },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         ).select("displayName email photoURL role isActive createdAt");
         if (!updated) {
             return res.status(409).json({
@@ -170,7 +170,7 @@ export async function changeAccountStatus(req, res, next) {
                         : { reason: value.reason, suspendedAt: new Date() },
                 },
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         ).select("displayName email photoURL role isActive createdAt");
         if (!updated) {
             return res.status(409).json({

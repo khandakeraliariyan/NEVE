@@ -220,7 +220,7 @@ export async function updateReview(req, res, next) {
                 }
             },
             {
-                new: true,
+                returnDocument: "after",
                 runValidators: true
             }
         );

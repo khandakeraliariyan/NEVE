@@ -146,7 +146,7 @@ export async function updateEmailTemplate(req, res, next) {
         const doc = await EmailTemplate.findOneAndUpdate(
             { type },
             { $set: { ...parsed.data, updatedBy: req.neveUser._id } },
-            { upsert: true, new: true, runValidators: true }
+            { upsert: true, returnDocument: "after", runValidators: true }
         ).lean();
         clearSettingsCache();
         await recordAdminAction({

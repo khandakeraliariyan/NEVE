@@ -114,7 +114,7 @@ export async function changeListingSuspension(req, res, next) {
                 "moderation.suspended": suspending ? { $ne: true } : true,
             },
             { $set: update },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         ).select("title status landlord moderation");
 
         if (!updated) {

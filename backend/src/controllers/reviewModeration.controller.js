@@ -180,7 +180,7 @@ export async function moderateReview(req, res, next) {
                     moderationReason: reason.trim() || null
                 }
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
 
         if (!review) {
@@ -236,7 +236,7 @@ export async function resolveReviewReport(req, res, next) {
                     resolvedBy: req.neveUser._id
                 }
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
 
         if (!report) {

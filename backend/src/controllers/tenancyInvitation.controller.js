@@ -281,7 +281,7 @@ export async function acceptInvitation(req, res, next) {
         const claimed = await TenancyInvitation.findOneAndUpdate(
             { _id: invitation._id, status: "pending", expiresAt: { $gt: new Date() } },
             { $set: { status: "accepted", invitee: req.neveUser._id, respondedAt: new Date() } },
-            { new: true }
+            { returnDocument: "after" }
         );
         if (!claimed) return res.status(409).json({ success: false, message: "This invitation was already answered." });
 
@@ -368,7 +368,7 @@ export async function declineInvitation(req, res, next) {
         const updated = await TenancyInvitation.findOneAndUpdate(
             { _id: invitation._id, status: "pending" },
             { $set: { status: "declined", invitee: req.neveUser._id, respondedAt: new Date(), declineReason: reason } },
-            { new: true }
+            { returnDocument: "after" }
         );
         if (!updated) return res.status(409).json({ success: false, message: "This invitation was already answered." });
         await createNotification({
@@ -395,7 +395,7 @@ export async function cancelInvitation(req, res, next) {
         const updated = await TenancyInvitation.findOneAndUpdate(
             { _id: found.invitation._id, status: "pending" },
             { $set: { status: "cancelled", respondedAt: new Date() } },
-            { new: true }
+            { returnDocument: "after" }
         );
         if (!updated) return res.status(409).json({ success: false, message: "Only a pending invitation can be cancelled." });
         privateResponse(res);

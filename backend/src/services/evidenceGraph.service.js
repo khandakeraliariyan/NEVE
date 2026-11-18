@@ -80,7 +80,7 @@ export async function attachEvidenceToClaim({
                 },
             },
             {
-                new: true,
+                returnDocument: "after",
                 upsert: true,
                 runValidators: true,
             }

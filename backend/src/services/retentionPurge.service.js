@@ -171,7 +171,7 @@ export async function runRetentionPurge({ dryRun = false, now = new Date(), deps
                 lockFilter.retentionUntil = { $ne: null, $lte: now };
             }
         }
-        const locked = await Files.findOneAndUpdate(lockFilter, { $set: { status: "deletion_pending" } }, { new: true });
+        const locked = await Files.findOneAndUpdate(lockFilter, { $set: { status: "deletion_pending" } }, { returnDocument: "after" });
         if (!locked) {
             summary.skippedChanged += 1;
             continue;

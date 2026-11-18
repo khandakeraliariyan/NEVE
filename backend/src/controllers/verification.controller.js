@@ -253,7 +253,7 @@ export async function cancelMyVerificationRequest(req, res, next) {
         const request = await VerificationRequest.findOneAndUpdate(
             { _id: requestId, user: req.neveUser._id, status: "pending" },
             { $set: { status: "cancelled" } },
-            { new: true }
+            { returnDocument: "after" }
         );
         if (!request) {
             return res.status(404).json({ success: false, message: "Pending request not found." });
@@ -413,7 +413,7 @@ export async function adminReviewVerificationRequest(req, res, next) {
                     reviewedAt: now,
                 },
             },
-            { new: true }
+            { returnDocument: "after" }
         );
         if (!request) {
             return res.status(404).json({

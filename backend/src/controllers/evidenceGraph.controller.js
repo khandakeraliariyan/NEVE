@@ -320,7 +320,7 @@ export const reviewPropertyClaim = async (req, res) => {
                     publicSummary: null,
                 },
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         );
 
         if (!claim) {

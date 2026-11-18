@@ -249,7 +249,7 @@ async function claim(filter, DeliveryModel) {
             ],
         },
         { $set: { status: "sending", lockedUntil: new Date(now.getTime() + LOCK_MS) }, $inc: { attempts: 1 } },
-        { new: true, sort: { nextAttemptAt: 1 } }
+        { returnDocument: "after", sort: { nextAttemptAt: 1 } }
     ).select("+payload");
 }
 
@@ -348,7 +348,7 @@ export async function retryDeadDelivery(jobId, DeliveryModel = NotificationDeliv
         {
             $set: { status: "pending", attempts: 0, nextAttemptAt: new Date(), lastError: null, purgeAt: null },
         },
-        { new: true }
+        { returnDocument: "after" }
     );
 }
 

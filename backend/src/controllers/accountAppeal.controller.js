@@ -123,7 +123,7 @@ export async function decideAppeal(req, res, next) {
         const decided = await AccountAppeal.findOneAndUpdate(
             { _id: appeal._id, status: "pending" },
             { $set: { status: value.decision, decision: { by: req.neveUser._id, note: value.note, at: now, accountReactivated: false } } },
-            { new: true }
+            { returnDocument: "after" }
         );
         if (!decided) {
             return res.status(409).json({ success: false, message: "This appeal was decided in the meantime. Reload and try again." });
@@ -133,7 +133,7 @@ export async function decideAppeal(req, res, next) {
             const reactivated = await User.findOneAndUpdate(
                 { _id: decided.user, isActive: false, deletedAt: null, role: { $ne: "admin" } },
                 { $set: { isActive: true, suspension: { reason: "", suspendedAt: null } } },
-                { new: true }
+                { returnDocument: "after" }
             ).select("_id");
             if (reactivated) {
                 decided.decision.accountReactivated = true;

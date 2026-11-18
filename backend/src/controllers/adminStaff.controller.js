@@ -199,7 +199,7 @@ export async function completeAdminSetup(req, res, next) {
         const user = await User.findOneAndUpdate(
             { role: "admin", isActive: true, "adminSetup.tokenHash": tokenHash, "adminSetup.expiresAt": { $gt: now } },
             { $set: { passwordHash, passwordChangedAt: now }, $unset: { adminSetup: "" } },
-            { new: true }
+            { returnDocument: "after" }
         ).select("email displayName");
         if (!user) {
             return res.status(400).json({ success: false, message: "This setup link is invalid or has expired. Ask another admin for a new one." });
