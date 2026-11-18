@@ -27,7 +27,10 @@ const editableFields = [
     "floor",
     "furnishing",
     "amenities",
-    "images",
+    // "images" is left out on purpose: photos are attached only through
+    // POST /property-images/:propertyId/:fileId/attach, which checks that the
+    // file was uploaded for this listing. Taking file IDs here would let a
+    // landlord show photos from someone else's listing, including drafts.
     "pricing",
     "availabilityDate",
     "leaseDurationMonths",
@@ -45,7 +48,7 @@ function favoriteSnapshot(property) {
 
 function pickFields(source, allowedFields) {
     return Object.fromEntries(
-        Object.entries(source).filter(([key]) => allowedFields.includes(key))
+        Object.entries(source && typeof source === "object" ? source : {}).filter(([key]) => allowedFields.includes(key))
     );
 }
 
