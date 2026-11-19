@@ -1,0 +1,6 @@
+# Never upload credentials or local data when deploying with the Vercel CLI.
+.env
+.env.*
+secrets/
+eval/results/
+node_modules/

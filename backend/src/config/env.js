@@ -13,7 +13,15 @@ const envSchema = z.object({
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
     CLIENT_URL: z.string().url(),
     MONGODB_URI: z.string().min(1),
-    FIREBASE_SERVICE_ACCOUNT_PATH: z.string().min(1),
+    // Firebase Admin credentials: a path to the service-account JSON file
+    // (relative to backend/), or, where there is no file system to put it on
+    // (e.g. Vercel), the JSON itself or its base64 encoding. One is required.
+    FIREBASE_SERVICE_ACCOUNT_PATH: z.string().min(1).optional(),
+    FIREBASE_SERVICE_ACCOUNT_JSON: z.string().min(1).optional(),
+    // Shared secret that scheduled-job requests must send as
+    // "Authorization: Bearer <secret>" (Vercel Cron does this automatically
+    // when CRON_SECRET is set). Without it the cron endpoint is disabled.
+    CRON_SECRET: z.string().min(16, "CRON_SECRET must be at least 16 characters").optional(),
     // Signs admin session JWTs. Use a long random value, e.g.
     // node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
     ADMIN_JWT_SECRET: z.string().min(32, "ADMIN_JWT_SECRET must be at least 32 characters"),
@@ -129,7 +137,10 @@ const envSchema = z.object({
         .string()
         .url()
         .default("http://localhost:5000/api/v1"),
-});
+}).refine(
+    (value) => Boolean(value.FIREBASE_SERVICE_ACCOUNT_PATH || value.FIREBASE_SERVICE_ACCOUNT_JSON),
+    { path: ["FIREBASE_SERVICE_ACCOUNT_PATH"], message: "Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON." }
+);
 
 // A blank line like "EMAIL_PROVIDER=" means "not set", not an empty value.
 const definedEnv = Object.fromEntries(
