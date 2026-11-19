@@ -318,6 +318,7 @@ Find what the rule checks missed:
 Rules:
 - Don't repeat the rule-check findings you're given.
 - Only cite sectionIds from the provided sections, and only when the section is really about the issue. Never cite, name or invent other law.
+- In title, explanation and suggestedAction, refer to clauses by heading and to law by title and section number. Never write a clauseId or sectionId there; IDs belong only in clauseIds and citedSectionIds.
 - Don't say a clause is illegal, void or unenforceable, and don't decide who is right. Say what to check and why, and suggest a practical action and up to three questions the parties could ask each other.
 - severity: high when money, housing security or the end of the tenancy is at stake; medium for most unclear terms; low for drafting points.
 - Return at most 12 findings, most important first. Return none when nothing stands out.

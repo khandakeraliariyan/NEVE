@@ -108,6 +108,8 @@ test("Groq errors become AIServiceError kinds and are recorded", async () => {
         [new Groq.RateLimitError(429, { message: "slow down" }, "slow down", new Headers()), "rate_limit"],
         [new Groq.BadRequestError(400, { message: "too long" }, "too long", new Headers()), "bad_request"],
         [new Groq.InternalServerError(500, { message: "oops" }, "oops", new Headers()), "api"],
+        [new Groq.APIError(413, { message: "Request too large on tokens per minute (TPM)", code: "rate_limit_exceeded" }, "Request too large for model on tokens per minute (TPM): Limit 8000", new Headers()), "rate_limit"],
+        [new Groq.APIError(413, { message: "payload too large" }, "payload too large", new Headers()), "api"],
     ];
     for (const [error, kind] of cases) {
         const records = [];
