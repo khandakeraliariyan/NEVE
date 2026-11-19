@@ -23,6 +23,7 @@ export const DATASETS = {
     source_retrieval: new URL("./datasets/source_retrieval.json", import.meta.url),
     copilot_answer_quality: new URL("./datasets/copilot_answer_quality.json", import.meta.url),
     evidence_conflict: new URL("./datasets/evidence_conflict.json", import.meta.url),
+    source_retrieval_bd: new URL("./datasets/source_retrieval_bd.json", import.meta.url),
 };
 export const LIVE_ONLY = new Set(["agreement_extraction", "obligation_extraction", "copilot_answer_quality"]);
 
@@ -176,12 +177,33 @@ async function riskDetection(dataset, { live, client }) {
     return results;
 }
 
-// Section numbers among the top k retrieved for each question.
+// A dataset's sources: an inline synthetic pack, or real files from
+// backend/legal-corpus (shaped as an approved source would be stored).
+export async function loadSourcePack(dataset) {
+    if (dataset.sourcePack) return dataset.sourcePack;
+    return Promise.all(
+        (dataset.sourceFiles ?? []).map(async (name, index) => {
+            const file = JSON.parse(await readFile(new URL(`../legal-corpus/${name}`, import.meta.url), "utf8"));
+            return {
+                ...file,
+                _id: `corpus-${index}`,
+                version: 1,
+                sections: file.sections.map((section, n) => ({ ...section, _id: `${file.sourceKey}-${n}` })),
+            };
+        })
+    );
+}
+
+// Section numbers among the top k retrieved for each question. With
+// sourceAliases they are labelled <alias>:<section>, so sections of
+// different sources don't collide.
 async function sourceRetrieval(dataset) {
     const k = dataset.k ?? 3;
+    const sources = await loadSourcePack(dataset);
+    const labelOf = (s) => (dataset.sourceAliases ? `${dataset.sourceAliases[s.sourceKey] ?? s.sourceKey}:${s.sectionNumber}` : s.sectionNumber);
     return dataset.cases.map((c) => {
         const started = Date.now();
-        const predicted = retrieveSections(dataset.sourcePack, c.question).slice(0, k).map((s) => s.sectionNumber);
+        const predicted = retrieveSections(sources, c.question).slice(0, k).map(labelOf);
         return { caseId: c.id, expected: c.expected, predicted: [...new Set(predicted)], latencyMs: Date.now() - started };
     });
 }
@@ -281,6 +303,7 @@ const RUNNERS = {
     obligation_extraction: obligationExtraction,
     risk_detection: riskDetection,
     source_retrieval: sourceRetrieval,
+    source_retrieval_bd: sourceRetrieval,
     copilot_answer_quality: copilotAnswerQuality,
 };
 
@@ -303,10 +326,12 @@ export async function runTask(task, { live = false, client, modelName } = {}) {
 }
 
 // Scores below the baseline (more than a rounding margin) are regressions.
-export function compareWithBaseline(metrics, baseline) {
-    const floor = baseline?.[metrics.task];
+// Baselines are keyed by dataset (the DATASETS key), because two datasets can
+// share a task, e.g. source_retrieval and source_retrieval_bd.
+export function compareWithBaseline(metrics, baseline, key = metrics.task) {
+    const floor = baseline?.[key];
     if (!floor) return [];
     return Object.entries(floor)
         .filter(([name, minimum]) => metrics[name] === null || metrics[name] + 1e-9 < minimum)
-        .map(([name, minimum]) => `${metrics.task} ${name} ${metrics[name] === null ? "missing" : metrics[name].toFixed(3)} is below the baseline ${minimum}`);
+        .map(([name, minimum]) => `${key} ${name} ${metrics[name] === null ? "missing" : metrics[name].toFixed(3)} is below the baseline ${minimum}`);
 }

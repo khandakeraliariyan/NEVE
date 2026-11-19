@@ -61,7 +61,7 @@ async function main() {
         }
         const stamp = new Date().toISOString().replace(/[:.]/g, "-");
         await writeFile(new URL(`./results/${task}-${stamp}.json`, import.meta.url), JSON.stringify({ metrics, cases }, null, 2));
-        problems.push(...compareWithBaseline(metrics, baseline));
+        problems.push(...compareWithBaseline(metrics, baseline, task));
         if (flag("save")) await save(metrics);
     }
 

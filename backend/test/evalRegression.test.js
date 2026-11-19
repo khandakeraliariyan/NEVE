@@ -7,11 +7,11 @@ import { AI_EVALUATION_TASKS } from "../src/services/aiEvaluation.service.js";
 
 const baseline = JSON.parse(await readFile(new URL("../eval/baseline.json", import.meta.url), "utf8"));
 
-for (const task of ["missing_information", "legal_citation", "risk_detection", "source_retrieval", "evidence_conflict"]) {
+for (const task of ["missing_information", "legal_citation", "risk_detection", "source_retrieval", "evidence_conflict", "source_retrieval_bd"]) {
     test(`${task} evaluation stays at or above its baseline`, async () => {
         const { metrics } = await runTask(task);
         assert.equal(metrics.failureCount, 0);
-        assert.deepEqual(compareWithBaseline(metrics, baseline), []);
+        assert.deepEqual(compareWithBaseline(metrics, baseline, task), []);
     });
 }
 
