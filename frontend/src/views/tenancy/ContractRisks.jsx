@@ -30,7 +30,68 @@ const STATUS_ACTIONS = [
     ["open", "Reopen"],
 ];
 
-function Finding({ finding, clauses, agreementId, isParticipant, isReviewer, onChanged }) {
+// The original wording a finding points at, so it can be read beside the explanation.
+function ClauseExcerpt({ clause, name }) {
+    if (!clause) return <p className="rounded-lg bg-mist px-3 py-2 text-xs text-muted">{name}: this clause was removed after the check ran.</p>;
+    return (
+        <figure className="rounded-xl border border-line bg-mist p-3 text-xs">
+            <figcaption className="mb-1 flex flex-wrap items-center gap-2 font-semibold text-ink">
+                {name}
+                {clause.sourcePage && <Badge tone="gray">Page {clause.sourcePage}</Badge>}
+                {clause.sourceVerified === true && <Badge tone="green">Quote found in the document</Badge>}
+                {clause.sourceVerified === false && <Badge tone="rose">Quote not found word-for-word</Badge>}
+                {clause.reviewStatus === "proposed" && <Badge tone="amber">Not yet confirmed by the parties</Badge>}
+            </figcaption>
+            <blockquote className="whitespace-pre-line italic leading-relaxed">“{clause.text}”</blockquote>
+        </figure>
+    );
+}
+
+// Where a finding came from and what it rests on, built only from stored data.
+function DecisionTrace({ finding, clauses, analysis }) {
+    const cited = (finding.clauseIds ?? []).map((id) => clauses.find((c) => String(c._id) === String(id))).filter(Boolean);
+    const limits = [];
+    if (finding.method === "ai") limits.push("Written by an AI model. It can be wrong; check it against the clause wording.");
+    if (finding.method === "rule") limits.push("A fixed wording check. It can't tell whether different amounts are separate charges, or whether missing terms were agreed elsewhere.");
+    if (cited.some((c) => c.sourceVerified === false)) limits.push("A cited clause's quote wasn't found word-for-word in the document text (possible extraction or OCR error).");
+    if (cited.some((c) => c.reviewStatus === "proposed")) limits.push("A cited clause was extracted automatically and hasn't been confirmed by the parties.");
+    if (finding.legalReferences?.some((r) => r.matchedBy === "keyword")) limits.push("Legal references on rule findings were matched by keyword and topic; they may not apply to this situation.");
+    if (!finding.legalReferences?.length) limits.push("No approved legal source is linked to this finding.");
+    const humanReview = [
+        finding.status !== "open" ? `Marked ${label(finding.status)}${finding.statusAt ? ` on ${dateTime(finding.statusAt)}` : ""}${finding.statusNote ? `: “${finding.statusNote}”` : ""}.` : "Not yet responded to by the parties.",
+        finding.reviewerNotes?.length ? `${finding.reviewerNotes.length} legal reviewer view(s), shown above.` : "No legal reviewer has looked at it yet.",
+    ];
+    const rows = [
+        ["What was detected", `${TYPE_TEXT[finding.type] ?? label(finding.type)}: ${finding.title}`],
+        ["How", finding.method === "ai" ? `AI review${analysis?.model ? ` (${analysis.model})` : ""}` : "Rule check (no AI)"],
+        ["Why it was flagged", finding.basis || "Not recorded for this finding (it was created before Neve stored the reason; run the check again)."],
+        ["Record analysed", `This agreement's recorded clauses and key terms, checked ${analysis ? dateTime(analysis.runAt) : ""}.`],
+        ["Passages used", cited.length ? cited.map((c) => `${c.heading || label(c.category)}${c.sourcePage ? ` (page ${c.sourcePage})` : ""}`).join("; ") : "No specific clause; the finding is about the agreement as a whole or something missing."],
+        [
+            "Legal sources",
+            finding.legalReferences?.length
+                ? finding.legalReferences.map((r) => `${r.title}, section ${r.sectionNumber}, version ${r.version}${r.matchedBy === "ai" ? " (chosen by the AI review)" : r.matchedBy === "keyword" ? " (keyword match)" : ""}`).join("; ")
+                : "None",
+        ],
+        ["Uncertainty and limits", limits],
+        ["Human review", humanReview],
+    ];
+    return (
+        <details className="rounded-xl border border-line p-3 text-xs">
+            <summary className="cursor-pointer font-semibold text-ink">Decision trace</summary>
+            <dl className="mt-2 grid gap-2 sm:grid-cols-[160px_1fr]">
+                {rows.map(([term, value]) => (
+                    <div key={term} className="contents">
+                        <dt className="font-semibold text-muted">{term}</dt>
+                        <dd>{Array.isArray(value) ? <ul className="ml-4 list-disc">{value.map((v) => <li key={v}>{v}</li>)}</ul> : value}</dd>
+                    </div>
+                ))}
+            </dl>
+        </details>
+    );
+}
+
+function Finding({ finding, clauses, analysis, agreementId, isParticipant, isReviewer, onChanged }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
     const [note, setNote] = useState("");
@@ -64,13 +125,21 @@ function Finding({ finding, clauses, agreementId, isParticipant, isReviewer, onC
             </div>
             <h3 className="text-base font-semibold">{finding.title}</h3>
             <p className="leading-relaxed">{finding.explanation}</p>
-            {finding.clauseIds?.length > 0 && (
+            {finding.basis && (
                 <p className="text-xs text-muted">
-                    Clauses:{" "}
-                    <Link className="text-forest underline" href={`/agreements/${agreementId}/clauses`}>
-                        {finding.clauseIds.map((id) => clauseNumber.get(String(id)) ?? "a removed clause").join(", ")}
-                    </Link>
+                    <span className="font-semibold">Why it was flagged: </span>
+                    {finding.basis}
                 </p>
+            )}
+            {finding.clauseIds?.length > 0 && (
+                <div className="space-y-2">
+                    {finding.clauseIds.map((id) => (
+                        <ClauseExcerpt key={String(id)} clause={clauses.find((c) => String(c._id) === String(id))} name={clauseNumber.get(String(id)) ?? "A removed clause"} />
+                    ))}
+                    <Link className="text-xs text-forest underline" href={`/agreements/${agreementId}/clauses`}>
+                        Open the clauses page
+                    </Link>
+                </div>
             )}
             {finding.suggestedAction && (
                 <p>
@@ -100,6 +169,7 @@ function Finding({ finding, clauses, agreementId, isParticipant, isReviewer, onC
                 </p>
             ))}
             {finding.statusNote && <p className="text-xs text-muted">Note: {finding.statusNote}</p>}
+            <DecisionTrace finding={finding} clauses={clauses} analysis={analysis} />
             {isParticipant && (
                 <div className="space-y-2">
                     <input className="field text-xs" maxLength={1000} placeholder="Optional note (for example what you agreed)" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -230,7 +300,7 @@ export default function ContractRisks() {
                             )}
                             <ul className="space-y-4">
                                 {findings.map((f) => (
-                                    <Finding key={f._id} finding={f} clauses={clauses} agreementId={agreementId} isParticipant={isParticipant} isReviewer={isReviewer} onChanged={risk.reload} />
+                                    <Finding key={f._id} finding={f} clauses={clauses} analysis={analysis} agreementId={agreementId} isParticipant={isParticipant} isReviewer={isReviewer} onChanged={risk.reload} />
                                 ))}
                             </ul>
                         </>

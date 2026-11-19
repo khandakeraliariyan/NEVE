@@ -28,6 +28,8 @@ const findingSchema = new mongoose.Schema(
         method: { type: String, enum: ["rule", "ai"], required: true },
         title: { type: String, required: true, maxlength: 200 },
         explanation: { type: String, required: true, maxlength: 2000 },
+        // What the rule checked, or how the AI review was limited: why it was flagged.
+        basis: { type: String, maxlength: 1000, default: "" },
         suggestedAction: { type: String, maxlength: 1000, default: "" },
         questionsToAsk: { type: [String], default: [] },
         clauseIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },
@@ -41,6 +43,8 @@ const findingSchema = new mongoose.Schema(
                     sectionNumber: { type: String, maxlength: 40 },
                     heading: { type: String, maxlength: 300, default: "" },
                     version: { type: Number },
+                    // How the section was found: keyword search (rule findings) or chosen by the AI review.
+                    matchedBy: { type: String, enum: ["keyword", "ai", null], default: null },
                 },
             ],
             default: [],

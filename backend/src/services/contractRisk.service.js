@@ -44,6 +44,35 @@ export function activeClauses(agreement) {
     return (agreement?.clauses ?? []).filter((c) => (c.reviewStatus ?? "confirmed") !== "rejected" && c.text);
 }
 
+// What each rule actually checked, so a reader can see why a finding was
+// raised separately from the explanation of why it matters.
+export function ruleBasis(key) {
+    const [kind, detail, rest] = String(key).split(":");
+    switch (kind) {
+        case "missing_clause":
+            return `No active clause with the category "${detail}" is recorded for this agreement.`;
+        case "missing_information":
+            return detail === "no_clauses" ? "The agreement has no active clauses recorded." : `These agreement fields are empty: ${rest ?? ""}.`;
+        case "ambiguous_clause":
+            return "The clause has an ambiguity note, written during extraction or by a participant.";
+        case "unclear_payment":
+            return detail === "no_amount"
+                ? "No amount of 500 Taka or more appears in any rent clause."
+                : "No due-day wording (such as \"by the 5th\", \"of each month\" or \"প্রতি মাসের\") appears in any rent clause.";
+        case "unclear_deposit_refund":
+            return "No refund or return wording (refund, return, repay, give back, ফেরত) appears in any deposit clause.";
+        case "termination_concern":
+            return detail === "no_notice_period" ? "No period in days, weeks or months appears in any notice clause." : "";
+        case "contradiction":
+            if (detail === "rent_amounts") return "The rent clauses mention more than one amount of 500 Taka or more.";
+            if (detail === "recorded_rent") return "The monthly rent recorded on the agreement doesn't appear as an amount in any rent clause.";
+            if (detail === "extracted") return `The ${rest} read from the agreement document differs from the value recorded on the agreement.`;
+            return "";
+        default:
+            return "";
+    }
+}
+
 const finding = (data) => ({
     method: "rule",
     severity: "medium",
@@ -52,6 +81,7 @@ const finding = (data) => ({
     clauseIds: [],
     legalReferences: [],
     ...data,
+    basis: data.basis ?? ruleBasis(data.key),
 });
 
 // Deterministic checks. They run with or without an AI model.
@@ -122,10 +152,12 @@ export function ruleFindings(agreement) {
             );
         }
         for (const rule of ONE_SIDED) {
-            if (!rule.pattern.test(clause.text)) continue;
+            const match = clause.text.match(rule.pattern);
+            if (!match) continue;
             findings.push(
                 finding({
                     key: `one_sided_term:${clause._id}:${rule.title}`,
+                    basis: `The clause contains the wording "${match[0]}".`,
                     type: clause.category === "notice" || clause.category === "term" ? "termination_concern" : "one_sided_term",
                     title: rule.title,
                     explanation: `${rule.why} Check whether both parties understand and accept it.`,
@@ -370,6 +402,7 @@ export function normalizeAiFindings(raw, { agreement, sections }) {
                 method: "ai",
                 title,
                 explanation,
+                basis: `AI review of the agreement's recorded clauses${ids.length ? "" : " (no specific clause cited)"}. Neve kept only the clause and legal-section IDs that exist in this agreement and in the approved sources it was given.`,
                 suggestedAction: String(item.suggestedAction ?? "").trim().slice(0, 1000),
                 questionsToAsk: (item.questionsToAsk ?? []).map((q) => String(q).trim().slice(0, 300)).filter(Boolean).slice(0, 3),
                 clauseIds: ids,
@@ -377,7 +410,7 @@ export function normalizeAiFindings(raw, { agreement, sections }) {
                     .filter((id) => sectionsById.has(id))
                     .map((id) => {
                         const s = sectionsById.get(id);
-                        return { legalSource: s.legalSourceId, sectionId: s.sectionId, title: s.title, sectionNumber: s.sectionNumber, heading: s.heading ?? "", version: s.version };
+                        return { legalSource: s.legalSourceId, sectionId: s.sectionId, title: s.title, sectionNumber: s.sectionNumber, heading: s.heading ?? "", version: s.version, matchedBy: "ai" };
                     }),
             },
         ];
@@ -396,7 +429,7 @@ export function attachRuleReferences(findings, sources, agreement) {
         const matches = searchSections(sources, { query: `${f.title} ${text}`, category, limit: 2 }).filter((s) => (s.topics ?? []).includes(category));
         return {
             ...f,
-            legalReferences: matches.map((s) => ({ legalSource: s.legalSourceId, sectionId: s.sectionId, title: s.title, sectionNumber: s.sectionNumber, heading: s.heading ?? "", version: s.version })),
+            legalReferences: matches.map((s) => ({ legalSource: s.legalSourceId, sectionId: s.sectionId, title: s.title, sectionNumber: s.sectionNumber, heading: s.heading ?? "", version: s.version, matchedBy: "keyword" })),
         };
     });
 }
@@ -471,6 +504,7 @@ export function buildAnalysisReport(agreement, analysis) {
     findings.forEach((f, i) => {
         lines.push("", `${i + 1}. ${f.title} [${TYPE_TEXT[f.type] ?? f.type}, ${f.severity}, ${f.status}]`);
         lines.push(`   ${f.explanation}`);
+        if (f.basis) lines.push(`   Why it was flagged (${f.method === "ai" ? "AI review" : "rule check"}): ${f.basis}`);
         if (f.clauseIds?.length) lines.push(`   Clauses: ${f.clauseIds.map((id) => clauseName.get(String(id)) ?? "removed clause").join(", ")}`);
         if (f.suggestedAction) lines.push(`   Suggested action: ${f.suggestedAction}`);
         f.questionsToAsk?.forEach((q) => lines.push(`   Question to ask: ${q}`));
