@@ -2,16 +2,16 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { answerQualityLabels, compareWithBaseline, extractionLabels, findingLabel, loadDataset, obligationLabels, runTask } from "../eval/runner.js";
+import { answerQualityLabels, compareWithBaseline, conflictLabels, extractionLabels, findingLabel, loadDataset, obligationLabels, runTask } from "../eval/runner.js";
 import { AI_EVALUATION_TASKS } from "../src/services/aiEvaluation.service.js";
 
 const baseline = JSON.parse(await readFile(new URL("../eval/baseline.json", import.meta.url), "utf8"));
 
-for (const task of ["missing_information", "legal_citation", "risk_detection", "source_retrieval"]) {
+for (const task of ["missing_information", "legal_citation", "risk_detection", "source_retrieval", "evidence_conflict", "source_retrieval_bd"]) {
     test(`${task} evaluation stays at or above its baseline`, async () => {
         const { metrics } = await runTask(task);
         assert.equal(metrics.failureCount, 0);
-        assert.deepEqual(compareWithBaseline(metrics, baseline), []);
+        assert.deepEqual(compareWithBaseline(metrics, baseline, task), []);
     });
 }
 
@@ -22,7 +22,7 @@ test("model-backed tasks need --live", async () => {
 });
 
 test("every dataset names a registered task with unique case IDs", async () => {
-    for (const task of ["missing_information", "legal_citation", "agreement_extraction", "obligation_extraction", "risk_detection", "source_retrieval", "copilot_answer_quality"]) {
+    for (const task of ["missing_information", "legal_citation", "agreement_extraction", "obligation_extraction", "risk_detection", "source_retrieval", "copilot_answer_quality", "evidence_conflict"]) {
         const dataset = await loadDataset(task);
         assert.equal(dataset.task, task);
         assert.ok(AI_EVALUATION_TASKS.includes(dataset.task));
@@ -70,8 +70,33 @@ test("copilot answer quality scores hallucinated support as false positives", as
     for (const c of inScope) assert.deepEqual([...c.predicted].sort(), [...c.expected].sort(), c.caseId);
     const outOfScope = cases.filter((c) => c.expected[0] === "abstain");
     assert.ok(outOfScope.length >= 3);
-    for (const c of outOfScope) assert.ok(!c.predicted.includes("abstain"), c.caseId);
+    // A question that retrieves nothing gives the fake nothing to cite, so it abstains.
+    const { retrieveSections } = await import("../src/services/legalCopilot.service.js");
+    for (const c of outOfScope) {
+        const question = dataset.cases.find((d) => d.id === c.caseId).question;
+        const retrievedAny = retrieveSections(dataset.sourcePack, question).length > 0;
+        assert.equal(c.predicted.includes("abstain"), !retrievedAny, c.caseId);
+    }
     const hallucinated = outOfScope.filter((c) => c.predicted.length).length;
     assert.ok(hallucinated > 0, "expected at least one out-of-scope question to retrieve a section");
     assert.ok(metrics.precision < 1);
+});
+
+test("conflict labels count only automatic detections", () => {
+    const analysis = {
+        potentialConflicts: [
+            { type: "listing_agreement_mismatch", field: "monthlyRentBdt" },
+            { type: "payment_amount_mismatch", paymentType: "rent" },
+            { type: "meter_reading_decreased", meterType: "gas" },
+            { type: "user_marked_contradiction", targetId: "x" },
+            { type: "disputed_payment", targetId: "y" },
+        ],
+    };
+    const rules = [{ key: "contradiction:rent_amounts:0123456789abcdef01234567" }, { key: "missing_clause:notice" }];
+    assert.deepEqual(conflictLabels(analysis, rules), [
+        "listing_agreement_mismatch:monthlyRentBdt",
+        "payment_amount_mismatch:rent",
+        "meter_reading_decreased:gas",
+        "contradiction:rent_amounts",
+    ]);
 });

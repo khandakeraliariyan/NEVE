@@ -1,5 +1,5 @@
 {
-    "note": "Minimum scores for the deterministic evaluations, set from the first measured run (keyword mode still misses: rent-increase also matches the deposit and receipt sections; eviction matches the notice section first). npm run eval -- --check and test/evalRegression.test.js fail below these. Raise them when scores improve; lower them only for an intended change, with the reason in the commit message. risk_detection and source_retrieval were added with their first measured run (source_retrieval is judged on recall@3; its precision is low by design).",
+    "note": "Minimum scores for the deterministic evaluations, set from the first measured run (keyword mode still misses: rent-increase also matches the deposit and receipt sections; eviction matches the notice section first). npm run eval -- --check and test/evalRegression.test.js fail below these. Raise them when scores improve; lower them only for an intended change, with the reason in the commit message. risk_detection and source_retrieval were added with their first measured run (source_retrieval is judged on recall@3; its precision is low by design). evidence_conflict was added with its first measured run (F1 0.941, exact 0.92, recall 1.0); its two misses are legitimate differences (a staged rent increase and a service charge written in a rent clause) that the rent-amount rule still flags for checking. source_retrieval_bd scores keyword retrieval (recall@3) against the real legal corpus with English and Bangla questions; first run recall 0.444: all 6 Bangla questions found the expected section, 8 of 12 English questions missed because the Premises Rent Control Act text is Bangla. Baselines are keyed by dataset. After adding the bilingual glossary and Bangla suffix stemming, source_retrieval_bd recall rose to 0.889 (remaining misses: salami-bn, holding-over-en); the glossary was written by the same team as the questions, so treat the gain as indicative.",
     "missing_information": {
         "f1": 0.95,
         "exactMatchRate": 0.85
@@ -13,6 +13,14 @@
         "exactMatchRate": 0.85
     },
     "source_retrieval": {
-        "recall": 1.0
+        "recall": 1
+    },
+    "evidence_conflict": {
+        "f1": 0.94,
+        "exactMatchRate": 0.92,
+        "recall": 1
+    },
+    "source_retrieval_bd": {
+        "recall": 0.88
     }
 }

@@ -9,6 +9,7 @@ import { useApi } from "../../hooks/useApi";
 import { useAgreement } from "./useAgreement";
 import { ConfirmLink, EvidenceSuggestions } from "./EvidenceSuggestions";
 import RecordLinks from "./RecordLinks";
+import FlagReview from "./FlagReview";
 import { useAuth } from "../../context/AuthContext";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, PageHeader } from "../../components/ui";
 import NotFound from "../NotFound";
@@ -22,7 +23,10 @@ const TYPES = {
     inquiry_message: { title: "Messages", color: "#8a6a8c" },
     event: { title: "Events", color: "#c9bdb1" },
     legal_section: { title: "Legal sections", color: "#5f7a63" },
+    maintenance_request: { title: "Maintenance requests", color: "#b0603a" },
+    condition_entry: { title: "Condition records", color: "#6f8f9c" },
 };
+const RECORD_PAGES = { maintenance_request: "maintenance", condition_entry: "condition" };
 const RELATIONSHIPS = ["supports", "contradicts", "relates_to", "cites", "context_only", "unassessed"];
 const TARGET_TYPES = { agreement: "agreement", clause: "clause", obligation: "obligation", payment: "payment_record", message: "inquiry_message" };
 const W = 820;
@@ -44,6 +48,12 @@ function nodeLabel(node) {
             return node.body?.slice(0, 40) ?? "Message";
         case "legal_section":
             return `${node.title ?? "Legal source"} s. ${node.sectionNumber}`;
+        case "maintenance_request":
+            return node.title ?? "Maintenance request";
+        case "condition_entry":
+            return node.kind === "meter_reading"
+                ? `${label(node.meterType)} meter (${label(node.stage)})`
+                : `${[node.room, node.item].filter(Boolean).join(": ") || "Condition"} (${label(node.stage)})`;
         default:
             return label(node.action);
     }
@@ -259,7 +269,7 @@ export default function EvidenceGraph() {
             <PageHeader
                 eyebrow="Evidence topology"
                 title="Interactive evidence graph"
-                description="See how files connect to the agreement's clauses, obligations, payments and messages, and where information is missing."
+                description="See how files connect to the agreement's clauses, obligations, payments, maintenance requests, condition records and messages, and where information is missing."
                 actions={
                     <>
                         <div className="flex rounded-lg bg-panel p-1 text-sm">
@@ -438,6 +448,45 @@ export default function EvidenceGraph() {
                                     </Button>
                                 )}
                                 {selected.type === "event" && <p className="text-muted">{dateTime(selected.createdAt)}</p>}
+                                {selected.type === "maintenance_request" && (
+                                    <>
+                                        <p className="text-muted">
+                                            {label(selected.category)} · {label(selected.priority)} priority · {label(selected.status)}
+                                            {selected.location ? ` · ${selected.location}` : ""}
+                                        </p>
+                                        <p className="rounded-xl bg-mist p-3">{selected.description}</p>
+                                        <p className="text-xs text-muted">
+                                            Reported {dateTime(selected.createdAt)} · {selected.updateCount} update(s)
+                                            {selected.responsibility ? ` · responsibility recorded as ${label(selected.responsibility)}` : ""}
+                                        </p>
+                                        {selected.lastUpdate && (
+                                            <p className="text-xs text-muted">
+                                                Latest update {dateTime(selected.lastUpdate.createdAt)}
+                                                {selected.lastUpdate.status ? ` (${label(selected.lastUpdate.status)})` : ""}
+                                                {selected.lastUpdate.message ? `: “${selected.lastUpdate.message}”` : ""}
+                                            </p>
+                                        )}
+                                    </>
+                                )}
+                                {selected.type === "condition_entry" && (
+                                    <>
+                                        <p className="text-muted">
+                                            {label(selected.stage)} ·{" "}
+                                            {selected.kind === "meter_reading" ? `reading ${selected.reading ?? "—"} ${selected.unit}` : label(selected.condition ?? "not rated")}
+                                        </p>
+                                        {selected.notes && <p className="rounded-xl bg-mist p-3">{selected.notes}</p>}
+                                        <p className="text-xs text-muted">
+                                            Recorded {dateTime(selected.recordedAt)}
+                                            {selected.correctsEntry ? " · corrects an earlier entry" : ""}
+                                            {selected.reviews?.length ? ` · ${selected.reviews.map((r) => label(r.decision)).join(", ")} by the other party` : " · not yet reviewed by the other party"}
+                                        </p>
+                                    </>
+                                )}
+                                {RECORD_PAGES[selected.type] && (
+                                    <Link href={`/agreements/${agreementId}/${RECORD_PAGES[selected.type]}`} className="inline-block text-sm font-semibold text-forest hover:underline">
+                                        Open the original record →
+                                    </Link>
+                                )}
                                 <p className="eyebrow pt-2">Connections ({selectedEdges.length})</p>
                                 {selectedEdges.length === 0 && <p className="text-muted">No linked evidence.</p>}
                                 {selectedEdges.map((e) => {
@@ -456,6 +505,7 @@ export default function EvidenceGraph() {
                                                     <p className="mt-1 text-xs text-muted">User confidence {Math.round(e.confidence * 100)}%</p>
                                                 </div>
                                             )}
+                                            {e.origin === "system" && <p className="mt-1 text-xs text-muted">Derived automatically from the record, not confirmed by a person.</p>}
                                             {e.reviewStatus === "proposed" && <p className="mt-1 text-xs text-ink">AI suggestion waiting for review: accept or reject it in the AI link suggestions panel.</p>}
                                             {e.explanation && <p className="mt-1 text-xs text-muted">{e.explanation}</p>}
                                             {isParticipant && <ConfirmLink agreement={agreement} agreementId={agreementId} edge={e} me={profile?._id} onChanged={graph.reload} />}
@@ -481,6 +531,20 @@ export default function EvidenceGraph() {
                                     >
                                         <Badge tone={f.kind === "Conflict" ? "rose" : f.kind === "Uncertain" ? "amber" : "gray"}>{f.kind}</Badge> {f.message}
                                     </button>
+                                    {f.values?.length > 0 && (
+                                        <div className="mt-1 space-y-1 rounded-lg border border-line p-2 text-xs">
+                                            {f.values.map((v) => (
+                                                <p key={v.source}>
+                                                    <span className="font-semibold">{v.label}:</span> {money(v.amountBdt)}
+                                                    {v.source === "listing" && v.listingUpdatedAt ? ` (listing last edited ${date(v.listingUpdatedAt)})` : ""}
+                                                    {v.sourcePage ? ` · page ${v.sourcePage}` : ""}
+                                                    {v.sourceText ? <span className="block italic text-muted">“{v.sourceText.slice(0, 200)}”</span> : null}
+                                                </p>
+                                            ))}
+                                            {f.caveat && <p className="text-muted">{f.caveat}</p>}
+                                        </div>
+                                    )}
+                                    {f.key && <FlagReview agreementId={agreementId} flagKey={f.key} review={f.review} canReview={isParticipant} onChanged={graph.reload} />}
                                 </li>
                             ))}
                         </ul>

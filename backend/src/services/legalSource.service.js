@@ -162,6 +162,8 @@ export function checkTransition(source, action, actor) {
 const STOP_WORDS = new Set([
     "the", "and", "for", "that", "with", "this", "shall", "will", "any", "are", "from",
     "has", "have", "not", "may", "such", "its", "his", "her", "their", "all", "per", "who",
+    // Common Bangla function words in statutes.
+    ...["এবং", "অথবা", "কোন", "হইবে", "হইলে", "হইতে", "করিতে", "করিয়া", "উক্ত", "তবে", "এই", "সেই", "যাহা", "জন্য", "দ্বারা", "অধীন", "পারিবেন", "থাকে", "থাকিলে", "বলিয়া", "নহে"].map((word) => word.normalize("NFC")),
 ]);
 
 export function validateFlagInput(body, reasons) {
@@ -171,9 +173,20 @@ export function validateFlagInput(body, reasons) {
     return { value: { reason: body.reason, note: body.note.trim(), sectionId: body.sectionId ?? null } };
 }
 
-// A light English stemmer, so "increased", "increases" and "increase" match.
-// Bangla and other words are left as they are.
+// Common Bangla case and plural endings: "উচ্ছেদের" -> "উচ্ছেদ", "ভাড়ার" -> "ভাড়া".
+// "দের" is left out: it would also cut words whose root ends in "দ" ("উচ্ছেদের").
+const BANGLA_SUFFIXES = ["গুলোর", "গুলো", "গণের", "য়ের", "টির", "ের", "কে", "টি", "গণ", "র"].map((suffix) => suffix.normalize("NFC"));
+const BANGLA_WORD = /^[ঀ-৿]+$/u;
+
+// A light English stemmer, so "increased", "increases" and "increase" match,
+// and Bangla case endings are dropped the same way on both sides.
 export function stem(word) {
+    if (BANGLA_WORD.test(word)) {
+        for (const suffix of BANGLA_SUFFIXES) {
+            if (word.endsWith(suffix) && word.length - suffix.length >= 3) return word.slice(0, -suffix.length);
+        }
+        return word;
+    }
     if (!/^[a-z]+$/.test(word) || word.length <= 4) return word;
     for (const suffix of ["ments", "ment", "ings", "ing", "ies", "ied", "ed", "es", "s"]) {
         if (word.endsWith(suffix) && word.length - suffix.length >= 3) {
@@ -184,10 +197,14 @@ export function stem(word) {
     return word;
 }
 
+// Combining marks (\p{M}) belong to the word: Bangla vowel signs and the
+// virama are marks, so splitting on them would cut every Bangla word apart.
+// NFC makes the two spellings of letters such as "ড়" compare equal.
 export function tokenize(value) {
     return String(value ?? "")
+        .normalize("NFC")
         .toLowerCase()
-        .split(/[^\p{L}\p{N}]+/u)
+        .split(/[^\p{L}\p{M}\p{N}]+/u)
         .filter((word) => word.length > 2 && !STOP_WORDS.has(word))
         .map(stem);
 }
@@ -195,26 +212,74 @@ export function tokenize(value) {
 // Everyday words that point at a clause topic, for questions that don't
 // say which topic they are about.
 const TOPIC_WORDS = {
-    rent: ["rent", "pay", "payment", "receipt", "increas", "raise", "late", "fine", "ভাড়া"],
-    deposit: ["deposit", "advance", "refund", "return", "back", "deduct", "অগ্রিম", "জামানত"],
-    term: ["term", "renew", "renewal", "expir", "lease", "length", "period"],
-    notice: ["notice", "leav", "vacat", "evict", "terminat", "move", "quit", "notify", "নোটিশ"],
+    rent: ["rent", "pay", "payment", "receipt", "increas", "raise", "late", "fine", "ভাড়া", "রশিদ"],
+    deposit: ["deposit", "advance", "refund", "return", "back", "deduct", "premium", "salami", "অগ্রিম", "অগ্রীম", "জামানত", "সালামী", "প্রিমিয়াম"],
+    term: ["term", "renew", "renewal", "expir", "lease", "length", "period", "মেয়াদ", "নবায়ন"],
+    notice: ["notice", "leav", "vacat", "evict", "terminat", "move", "quit", "notify", "নোটিশ", "উচ্ছেদ"],
     maintenance: ["repair", "fix", "leak", "broken", "damag", "mainten", "plumb", "clean", "মেরামত"],
-    utilities: ["bill", "electric", "electricity", "gas", "water", "utility", "utiliti", "service", "charge"],
+    utilities: ["bill", "electric", "electricity", "gas", "water", "utility", "utiliti", "service", "charge", "বিদ্যুত", "বিদ্যুৎ", "গ্যাস", "পানি"],
 };
+const TOPIC_CUES = Object.entries(TOPIC_WORDS).map(([topic, cues]) => [topic, cues.map((cue) => cue.normalize("NFC"))]);
 
 export function inferTopics(query) {
     const words = tokenize(query);
-    return Object.entries(TOPIC_WORDS)
+    return TOPIC_CUES
         .filter(([, cues]) => words.some((word) => cues.some((cue) => word.startsWith(cue))))
         .map(([topic]) => topic);
+}
+
+// "Landlord" and "tenant" are left out on purpose: they appear in almost
+// every section, so expanding them only adds noise.
+// English and Bangla words for the same legal idea, taken from the tenancy
+// statutes' own vocabulary (the Premises Rent Control Act's definitions and
+// section headings, and Transfer of Property Act Chapter V). An English
+// question also searches for the Bangla terms and the reverse, so a question
+// in one language can reach a source written in the other. `cues` are
+// English word starts; `en` are English words added for Bangla questions.
+const GLOSSARY = [
+    { cues: ["advance"], en: ["advance"], bn: ["অগ্রীম", "অগ্রিম"] },
+    { cues: ["deposit", "security"], en: ["deposit"], bn: ["জামানত"] },
+    { cues: ["premium", "salami"], en: ["premium"], bn: ["প্রিমিয়াম", "সালামী"] },
+    { cues: ["receipt"], en: ["receipt"], bn: ["রশিদ"] },
+    { cues: ["evict", "eject", "recover possession"], en: ["ejectment", "possession"], bn: ["উচ্ছেদ", "দখল"] },
+    { cues: ["possession", "vacant", "hand over"], en: ["possession"], bn: ["দখল", "খালি"] },
+    { cues: ["repair", "fix", "mainten"], en: ["repairs", "repair"], bn: ["মেরামত"] },
+    { cues: ["standard"], en: [], bn: ["মানসম্মত"] },
+    { cues: ["increas", "raise", "hike"], en: ["increase"], bn: ["বৃদ্ধি"] },
+    { cues: ["electric"], en: [], bn: ["বিদ্যুত", "বিদ্যুৎ"] },
+    { cues: ["supply", "facilit", "amenit", "easement", "cut off"], en: [], bn: ["সরবরাহ", "সুবিধা", "সুখাধিকার"] },
+    { cues: ["refund", "repay"], en: ["refund"], bn: ["ফেরত"] },
+    { cues: ["furniture"], en: [], bn: ["আসবাবপত্র"] },
+    { cues: ["penalt", "fine", "offence", "punish"], en: [], bn: ["দণ্ড", "অর্থদণ্ড", "দণ্ডনীয়"] },
+    { cues: ["notice", "quit"], en: ["notice"], bn: ["নোটিশ"] },
+    { cues: ["sublet", "sub-let", "under-let"], en: ["under-letting", "sublet"], bn: ["উপ-ভাড়া"] },
+    { cues: ["controller"], en: [], bn: ["নিয়ন্ত্রক"] },
+    { cues: ["lease", "tenancy", "term"], en: ["lease"], bn: ["মেয়াদ"] },
+].map((group) => ({
+    cues: group.cues,
+    en: group.en.flatMap(tokenize),
+    bn: group.bn.flatMap(tokenize),
+}));
+
+// The query's own words plus glossary words in the other language.
+export function expandQuery(query) {
+    const text = String(query ?? "").normalize("NFC").toLowerCase();
+    const words = tokenize(query);
+    const terms = new Set(words);
+    for (const group of GLOSSARY) {
+        const english = group.cues.some((cue) => (cue.includes(" ") ? text.includes(cue) : words.some((word) => word.startsWith(cue))));
+        const bangla = group.bn.some((term) => terms.has(term));
+        if (english) group.bn.forEach((term) => terms.add(term));
+        if (bangla) group.en.forEach((term) => terms.add(term));
+    }
+    return terms;
 }
 
 // Ranks approved sections by topic match and shared words with the query.
 // Without a category, topics are inferred from the query's wording and a
 // matching section gets a smaller boost. Heading words count double.
 export function searchSections(sources, { query = "", category = null, limit = 10 } = {}) {
-    const terms = new Set(tokenize(query));
+    const terms = expandQuery(query);
     const inferred = category ? [] : inferTopics(query);
     const results = [];
     for (const source of sources) {

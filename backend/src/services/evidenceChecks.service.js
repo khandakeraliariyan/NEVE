@@ -66,6 +66,53 @@ export function findPaymentConflicts(agreement) {
     return conflicts;
 }
 
+// Advertised (listing) amounts vs the agreement. The listing shows its
+// current price, which may have changed since the agreement was made, so a
+// difference is a question to check, never evidence of wrongdoing.
+const LISTING_FIELDS = [
+    { listing: "monthlyRent", agreement: "monthlyRentBdt", name: "monthly rent" },
+    { listing: "securityDeposit", agreement: "depositBdt", name: "security deposit" },
+    { listing: "advanceRent", agreement: "advanceRentBdt", name: "advance rent" },
+];
+
+export function findListingAgreementConflicts(agreement, property) {
+    const pricing = property?.pricing;
+    if (!pricing) return [];
+    const conflicts = [];
+    for (const field of LISTING_FIELDS) {
+        const advertised = pricing[field.listing];
+        if (!Number.isFinite(advertised)) continue;
+        const values = [{ source: "listing", label: "Advertised on the listing", amountBdt: advertised, listingUpdatedAt: property.updatedAt ?? null }];
+        if (Number.isFinite(agreement?.[field.agreement])) {
+            values.push({ source: "agreement_record", label: "Recorded on the agreement", amountBdt: agreement[field.agreement] });
+        }
+        const fact = agreement?.extraction?.status === "completed" ? agreement.extraction.facts?.[field.agreement] : null;
+        if (Number.isFinite(fact?.value)) {
+            values.push({
+                source: "agreement_document",
+                label: "Read from the agreement document",
+                amountBdt: fact.value,
+                sourceText: fact.sourceText ?? "",
+                sourcePage: fact.sourcePage ?? null,
+                sourceVerified: fact.sourceVerified ?? null,
+            });
+        }
+        const agreed = values.filter((value) => value.source !== "listing");
+        if (!agreed.length || !agreed.some((value) => differs(value.amountBdt, advertised))) continue;
+        const agreedText = agreed.map((value) => `${value.label.toLowerCase()}: ${value.amountBdt} BDT`).join("; ");
+        conflicts.push({
+            type: "listing_agreement_mismatch",
+            field: field.agreement,
+            listingField: `pricing.${field.listing}`,
+            propertyId: property._id ? String(property._id) : null,
+            values,
+            message: `The listing advertises a ${field.name} of ${advertised} BDT, which differs from the agreement (${agreedText}).`,
+            caveat: "The listing shows its current price, which may have been changed after the agreement was made, or the parties may have agreed a different amount. Check the dates before drawing any conclusion.",
+        });
+    }
+    return conflicts;
+}
+
 // The latest reading per meter in a report, ignoring superseded entries.
 function currentMeterReadings(report) {
     const entries = (report?.entries ?? []).filter((entry) => entry.kind === "meter_reading");

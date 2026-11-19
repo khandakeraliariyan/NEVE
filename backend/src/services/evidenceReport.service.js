@@ -12,6 +12,8 @@ export function buildAgreementEvidenceReport({
     generatedAt = new Date(),
     messageCount = messages.length,
     messageLimit = 500,
+    maintenanceRequests = [],
+    property = null,
 }) {
     const fileById = new Map(files.map((file) => [String(file._id), file]));
     const messageTruncated = messageCount > messages.length;
@@ -171,7 +173,7 @@ export function buildAgreementEvidenceReport({
                 hash: event.hash ?? null,
             })),
         },
-        analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports),
+        analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports, { maintenanceRequests, property }),
         disclaimer:
             "This report compiles user-entered records and participant assessments. It does not independently verify evidence, provide legal advice, or determine liability. File contents are not embedded; sources are identified by their record IDs and metadata.",
     };

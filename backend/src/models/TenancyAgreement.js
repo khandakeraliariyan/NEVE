@@ -345,6 +345,23 @@ const sharedUserSchema = new mongoose.Schema(
     { _id: false }
 );
 
+const conflictReviewDecision = {
+    status: { type: String, enum: ["open", "resolved", "dismissed"], required: true },
+    reason: { type: String, trim: true, maxlength: 1000, default: "" },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    reviewedAt: { type: Date, default: Date.now },
+};
+
+const conflictReviewSchema = new mongoose.Schema(
+    {
+        key: { type: String, required: true, maxlength: 300 },
+        flagType: { type: String, maxlength: 80, default: "" },
+        ...conflictReviewDecision,
+        history: { type: [new mongoose.Schema(conflictReviewDecision, { _id: false })], default: [] },
+    },
+    { _id: false }
+);
+
 const auditEventSchema = new mongoose.Schema(
     {
         actor: {
@@ -437,6 +454,9 @@ const tenancyAgreementSchema = new mongoose.Schema(
         payments: { type: [paymentSchema], default: [] },
         sharedWith: { type: [sharedUserSchema], default: [] },
         auditTrail: { type: [auditEventSchema], default: [] },
+        // Participants' decisions on automated evidence flags (conflicts and
+        // missing records), matched to a flag by its key when it is recomputed.
+        conflictReviews: { type: [conflictReviewSchema], default: [] },
     },
     { timestamps: true }
 );

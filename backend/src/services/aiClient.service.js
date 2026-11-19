@@ -77,6 +77,11 @@ function mapError(error) {
         return new AIServiceError("auth", error.message);
     }
     if (error instanceof Groq.RateLimitError) return new AIServiceError("rate_limit", error.message);
+    // Groq answers 413 "Request too large ... tokens per minute" when a request
+    // doesn't fit the account's per-minute token budget: wait and retry.
+    if (error instanceof Groq.APIError && error.status === 413 && /rate_limit_exceeded|tokens per minute/i.test(error.message)) {
+        return new AIServiceError("rate_limit", error.message);
+    }
     if (error instanceof Groq.BadRequestError || error instanceof Groq.UnprocessableEntityError) {
         return new AIServiceError("bad_request", error.message);
     }
