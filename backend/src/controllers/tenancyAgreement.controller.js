@@ -3,6 +3,8 @@ import Inquiry from "../models/Inquiry.js";
 import InquiryMessage from "../models/InquiryMessage.js";
 import Property from "../models/Property.js";
 import ConditionReport from "../models/ConditionReport.js";
+import MaintenanceRequest from "../models/MaintenanceRequest.js";
+import { buildRecordGraphParts } from "../services/evidenceGraphRecords.service.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
 import TenancyRecordLink, {
@@ -1098,12 +1100,18 @@ export async function getAgreementEvidenceGraph(req, res, next) {
         }
 
         await saveAuditedChange(agreement, req, "evidence_graph_viewed");
-        const [recordLinks, conditionReports] = await Promise.all([
+        const [recordLinks, conditionReports, maintenanceRequests] = await Promise.all([
             TenancyRecordLink.find({ agreement: agreement._id }).sort({ createdAt: 1 }).lean(),
             ConditionReport.find({ agreement: agreement._id })
-                .select("stage entries._id entries.kind entries.meterType entries.reading entries.recordedAt entries.supersedes")
+                .select("stage entries")
+                .lean(),
+            MaintenanceRequest.find({ agreement: agreement._id })
+                .select("title description location category priority status responsibility submittedBy evidenceFiles history createdAt completedAt")
+                .sort({ createdAt: 1 })
+                .limit(200)
                 .lean(),
         ]);
+        const recordGraph = buildRecordGraphParts({ agreement, maintenanceRequests, conditionReports });
         const [messages, links] = await Promise.all([
             InquiryMessage.find({ inquiry: agreement.inquiry })
                 .populate("sender", "displayName role")
@@ -1128,6 +1136,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 .map((payment) => payment.receiptFile)
                 .filter(Boolean),
             ...links.map((link) => link.uploadedFile?._id ?? link.uploadedFile),
+            ...recordGraph.fileIds,
         ];
         const files = await UploadedFile.find({
             _id: { $in: [...new Set(fileIds.map(String))] },
@@ -1214,6 +1223,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 hash: event.hash ?? null,
                 prevHash: event.prevHash ?? null,
             })),
+            ...recordGraph.nodes,
         ];
         const edges = [
             ...(agreement.documentFile
@@ -1273,6 +1283,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 createdBy: String(link.createdBy),
                 createdAt: link.createdAt,
             })),
+            ...recordGraph.edges,
         ];
 
         const legalSourceIds = [
@@ -1312,7 +1323,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             agreementId: agreement._id,
             nodes,
             edges,
-            analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports),
+            analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports, { maintenanceRequests }),
             disclaimer:
                 "User-entered records and links are not independently verified and do not determine legal liability.",
         });
