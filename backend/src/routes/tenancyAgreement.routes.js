@@ -98,6 +98,8 @@ import {
     updateCaseStatement,
 } from "../controllers/tenancyCase.controller.js";
 
+import { getRiskSentinel, reviewEvidenceFlag } from "../controllers/riskSentinel.controller.js";
+
 const router = express.Router();
 
 router.use(
@@ -113,6 +115,8 @@ router.post("/agreements", allowRoles("renter", "landlord"), createTenancyAgreem
 
 // ComplianceOS: obligations across agreements, and reviewing proposed ones.
 router.get("/compliance", getMyCompliance);
+// Risk Sentinel: open findings, conflicts and missing records across agreements.
+router.get("/risk-sentinel", getRiskSentinel);
 router.get("/agreements/:agreementId/compliance", getAgreementCompliance);
 router.post(
     "/agreements/:agreementId/proposed-obligations/:proposalId/accept",
@@ -223,6 +227,13 @@ router.post(
     "/agreements/:agreementId/evidence-links",
     allowRoles("renter", "landlord"),
     addAgreementEvidenceLink
+);
+// Participants mark an automated conflict or missing-record flag as resolved
+// or not an issue, with a reason.
+router.patch(
+    "/agreements/:agreementId/evidence-flags",
+    allowRoles("renter", "landlord"),
+    reviewEvidenceFlag
 );
 router.patch(
     "/agreements/:agreementId/evidence-links/:linkId",

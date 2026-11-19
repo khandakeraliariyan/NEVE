@@ -60,6 +60,7 @@ const PARTY_TENANCY_NAV = (invitationsLabel) => [
         title: "Tenancy",
         items: [
             { to: "/agreements", label: "Tenancy dashboard", end: true },
+            { to: "/risk-sentinel", label: "Risk Sentinel" },
             { to: "/compliance", label: "Obligations & deadlines" },
             { to: "/invitations", label: invitationsLabel },
             { to: "/copilot", label: "Legal Copilot" },
@@ -72,6 +73,7 @@ const REVIEWER_NAV = [
         title: "Active review",
         items: [
             { to: "/cases", label: "Case queue", end: true },
+            { to: "/risk-sentinel", label: "Risk Sentinel" },
             { to: "/legal-review", label: "Legal sources", end: true },
             { to: "/legal-review/ai-oversight", label: "AI oversight" },
             { to: "/legal-review/ai-evaluations", label: "AI evaluations" },

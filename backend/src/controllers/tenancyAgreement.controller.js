@@ -5,6 +5,7 @@ import Property from "../models/Property.js";
 import ConditionReport from "../models/ConditionReport.js";
 import MaintenanceRequest from "../models/MaintenanceRequest.js";
 import { buildRecordGraphParts } from "../services/evidenceGraphRecords.service.js";
+import { applyFlagReviews } from "../services/riskSentinel.service.js";
 import TenancyAgreement from "../models/TenancyAgreement.js";
 import TenancyEvidenceLink from "../models/TenancyEvidenceLink.js";
 import TenancyRecordLink, {
@@ -1333,7 +1334,10 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             agreementId: agreement._id,
             nodes,
             edges,
-            analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports, { maintenanceRequests, property: listing }),
+            analysis: applyFlagReviews(
+                analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports, { maintenanceRequests, property: listing }),
+                agreement.conflictReviews ?? []
+            ),
             disclaimer:
                 "User-entered records and links are not independently verified and do not determine legal liability.",
         });

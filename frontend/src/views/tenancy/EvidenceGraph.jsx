@@ -9,6 +9,7 @@ import { useApi } from "../../hooks/useApi";
 import { useAgreement } from "./useAgreement";
 import { ConfirmLink, EvidenceSuggestions } from "./EvidenceSuggestions";
 import RecordLinks from "./RecordLinks";
+import FlagReview from "./FlagReview";
 import { useAuth } from "../../context/AuthContext";
 import { Badge, Button, Card, Disclaimer, ErrorBox, Field, Loading, PageHeader } from "../../components/ui";
 import NotFound from "../NotFound";
@@ -543,6 +544,7 @@ export default function EvidenceGraph() {
                                             {f.caveat && <p className="text-muted">{f.caveat}</p>}
                                         </div>
                                     )}
+                                    {f.key && <FlagReview agreementId={agreementId} flagKey={f.key} review={f.review} canReview={isParticipant} onChanged={graph.reload} />}
                                 </li>
                             ))}
                         </ul>
