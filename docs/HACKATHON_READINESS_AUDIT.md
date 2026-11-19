@@ -334,9 +334,13 @@ Each step was committed separately on branch `ariyan`.
 | M3: evaluation evidence | 🟠 Offline done; live pending | Real-corpus retrieval (recall@3 44.4% → 88.9% after cross-language retrieval); prompt-injection and Bangla cases added to the live datasets; **live runs not done (they cost money and need approval)** |
 | M4: Risk Sentinel and reviewable evidence flags | ✅ Done | `/risk-sentinel`; dismiss or resolve needs a reason, with history and audit |
 | M5: demo seed, demo script, pitch, docs | ✅ Done | `npm run seed-demo`; `HACKATHON_DEMO_SCRIPT.md`, `HACKATHON_PITCH.md`, `docs/` |
+| End-to-end testing | ✅ Done | 52-step smoke test against a throwaway database with live Groq calls; fixed a graph and report crash for agreements without a document, and Groq `413` token-limit errors now report "busy" |
+| Positioning: legal intelligence first | ✅ Done | The README, landing page and renter and landlord menus now lead with ContractMind, Legal Copilot, the evidence graph, contradiction detection and Risk Sentinel; the marketplace is presented as the way people arrive |
 
 **Still open:** the live model evaluations; legal-reviewer approval of the
 corpus and the retrieval labels; checking the Transfer of Property Act text
 against the live page; a fallback screen recording; seeding a deployed
 database; the frontend lint warnings; clause categories (still 7); a
-case-level graph; and OCR measurement.
+case-level graph; OCR measurement; a paid Groq tier (the free tier allows
+about one AI request per minute); and Legal Copilot's answer on deposits,
+which contradicted section 10 of the Premises Rent Control Act in one test.

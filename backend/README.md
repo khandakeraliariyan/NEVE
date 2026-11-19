@@ -112,6 +112,8 @@ The password is read from `NEVE_ADMIN_PASSWORD` or prompted for interactively, s
 | `npm run backup` | Back up the database to object storage now. |
 | `npm run restore-backup` | List or restore backups from object storage. |
 | `npm run eval` | Run the AI evaluation tooling. |
+| `npm run import-legal-sources` | Load `legal-corpus/*.json` as draft legal sources for legal review (see [legal-corpus/README.md](legal-corpus/README.md)). |
+| `npm run seed-demo` | Create the synthetic `[DEMO]` dispute scenario for two existing accounts (see the root README's "Preparing a demo"). |
 
 Backup and restore need R2 configured. To restore:
 

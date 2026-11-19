@@ -1,6 +1,6 @@
 # NEVE Frontend
 
-The frontend is the NEVE web application, built with Next.js App Router and React. It provides public property discovery and authenticated workflows for renters, landlords, legal reviewers, and administrators. The API remains responsible for authorization and business rules.
+The frontend is the NEVE web application, built with Next.js App Router and React. Its core is legal intelligence for tenancies: agreement risk checks (ContractMind), Legal Copilot, the evidence graph, contradiction detection and Risk Sentinel. The landing page and the renter and landlord menus lead with these. It also provides public property discovery, and authenticated workflows for renters, landlords, legal reviewers, and administrators. The API remains responsible for authorization and business rules.
 
 ## Requirements
 

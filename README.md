@@ -1,10 +1,20 @@
 # NEVE
 
-NEVE is a rental discovery and tenancy intelligence platform for the Bangladesh market. It helps renters and landlords make more informed decisions by bringing property listings, neighborhood information, rental costs, agreements, and tenancy records into one place.
+NEVE is an **evidence-based legal intelligence platform for renting in Bangladesh**. It checks tenancy agreements for risky terms, answers questions from Bangladesh's rental law with citations, connects the records of a tenancy, and flags what is disputed or missing. It also includes rental discovery, with listings, itemized costs and neighborhood information.
+
+Its five core AI features, built for the JusticeSphere AI challenges:
+
+| Feature | What it does |
+|---|---|
+| **ContractMind** (agreement risk check) | Extracts clauses and obligations from agreements in English or Bangla (with OCR) and flags ambiguous, missing, one-sided and contradictory terms. Each finding quotes the clause and shows why it was flagged, with a decision trace. |
+| **Legal Copilot** | Answers tenancy questions in English or Bangla only from legal sources a legal reviewer approved: the Premises Rent Control Act, 1991 and Chapter V of the Transfer of Property Act, 1882. Citations are validated, so it can't cite a section it wasn't given. |
+| **Evidence graph** | Connects clauses, payments, maintenance requests, condition records, photos, messages and legal sections, and marks what supports, contradicts or is missing. |
+| **Contradiction detection** | Compares the listing, the agreement, payment records, meter readings and maintenance updates. Every conflict shows each value with its source. |
+| **Risk Sentinel** | One prioritized list of what needs attention across tenancies. Each item links to its source and can be resolved or dismissed with a recorded reason. |
 
 The platform is built around **clarity over opinion**: it aims to show what is documented, disputed, uncertain, or missing, rather than reducing a consequential decision to a single unexplained verdict.
 
-In practical terms, NEVE is meant to support the rental relationship from the first property search through the tenancy: compare homes and costs, communicate about a listing, organize agreements and records, and keep evidence available if a question or dispute arises.
+In practical terms, NEVE supports the rental relationship from the agreement through the tenancy and any dispute: understand what the agreement and the law say, keep the records connected, and see early what needs attention. Property search and cost comparison are how many people first arrive.
 
 ## The problem NEVE addresses
 
@@ -13,6 +23,10 @@ Rental decisions involve more than choosing a property based on its advertised r
 NEVE brings these related details together. It helps people inspect the information available to them, understand where estimates or AI suggestions are being used, and keep relevant records connected. It is an information and workflow platform: it does not guarantee that a listing is accurate, determine who is at fault, or replace legal advice.
 
 ## What NEVE provides
+
+### Legal intelligence (the core)
+
+Agreement risk checks, Legal Copilot, the evidence graph, contradiction detection and Risk Sentinel (see the table above) work together on one tenancy: the agreement is checked, the law is cited, the records are connected, conflicts are surfaced, and open items are ranked. Every finding links to its source, and people make the decisions. See [AI features and evaluation](#ai-features-and-evaluation) for how each one works and how it is measured.
 
 ### Find and compare rental properties
 
@@ -100,6 +114,7 @@ This list describes the scope represented in the codebase; it is not a guarantee
 - [Background jobs](#background-jobs)
 - [Platform settings](#platform-settings)
 - [AI features and evaluation](#ai-features-and-evaluation)
+- [Preparing a demo](#preparing-a-demo)
 - [Data, privacy, and AI](#data-privacy-and-ai)
 - [Security](#security)
 - [Deploying](#deploying)
@@ -225,9 +240,11 @@ NEVE/
     │   ├── models/            Mongoose models (see Data model)
     │   └── utils/             response and pagination helpers
     ├── test/                  Node.js test suite
-    ├── scripts/               create-admin, backup, restore-backup
+    ├── scripts/               create-admin, backup, restore-backup, importLegalSources, seedDemo
     ├── eval/                  AI evaluation runner, datasets, and baseline
+    ├── legal-corpus/          official Bangladesh tenancy law text, ready to import for legal review
     └── secrets/               Firebase service-account file (gitignored)
+docs/                          evaluation methodology and responsible-AI notes
 ```
 
 ## Configuration
@@ -362,7 +379,7 @@ Run each command from its app directory.
 | Backend | `npm run restore-backup` | List or restore backups. |
 | Backend | `npm run eval` | AI evaluation (see [AI features and evaluation](#ai-features-and-evaluation)). |
 | Backend | `npm run import-legal-sources` | Load `backend/legal-corpus/*.json` as draft legal sources for legal review (see [backend/legal-corpus/README.md](backend/legal-corpus/README.md)). |
-| Backend | `npm run seed-demo` | Create the synthetic `[DEMO]` dispute scenario for two existing demo accounts (see [HACKATHON_DEMO_SCRIPT.md](HACKATHON_DEMO_SCRIPT.md)). |
+| Backend | `npm run seed-demo` | Create the synthetic `[DEMO]` dispute scenario for two existing demo accounts (see [docs/HACKATHON_DEMO_SCRIPT.md](docs/HACKATHON_DEMO_SCRIPT.md)). |
 
 Restoring a backup (needs R2):
 
@@ -473,6 +490,8 @@ AI features run on Groq and are optional. When `GROQ_API_KEY` is missing, they r
 
 AI output is assistance and must be checked against the source documents; it is not legal advice.
 
+**Groq rate limits.** On Groq's free tier, `openai/gpt-oss-120b` allows about 8,000 tokens per minute. Each AI request reserves at least 16,000 output tokens, because reasoning tokens count toward the output limit. In practice that is about **one AI request per minute**. When the limit is hit, the API responds `503` with a "busy, try again shortly" message instead of failing; this includes Groq's `413 Request too large ... tokens per minute` error. For demos or several users at once, use a paid Groq tier.
+
 The evaluation suite (`backend/eval/`) scores AI tasks against small datasets. The tasks are agreement extraction, obligation extraction, risk detection, missing information, legal citation, source retrieval (synthetic law and the real corpus, in English and Bangla), evidence-conflict detection, and Copilot answer quality. Datasets, current results, known failures and limits are in [docs/evaluation-methodology.md](docs/evaluation-methodology.md).
 
 ```bash
@@ -482,6 +501,31 @@ npm run eval -- --live                 # also model-backed tasks (calls Groq; co
 npm run eval -- --check                # exit 1 if a score drops below eval/baseline.json
 npm run eval -- --save                 # store the run for the admin AI evaluation pages
 ```
+
+## Preparing a demo
+
+The demo uses one synthetic dispute and the real legal corpus. Run these from `backend/`, against the database you will demo from:
+
+1. **Legal sources.** Import the corpus as drafts in review:
+
+   ```bash
+   npm run import-legal-sources -- --dry-run legal-corpus/*.json
+   npm run import-legal-sources -- --as admin@example.com --submit legal-corpus/*.json
+   ```
+
+   A legal reviewer then compares each source with the official page and approves it under **Legal review → Legal sources**. The person who imported a source can't approve it. Until approval, Legal Copilot and contract-risk findings don't use it.
+2. **Demo accounts.** Sign up a renter and a landlord in the app, since they use Firebase sign-in and the script can't create them.
+3. **Scenario.** Create the `[DEMO]` listing, agreement, payments, maintenance request and condition record:
+
+   ```bash
+   npm run seed-demo -- --dry-run
+   npm run seed-demo -- --renter renter@example.com --landlord landlord@example.com --confirm
+   npm run seed-demo -- --renter ... --landlord ... --confirm --reset   # replace an earlier demo
+   ```
+
+4. **Walkthrough.** Follow [docs/HACKATHON_DEMO_SCRIPT.md](docs/HACKATHON_DEMO_SCRIPT.md). Leave about a minute between AI actions on Groq's free tier (see [AI features and evaluation](#ai-features-and-evaluation)), and keep a recording as a fallback.
+
+All demo names, places and amounts are invented. Don't seed a database that holds real user data.
 
 ## Data, privacy, and AI
 
@@ -538,11 +582,24 @@ Beyond the local setup, a deployment needs:
 ## Testing
 
 ```bash
-cd backend && npm test        # about 430 tests; no database or network needed
+cd backend && npm test        # 432 tests; no database or network needed
+cd backend && npm run eval -- --check
 cd frontend && npm run lint && npm run build
 ```
 
 Backend tests use Node's built-in test runner and replace database and storage calls with mocks, so they run offline. Run the AI evaluation separately (see [AI features and evaluation](#ai-features-and-evaluation)).
+
+**Last verified run (19 November 2026)**
+
+| Check | Result |
+|---|---|
+| Backend unit tests | 432 of 432 pass |
+| Offline evaluation (`--check`) | no regressions against `eval/baseline.json`; evidence conflicts F1 0.94, Bangla source retrieval recall 0.88 |
+| End-to-end smoke test against a throwaway MongoDB database, with live Groq calls | 52 of 52 steps pass: corpus import and review, demo seed, evidence graph, flag reviews, Risk Sentinel, evidence report PDF, contract risk, Legal Copilot in English and Bangla |
+| API auth checks | the new endpoints return `401` without a valid token |
+| Frontend | lint has 0 errors (24 warnings); production build succeeds; every page returns `200` |
+
+Not yet verified: the full live (model-backed) evaluation, which costs money, and a click-through in a browser with real sign-ins. In one smoke run, Legal Copilot said a security deposit was allowed, which contradicts section 10 of the Premises Rent Control Act. AI answers still need human review.
 
 ## Troubleshooting
 
@@ -557,6 +614,8 @@ Backend tests use Node's built-in test runner and replace database and storage c
 | Everyone gets "Too many requests" in production | `TRUST_PROXY_HOPS` isn't set, so all users share the proxy's IP. |
 | Upload fails with "contents don't match its type" | The file isn't really the format it claims, for example a renamed HEIC or HTML file. Convert it and upload again. |
 | Uploads or AI features are unavailable | The optional R2 or Groq settings. |
+| AI features say they are busy (`503`) | Groq's per-minute token limit. On the free tier, wait about a minute between AI requests, or upgrade the Groq tier. |
+| Legal Copilot finds no sources | The legal sources are imported but not approved yet. A legal reviewer must approve them (see [Preparing a demo](#preparing-a-demo)). |
 | Emails aren't sent | `EMAIL_PROVIDER`, `EMAIL_API_KEY`, and `EMAIL_FROM` must all be set. |
 | Nearby places or travel times fail | The public Overpass and OSRM services can be slow or rate-limited. List fallback servers in `OVERPASS_API_URL`, or point the routing URLs at your own instances. |
 
@@ -571,4 +630,4 @@ This guide covers the whole project. The component READMEs repeat the parts spec
 - [Frontend README](frontend/README.md): frontend setup, environment variables, scripts, route map, architecture, and security headers
 - [Backend README](backend/README.md): API setup, configuration, deployment settings, admin accounts, scripts, route overview, and security
 - [Evaluation methodology](docs/evaluation-methodology.md) and [Responsible AI](docs/responsible-ai.md)
-- Hackathon: [readiness audit](HACKATHON_READINESS_AUDIT.md), [demo script](HACKATHON_DEMO_SCRIPT.md), [pitch](HACKATHON_PITCH.md)
+- Hackathon: [readiness audit](docs/HACKATHON_READINESS_AUDIT.md), [demo script](docs/HACKATHON_DEMO_SCRIPT.md), [pitch](docs/HACKATHON_PITCH.md)

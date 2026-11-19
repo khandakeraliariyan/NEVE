@@ -100,7 +100,7 @@ export default function PublicLayout({ children }) {
                     <div className="grid gap-10 py-12 text-sm md:grid-cols-4">
                         <div className="space-y-3">
                             <Logo tone="light" />
-                            <p className="text-white/60">Rental discovery and tenancy records for renters and landlords in Bangladesh.</p>
+                            <p className="text-white/60">Legal intelligence, tenancy records and rental discovery for renters and landlords in Bangladesh.</p>
                         </div>
                         <div>
                             <p className="mb-3 text-xs uppercase tracking-widest text-white/40">Explore</p>

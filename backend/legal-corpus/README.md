@@ -41,9 +41,9 @@ references on contract-risk findings.
 
 ## Known limitations
 
-- The Premises Rent Control Act text is Bangla. Keyword retrieval matches
-  Bangla questions word for word, and English questions only through the
-  section topic tags, so English questions get broader, less precise matches.
+- The Premises Rent Control Act text is Bangla. English questions reach it
+  through a glossary of statutory terms and the section topic tags, so they
+  can get broader, less precise matches than Bangla questions.
 - Section 1(2) gives the Act area-by-area and retrospective commencement. The
   file does not record which areas it is in force in; check the gazette
   notifications for the property's area.
