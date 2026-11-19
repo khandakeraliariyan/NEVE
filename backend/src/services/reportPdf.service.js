@@ -1,6 +1,9 @@
 import { PDFDocument } from "@napi-rs/canvas";
 
 import { env } from "../config/env.js";
+import { registerBundledFonts } from "../config/fonts.js";
+
+registerBundledFonts();
 
 // Renders the tenancy evidence report (evidenceReport.service.js) as a PDF a
 // renter or landlord can take to a mediator, lawyer or authority. Pure Skia
