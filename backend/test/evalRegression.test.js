@@ -70,7 +70,13 @@ test("copilot answer quality scores hallucinated support as false positives", as
     for (const c of inScope) assert.deepEqual([...c.predicted].sort(), [...c.expected].sort(), c.caseId);
     const outOfScope = cases.filter((c) => c.expected[0] === "abstain");
     assert.ok(outOfScope.length >= 3);
-    for (const c of outOfScope) assert.ok(!c.predicted.includes("abstain"), c.caseId);
+    // A question that retrieves nothing gives the fake nothing to cite, so it abstains.
+    const { retrieveSections } = await import("../src/services/legalCopilot.service.js");
+    for (const c of outOfScope) {
+        const question = dataset.cases.find((d) => d.id === c.caseId).question;
+        const retrievedAny = retrieveSections(dataset.sourcePack, question).length > 0;
+        assert.equal(c.predicted.includes("abstain"), !retrievedAny, c.caseId);
+    }
     const hallucinated = outOfScope.filter((c) => c.predicted.length).length;
     assert.ok(hallucinated > 0, "expected at least one out-of-scope question to retrieve a section");
     assert.ok(metrics.precision < 1);
