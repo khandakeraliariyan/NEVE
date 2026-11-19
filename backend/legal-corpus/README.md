@@ -8,6 +8,10 @@ approved it in the workspace (**Legal review → Legal sources**).
 | File | Source | Text | Retrieved from |
 |---|---|---|---|
 | `bd-premises-rent-control-act-1991.json` | বাড়ী ভাড়া নিয়ন্ত্রণ আইন, ১৯৯১ (Act No. 3 of 1991), all 36 sections | Official Bangla text | <https://bdlaws.minlaw.gov.bd/act-details-748.html> |
+| `bd-transfer-of-property-act-1882-ch5.json` | The Transfer of Property Act, 1882 (Act No. IV of 1882), Chapter V: leases, sections 105-117 | Official English text | Internet Archive copy (2024-08-05) of <https://bdlaws.minlaw.gov.bd/act-48/chapter-details-164.html>; the live page timed out. **Compare with the live page before approving.** |
+
+The Contract Act, 1872 is not included yet: it is long and only a few
+sections bear on tenancies, so a legal reviewer should choose them.
 
 ## Rules for adding a source
 
