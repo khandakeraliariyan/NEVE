@@ -51,6 +51,7 @@ Files are then referenced by `fileId`. Private files are opened through `GET /up
 | `GET` | `/health` | Public | Health check: `{"success":true,...}` |
 | `GET` | `/platform` | Public | Public platform information: the announcement banner, support email and enabled features |
 | `GET` | `/platform/privacy-policy` | Public | The published privacy policy |
+| `GET` | `/cron/:task` | `Authorization: Bearer <CRON_SECRET>` | Runs a scheduled job (`notification_reminders`, `notification_digest`, `retention_purge`, `backup`, `notification_delivery`, or `all`) on serverless hosts. Returns `404` when `CRON_SECRET` isn't set. |
 
 ## Endpoints by area
 

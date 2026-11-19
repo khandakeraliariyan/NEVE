@@ -2,7 +2,7 @@
 
 How to deploy, configure and run NEVE: the first-run checklist, scheduled jobs, backups, key rotation, AI capacity, loading the legal corpus, monitoring and troubleshooting.
 
-Every environment variable, with its default, is listed in the [root README's Configuration section](../README.md#configuration). The API validates them at startup (`backend/src/config/env.js`) and refuses to start if any value is invalid.
+Every environment variable, with its default, is listed in the [root README's Configuration section](../README.md#configuration). For a step-by-step deployment of both apps on Vercel, see [deployment-vercel.md](deployment-vercel.md). The API validates them at startup (`backend/src/config/env.js`) and refuses to start if any value is invalid.
 
 ## Deployment checklist
 
@@ -38,7 +38,13 @@ npm run build                  # after setting NEXT_PUBLIC_* values
 npm start                      # serves on port 5173
 ```
 
-Run `npm audit` in both apps after changing dependencies. The API is stateless apart from MongoDB and R2, so several instances can run behind a load balancer. Each instance starts the background jobs, and runs are recorded so admins can see them.
+Run `npm audit` in both apps after changing dependencies. The API is stateless apart from MongoDB and R2, so several instances can run behind a load balancer. Each instance starts the background jobs; a database lock makes sure only one instance runs a given job at a time, and runs are recorded so admins can see them.
+
+**Serverless hosts** (Vercel) have no background timers. There, a scheduler calls `GET /api/v1/cron/:task` with `Authorization: Bearer <CRON_SECRET>`:
+- `:task` is a single job (`notification_reminders`, `notification_digest`, `retention_purge`, `backup`, `notification_delivery`), or `all` to run every enabled one;
+- without `CRON_SECRET` the endpoint doesn't exist.
+
+See [deployment-vercel.md](deployment-vercel.md).
 
 ### Health
 

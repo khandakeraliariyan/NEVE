@@ -76,6 +76,10 @@ Routes live in `src/app/` in three route groups. The group name in parentheses d
 
 Workspace navigation is role-aware (see `src/nav.js`). Renters and landlords see a **Legal intelligence** group (Risk Sentinel, Legal Copilot, Legal library) right after the dashboard, then **Tenancy** (Agreements & evidence, Obligations & deadlines, invitations). The public menu starts with **Legal AI**, which links to the home page's `#legal-ai` section. Admins sign in with a password through the admin portal rather than Firebase; admin accounts are created with the backend's `npm run create-admin` script.
 
+## Deploying on Vercel
+
+Import the repository as a Vercel project with **Root Directory** `frontend` (Next.js is detected), and set the `NEXT_PUBLIC_*` variables above. `NEXT_PUBLIC_API_BASE_URL` is the deployed API's `/api/v1` address. Redeploy after changing any of them, since they are built into the pages. The API is a second Vercel project; see [docs/deployment-vercel.md](../docs/deployment-vercel.md).
+
 ## Integration notes
 
 - All API calls go through `src/lib/api.js`, using `NEXT_PUBLIC_API_BASE_URL`. Requests for signed-in renters, landlords, and legal reviewers carry a Firebase ID token in the `Authorization` header.

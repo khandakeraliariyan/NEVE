@@ -53,6 +53,7 @@ function checkServer() {
 async function fontStatus() {
     try {
         const { GlobalFonts } = await import("@napi-rs/canvas");
+        (await import("../config/fonts.js")).registerBundledFonts();
         const families = GlobalFonts.families.map((family) => family.family);
         const bengali = families.some((family) => /bengali|nirmala|vrinda/i.test(family));
         return { bengali, latin: families.length > 0 };

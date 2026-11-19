@@ -50,6 +50,7 @@ import legalReviewRoutes from "./routes/legalReview.routes.js";
 import platformSettingsRoutes from "./routes/platformSettings.routes.js";
 import legalCopilotRoutes from "./routes/legalCopilot.routes.js";
 import { getPrivacyPolicy, getPublicPlatformInfo } from "./controllers/platformSettings.controller.js";
+import { runCronTask } from "./controllers/cron.controller.js";
 import adminSecurityRoutes from "./routes/adminSecurity.routes.js";
 import { recordSystemError } from "./services/systemErrors.service.js";
 
@@ -131,6 +132,8 @@ app.use("/api/v1/legal-review", legalReviewRoutes);
 app.use("/api/v1/copilot", legalCopilotRoutes);
 app.use("/api/v1/admin/security", adminSecurityRoutes);
 app.use("/api/v1/admin", platformSettingsRoutes);
+// Scheduled jobs on hosts without background timers (Vercel Cron); needs CRON_SECRET.
+app.get("/api/v1/cron/:task", runCronTask);
 // Public: announcement banner and sign-up options.
 app.get("/api/v1/platform", getPublicPlatformInfo);
 app.get("/api/v1/platform/privacy-policy", getPrivacyPolicy);

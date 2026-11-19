@@ -146,7 +146,7 @@ Edges NEVE derives itself are marked `origin: system`, so the interface can show
 
 ### Background jobs
 
-`systemJobs.service.js` starts these when the API boots, and records each run as a `SystemJobRun`. Admins can also start them from **Admin → System**.
+`systemJobs.service.js` starts these when the API boots, and records each run as a `SystemJobRun`. Admins can also start them from **Admin → System**. On serverless hosts such as Vercel, where `api/index.js` handles requests and there are no timers, a scheduler calls `GET /api/v1/cron/:task` instead (see [deployment-vercel.md](deployment-vercel.md)).
 
 | Job | Schedule | Enabled by |
 |---|---|---|
