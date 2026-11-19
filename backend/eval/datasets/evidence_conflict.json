@@ -1,0 +1,226 @@
+{
+    "name": "neve-contradiction-detection",
+    "version": "1",
+    "task": "evidence_conflict",
+    "description": "Synthetic tenancy records and the automatic contradictions Neve should flag across the listing, the agreement record, the agreement document, payment records, condition reports and maintenance requests. Labels are <conflict type>:<field>. Cases tagged 'legitimate' describe differences that have an innocent explanation (split payments, staged rent increases, separate charges); a flag on them is a false positive. All amounts and records are invented. User-marked contradictions and disputes are not included, because they are not automatic detection.",
+    "cases": [
+        {
+            "id": "all-records-agree",
+            "tags": ["control"],
+            "agreement": { "monthlyRentBdt": 20000, "depositBdt": 40000, "advanceRentBdt": 20000 },
+            "listing": { "monthlyRent": 20000, "securityDeposit": 40000, "advanceRent": 20000 },
+            "extractedFacts": { "monthlyRentBdt": 20000, "depositBdt": 40000 },
+            "clauses": [{ "category": "rent", "text": "The tenant pays Tk 20,000 rent by the 5th of each month." }],
+            "payments": [
+                { "paymentType": "rent", "amountBdt": 20000, "paidAt": "2026-02-04", "recordedBy": "renter" },
+                { "paymentType": "deposit", "amountBdt": 40000, "paidAt": "2026-01-01", "recordedBy": "renter" }
+            ],
+            "expected": []
+        },
+        {
+            "id": "listing-rent-lower-than-agreement",
+            "agreement": { "monthlyRentBdt": 25000 },
+            "listing": { "monthlyRent": 22000 },
+            "expected": ["listing_agreement_mismatch:monthlyRentBdt"]
+        },
+        {
+            "id": "listing-deposit-differs",
+            "agreement": { "monthlyRentBdt": 18000, "depositBdt": 54000 },
+            "listing": { "monthlyRent": 18000, "securityDeposit": 36000 },
+            "expected": ["listing_agreement_mismatch:depositBdt"]
+        },
+        {
+            "id": "listing-advance-differs",
+            "agreement": { "monthlyRentBdt": 15000, "advanceRentBdt": 45000 },
+            "listing": { "monthlyRent": 15000, "advanceRent": 30000 },
+            "expected": ["listing_agreement_mismatch:advanceRentBdt"]
+        },
+        {
+            "id": "document-differs-from-listing-and-record",
+            "agreement": { "monthlyRentBdt": 20000 },
+            "listing": { "monthlyRent": 20000 },
+            "extractedFacts": { "monthlyRentBdt": 22000 },
+            "expected": ["listing_agreement_mismatch:monthlyRentBdt", "extracted_value_mismatch:monthlyRentBdt"]
+        },
+        {
+            "id": "listing-rounding-only",
+            "tags": ["legitimate"],
+            "agreement": { "monthlyRentBdt": 20000.4 },
+            "listing": { "monthlyRent": 20000 },
+            "expected": []
+        },
+        {
+            "id": "listing-silent-on-deposit",
+            "tags": ["control"],
+            "agreement": { "monthlyRentBdt": 20000, "depositBdt": 40000 },
+            "listing": { "monthlyRent": 20000, "securityDeposit": null },
+            "expected": []
+        },
+        {
+            "id": "document-start-date-differs",
+            "agreement": { "monthlyRentBdt": 20000, "startAt": "2026-01-01" },
+            "extractedFacts": { "startAt": "2026-02-01" },
+            "expected": ["extracted_value_mismatch:startAt"]
+        },
+        {
+            "id": "ocr-dropped-a-zero",
+            "tags": ["ocr"],
+            "agreement": { "monthlyRentBdt": 25000 },
+            "extractedFacts": { "monthlyRentBdt": 2500 },
+            "expected": ["extracted_value_mismatch:monthlyRentBdt"]
+        },
+        {
+            "id": "extraction-failed-is-ignored",
+            "tags": ["control"],
+            "agreement": { "monthlyRentBdt": 25000 },
+            "extractionStatus": "failed",
+            "extractedFacts": { "monthlyRentBdt": 30000 },
+            "expected": []
+        },
+        {
+            "id": "renter-and-landlord-record-different-rent",
+            "agreement": { "monthlyRentBdt": 20000 },
+            "payments": [
+                { "paymentType": "rent", "amountBdt": 20000, "paidAt": "2026-03-03", "recordedBy": "renter" },
+                { "paymentType": "rent", "amountBdt": 15000, "paidAt": "2026-03-03", "recordedBy": "landlord" }
+            ],
+            "expected": ["conflicting_payment_records:rent"]
+        },
+        {
+            "id": "rent-split-into-two-payments",
+            "tags": ["legitimate"],
+            "agreement": { "monthlyRentBdt": 20000 },
+            "payments": [
+                { "paymentType": "rent", "amountBdt": 12000, "paidAt": "2026-03-02", "recordedBy": "renter" },
+                { "paymentType": "rent", "amountBdt": 8000, "paidAt": "2026-03-20", "recordedBy": "renter" }
+            ],
+            "expected": []
+        },
+        {
+            "id": "rent-short-paid",
+            "agreement": { "monthlyRentBdt": 20000 },
+            "payments": [{ "paymentType": "rent", "amountBdt": 17000, "paidAt": "2026-04-05", "recordedBy": "renter" }],
+            "expected": ["payment_amount_mismatch:rent"]
+        },
+        {
+            "id": "rent-paid-correctly-each-month",
+            "tags": ["control"],
+            "agreement": { "monthlyRentBdt": 20000 },
+            "payments": [
+                { "paymentType": "rent", "amountBdt": 20000, "paidAt": "2026-01-05", "recordedBy": "renter" },
+                { "paymentType": "rent", "amountBdt": 20000, "paidAt": "2026-02-05", "recordedBy": "landlord" }
+            ],
+            "expected": []
+        },
+        {
+            "id": "deposit-in-two-instalments",
+            "tags": ["legitimate"],
+            "agreement": { "monthlyRentBdt": 20000, "depositBdt": 40000 },
+            "payments": [
+                { "paymentType": "deposit", "amountBdt": 20000, "paidAt": "2025-12-20", "recordedBy": "renter" },
+                { "paymentType": "deposit", "amountBdt": 20000, "paidAt": "2026-01-01", "recordedBy": "renter" }
+            ],
+            "expected": []
+        },
+        {
+            "id": "deposit-total-short",
+            "agreement": { "monthlyRentBdt": 20000, "depositBdt": 40000 },
+            "payments": [{ "paymentType": "deposit", "amountBdt": 30000, "paidAt": "2026-01-01", "recordedBy": "renter" }],
+            "expected": ["payment_amount_mismatch:deposit"]
+        },
+        {
+            "id": "advertised-rent-paid-not-agreed-rent",
+            "agreement": { "monthlyRentBdt": 20000 },
+            "listing": { "monthlyRent": 18000 },
+            "payments": [{ "paymentType": "rent", "amountBdt": 18000, "paidAt": "2026-02-05", "recordedBy": "renter" }],
+            "expected": ["listing_agreement_mismatch:monthlyRentBdt", "payment_amount_mismatch:rent"]
+        },
+        {
+            "id": "rent-clauses-disagree",
+            "agreement": { "monthlyRentBdt": 20000 },
+            "clauses": [
+                { "category": "rent", "text": "Monthly rent is Tk 20,000." },
+                { "category": "rent", "text": "The tenant shall pay rent of Tk 25,000 per month." }
+            ],
+            "expected": ["contradiction:rent_amounts"]
+        },
+        {
+            "id": "staged-rent-increase",
+            "tags": ["legitimate"],
+            "agreement": { "monthlyRentBdt": 20000 },
+            "clauses": [
+                { "category": "rent", "text": "Rent is Tk 20,000 a month for the first year." },
+                { "category": "rent", "text": "From the second year, rent increases to Tk 22,000 a month." }
+            ],
+            "expected": []
+        },
+        {
+            "id": "service-charge-written-in-rent-clause",
+            "tags": ["legitimate"],
+            "agreement": { "monthlyRentBdt": 20000 },
+            "clauses": [
+                { "category": "rent", "text": "Monthly rent is Tk 20,000, due by the 5th." },
+                { "category": "rent", "text": "A service charge of Tk 3,000 is paid with the rent each month." }
+            ],
+            "expected": []
+        },
+        {
+            "id": "recorded-rent-not-in-any-clause",
+            "agreement": { "monthlyRentBdt": 22000 },
+            "clauses": [{ "category": "rent", "text": "Monthly rent is Tk 20,000, due by the 5th." }],
+            "expected": ["contradiction:recorded_rent"]
+        },
+        {
+            "id": "meter-reading-went-down",
+            "conditionReports": [
+                { "stage": "move_in", "entries": [{ "kind": "meter_reading", "meterType": "electricity", "reading": 5400, "recordedAt": "2026-01-01" }] },
+                { "stage": "move_out", "entries": [{ "kind": "meter_reading", "meterType": "electricity", "reading": 5100, "recordedAt": "2026-12-31" }] }
+            ],
+            "agreement": { "monthlyRentBdt": 20000 },
+            "expected": ["meter_reading_decreased:electricity"]
+        },
+        {
+            "id": "meter-reading-went-up",
+            "tags": ["control"],
+            "conditionReports": [
+                { "stage": "move_in", "entries": [{ "kind": "meter_reading", "meterType": "gas", "reading": 100, "recordedAt": "2026-01-01" }] },
+                { "stage": "move_out", "entries": [{ "kind": "meter_reading", "meterType": "gas", "reading": 340, "recordedAt": "2026-12-31" }] }
+            ],
+            "agreement": { "monthlyRentBdt": 20000 },
+            "expected": []
+        },
+        {
+            "id": "maintenance-responsibility-disputed",
+            "agreement": { "monthlyRentBdt": 20000 },
+            "maintenanceRequests": [
+                {
+                    "title": "Bathroom ceiling leak",
+                    "status": "disputed",
+                    "evidenceFiles": ["photo"],
+                    "history": [
+                        { "responsibility": "landlord", "message": "The pipe above is old." },
+                        { "responsibility": "renter", "message": "The tenant left the tap running." }
+                    ]
+                }
+            ],
+            "expected": ["maintenance_responsibility_changed"]
+        },
+        {
+            "id": "maintenance-responsibility-agreed",
+            "tags": ["control"],
+            "agreement": { "monthlyRentBdt": 20000 },
+            "maintenanceRequests": [
+                {
+                    "title": "Broken kitchen tap",
+                    "status": "completed",
+                    "evidenceFiles": ["photo"],
+                    "history": [
+                        { "responsibility": "landlord", "message": "I will send a plumber." },
+                        { "responsibility": "landlord", "status": "completed" }
+                    ]
+                }
+            ],
+            "expected": []
+        }
+    ]
+}

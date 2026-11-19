@@ -6,6 +6,7 @@ import { calculateEvaluationMetrics } from "../src/services/aiEvaluation.service
 import { estimateCostUsd } from "../src/services/aiUsage.service.js";
 import { normalizeExtraction, requestAgreementExtraction } from "../src/services/agreementExtraction.service.js";
 import { guessCategory } from "../src/services/compliance.service.js";
+import { analyzeAgreementEvidence } from "../src/services/evidenceGraphAnalysis.service.js";
 import { normalizeAiFindings, requestRiskReview, ruleFindings, sectionsForAgreement } from "../src/services/contractRisk.service.js";
 import { normalizeAnswer, requestCopilotAnswer, retrieveSections } from "../src/services/legalCopilot.service.js";
 
@@ -21,6 +22,7 @@ export const DATASETS = {
     risk_detection: new URL("./datasets/risk_detection.json", import.meta.url),
     source_retrieval: new URL("./datasets/source_retrieval.json", import.meta.url),
     copilot_answer_quality: new URL("./datasets/copilot_answer_quality.json", import.meta.url),
+    evidence_conflict: new URL("./datasets/evidence_conflict.json", import.meta.url),
 };
 export const LIVE_ONLY = new Set(["agreement_extraction", "obligation_extraction", "copilot_answer_quality"]);
 
@@ -207,7 +209,72 @@ async function copilotAnswerQuality(dataset, { client }) {
     return results;
 }
 
+// Conflicts Neve finds by itself. User-marked contradictions and disputes are
+// left out: they record what a person said, not what Neve detected.
+export const AUTOMATIC_CONFLICTS = new Set([
+    "extracted_value_mismatch",
+    "conflicting_payment_records",
+    "payment_amount_mismatch",
+    "listing_agreement_mismatch",
+    "meter_reading_decreased",
+    "maintenance_responsibility_changed",
+]);
+const CLAUSE_CONTRADICTIONS = new Set(["contradiction:rent_amounts", "contradiction:recorded_rent"]);
+
+// <type>:<field> for each automatic conflict, plus clause-level contradictions.
+export function conflictLabels(analysis, rules = []) {
+    const labels = analysis.potentialConflicts
+        .filter((conflict) => AUTOMATIC_CONFLICTS.has(conflict.type))
+        .map((conflict) => [conflict.type, conflict.field ?? conflict.paymentType ?? conflict.meterType].filter(Boolean).join(":"));
+    for (const finding of rules) {
+        const label = findingLabel(finding.key);
+        if (CLAUSE_CONTRADICTIONS.has(label)) labels.push(label);
+    }
+    return [...new Set(labels)];
+}
+
+const asDate = (value) => (value ? new Date(value) : null);
+
+export function conflictCaseRecords(spec) {
+    const id = () => new mongoose.Types.ObjectId();
+    const facts = Object.fromEntries(
+        Object.entries(spec.extractedFacts ?? {}).map(([field, value]) => [field, { value: ["startAt", "endAt"].includes(field) ? asDate(value) : value, sourceText: "", sourcePage: null }])
+    );
+    const agreement = {
+        title: "Evaluation agreement",
+        monthlyRentBdt: null,
+        depositBdt: null,
+        advanceRentBdt: null,
+        ...spec.agreement,
+        startAt: asDate(spec.agreement?.startAt),
+        endAt: asDate(spec.agreement?.endAt),
+        clauses: (spec.clauses ?? []).map((clause) => ({ _id: id(), heading: "", reviewStatus: "confirmed", ...clause })),
+        obligations: [],
+        payments: (spec.payments ?? []).map((payment) => ({ _id: id(), status: "recorded", ...payment, paidAt: asDate(payment.paidAt) })),
+        extraction: spec.extractedFacts ? { status: spec.extractionStatus ?? "completed", facts } : null,
+    };
+    const conditionReports = (spec.conditionReports ?? []).map((report) => ({
+        _id: id(),
+        ...report,
+        entries: report.entries.map((entry) => ({ _id: id(), ...entry, recordedAt: asDate(entry.recordedAt) })),
+    }));
+    const maintenanceRequests = (spec.maintenanceRequests ?? []).map((request) => ({ _id: id(), ...request }));
+    const property = spec.listing ? { _id: id(), pricing: spec.listing } : null;
+    return { agreement, conditionReports, maintenanceRequests, property };
+}
+
+async function evidenceConflict(dataset) {
+    return dataset.cases.map((c) => {
+        const started = Date.now();
+        const { agreement, conditionReports, maintenanceRequests, property } = conflictCaseRecords(c);
+        const analysis = analyzeAgreementEvidence(agreement, [], [], conditionReports, { maintenanceRequests, property });
+        const predicted = conflictLabels(analysis, ruleFindings(agreement));
+        return { caseId: c.id, expected: c.expected, predicted, latencyMs: Date.now() - started };
+    });
+}
+
 const RUNNERS = {
+    evidence_conflict: evidenceConflict,
     missing_information: missingInformation,
     legal_citation: legalCitation,
     agreement_extraction: agreementExtraction,
