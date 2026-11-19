@@ -1150,7 +1150,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             ...recordGraph.fileIds,
         ];
         const files = await UploadedFile.find({
-            _id: { $in: [...new Set(fileIds.map(String))] },
+            _id: { $in: [...new Set(fileIds.filter(Boolean).map(String))] },
         })
             .select("originalName mimeType sizeBytes status sha256")
             .lean();
@@ -1403,7 +1403,7 @@ export async function getAgreementEvidenceReport(req, res, next) {
             ...links.map((link) => link.uploadedFile?._id ?? link.uploadedFile),
         ];
         const files = await UploadedFile.find({
-            _id: { $in: [...new Set(fileIds.map(String))] },
+            _id: { $in: [...new Set(fileIds.filter(Boolean).map(String))] },
         })
             .select("originalName mimeType sizeBytes status sha256")
             .lean();
