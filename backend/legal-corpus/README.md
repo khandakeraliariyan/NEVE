@@ -36,8 +36,13 @@ npm run import-legal-sources -- --as admin@example.com --submit legal-corpus/*.j
 ```
 
 Then a legal reviewer opens each source, compares it with the official page,
-and approves it. Approval makes it available to Legal Copilot and to the legal
+and approves it. The reviewer must not be the person the drafts were imported
+under (`--as`): NEVE refuses self-approval. Approval makes it available to Legal Copilot and to the legal
 references on contract-risk findings.
+
+How the sources are used (retrieval, the bilingual glossary, citations) is
+described in [docs/features.md](../../docs/features.md#legal-sources-and-the-legal-corpus)
+and [docs/architecture.md](../../docs/architecture.md#legal-retrieval).
 
 ## Known limitations
 

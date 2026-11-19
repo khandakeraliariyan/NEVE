@@ -16,6 +16,8 @@ The platform is built around **clarity over opinion**: it aims to show what is d
 
 In practical terms, NEVE supports the rental relationship from the agreement through the tenancy and any dispute: understand what the agreement and the law say, keep the records connected, and see early what needs attention. Property search and cost comparison are how many people first arrive.
 
+> **Full documentation is in [`docs/`](docs/README.md):** [features](docs/features.md), [user guide](docs/user-guide.md), [architecture](docs/architecture.md), [API reference](docs/api-reference.md), [data model](docs/data-model.md), [operations](docs/operations.md), [development](docs/development.md), [evaluation](docs/evaluation-methodology.md) and [responsible AI](docs/responsible-ai.md). This README covers setup and gives an overview of each topic.
+
 ## The problem NEVE addresses
 
 Rental decisions involve more than choosing a property based on its advertised rent. Important details may be spread across a listing, messages, an agreement, payment records, photos, and maintenance requests. Some information is confirmed by one party but disputed by another, while other information may be missing altogether.
@@ -121,6 +123,7 @@ This list describes the scope represented in the codebase; it is not a guarantee
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 - [Project status](#project-status)
+- [Documentation](#documentation)
 
 ## Quick start
 
@@ -244,7 +247,7 @@ NEVE/
     ├── eval/                  AI evaluation runner, datasets, and baseline
     ├── legal-corpus/          official Bangladesh tenancy law text, ready to import for legal review
     └── secrets/               Firebase service-account file (gitignored)
-docs/                          evaluation methodology and responsible-AI notes
+docs/                          full documentation (start at docs/README.md) and hackathon material
 ```
 
 ## Configuration
@@ -409,7 +412,7 @@ Workspace navigation is role-aware (`frontend/src/nav.js`). Frontend route check
 
 ## API overview
 
-All routes are under `/api/v1`. The health check is `GET /api/v1/health`.
+All routes are under `/api/v1`. The health check is `GET /api/v1/health`. Every endpoint, with its access rules, is listed in [docs/api-reference.md](docs/api-reference.md).
 
 | Area | Paths under `/api/v1` |
 |---|---|
@@ -429,7 +432,7 @@ Responses are JSON with a `success` flag. Errors include a `message`, and some i
 - 20 on `/auth` and `/users`;
 - a separate budget of 120 for `/uploads`, enough for a full listing's media.
 
-AI endpoints have their own lower limits: 10 for agreement extraction and for AI ranking, and 40 for Legal Copilot.
+AI endpoints have their own lower limits: 10 for agreement extraction, risk analysis and legal suggestions; 10 for AI ranking; and 40 for Legal Copilot questions.
 
 **Uploads** take three steps:
 1. `POST /uploads/presign` returns a signed URL.
@@ -440,7 +443,7 @@ Private files are opened through `GET /uploads/:fileId/access-url`, which return
 
 ## Data model
 
-MongoDB collections are defined as Mongoose models in `backend/src/models/`:
+MongoDB collections are defined as Mongoose models in `backend/src/models/`. How they relate, and what the important fields mean, is in [docs/data-model.md](docs/data-model.md).
 
 | Area | Models |
 |---|---|
@@ -479,7 +482,7 @@ Admins change these at runtime under **Admin → Settings**, without editing env
 
 ## AI features and evaluation
 
-AI features run on Groq and are optional. When `GROQ_API_KEY` is missing, they report "not configured" and the rest of the app keeps working.
+AI features run on Groq and are optional. When `GROQ_API_KEY` is missing, they report "not configured" and the rest of the app keeps working. How each feature works is in [docs/features.md](docs/features.md), and how AI is called safely (masking, strict schemas, grounding checks) is in [docs/architecture.md](docs/architecture.md#calling-ai-safely).
 
 - **Agreement analysis:** text extraction from uploaded agreements (OCR for scans, in English and Bangla), plus clause, obligation, and contract-risk extraction.
 - **Contract risk findings:** each finding shows the original clause wording, why it was flagged, and a decision trace (method, passages, legal sources, limits, human review).
@@ -568,7 +571,7 @@ The component guides have more detail: [backend security](backend/README.md#secu
 
 ## Deploying
 
-Beyond the local setup, a deployment needs:
+Beyond the local setup, a deployment needs the items below. The full checklist, backups, key rotation, AI capacity and monitoring are in [docs/operations.md](docs/operations.md).
 
 1. **HTTPS for both apps.** In production the admin session cookie is `Secure`, so it is only sent over HTTPS.
 2. **`NODE_ENV=production`** on the API, and a production frontend build (`npm run build`, then `npm start` or your host's Next.js runtime).
@@ -623,11 +626,20 @@ Not yet verified: the full live (model-backed) evaluation, which costs money, an
 
 NEVE is a feature-rich MVP/prototype with broad frontend and backend workflows. “Implemented” in the codebase does not necessarily mean a feature has been deployed, configured with live external services, or independently validated for production use. Operational readiness depends on environment configuration, data protection, monitoring, and deployment-specific testing. AI-assisted or legally consequential outputs should not be treated as a substitute for qualified human review. Validate the deployment before using the system with real user or tenancy data.
 
-## Component documentation
+## Documentation
 
-This guide covers the whole project. The component READMEs repeat the parts specific to each app:
+The [documentation index](docs/README.md) says which document to read for what.
 
-- [Frontend README](frontend/README.md): frontend setup, environment variables, scripts, route map, architecture, and security headers
-- [Backend README](backend/README.md): API setup, configuration, deployment settings, admin accounts, scripts, route overview, and security
-- [Evaluation methodology](docs/evaluation-methodology.md) and [Responsible AI](docs/responsible-ai.md)
-- Hackathon: [readiness audit](docs/HACKATHON_READINESS_AUDIT.md), [demo script](docs/HACKATHON_DEMO_SCRIPT.md), [pitch](docs/HACKATHON_PITCH.md)
+| Document | Contents |
+|---|---|
+| [Features](docs/features.md) | Every feature and how it works, starting with the legal intelligence core |
+| [User guide](docs/user-guide.md) | Step-by-step use for renters, landlords, legal reviewers and admins |
+| [Architecture](docs/architecture.md) | Request lifecycle, safe AI calls, legal retrieval, evidence analysis, tamper evidence, jobs, frontend structure |
+| [API reference](docs/api-reference.md) | Every endpoint with access rules and handlers |
+| [Data model](docs/data-model.md) | The MongoDB models and how they relate |
+| [Operations](docs/operations.md) | Deployment checklist, jobs, backups, key rotation, AI capacity, corpus loading, monitoring |
+| [Development](docs/development.md) | Conventions, testing, evaluation, recipes for common changes |
+| [Evaluation methodology](docs/evaluation-methodology.md) / [Responsible AI](docs/responsible-ai.md) | AI quality, limits and safeguards |
+| [Frontend README](frontend/README.md) / [Backend README](backend/README.md) | Setup and reference for each app |
+| [Legal corpus](backend/legal-corpus/README.md) | The official legal texts and how to add more |
+| Hackathon: [pitch](docs/HACKATHON_PITCH.md), [demo script](docs/HACKATHON_DEMO_SCRIPT.md), [readiness audit](docs/HACKATHON_READINESS_AUDIT.md) | International AI Builders Congress 2026 material |

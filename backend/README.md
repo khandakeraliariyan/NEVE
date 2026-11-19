@@ -1,6 +1,14 @@
 # NEVE Backend
 
-The backend is the NEVE REST API. It is built with Node.js, Express 5, MongoDB/Mongoose, and Firebase Admin. It provides APIs for property discovery, renter and landlord workflows, tenancy records, evidence management, legal review, notifications, and administration.
+The backend is the NEVE REST API. It is built with Node.js, Express 5, MongoDB/Mongoose, and Firebase Admin. Its core is legal intelligence for tenancies:
+- agreement extraction and contract-risk checks (ContractMind);
+- Legal Copilot over approved legal sources;
+- the evidence graph and contradiction detection;
+- flag reviews and Risk Sentinel.
+
+It also provides APIs for property discovery, renter and landlord workflows, tenancy records, notifications, and administration.
+
+More documentation: [architecture](../docs/architecture.md), [API reference](../docs/api-reference.md) (every endpoint), [data model](../docs/data-model.md), [operations](../docs/operations.md), [development](../docs/development.md). The index is [docs/README.md](../docs/README.md).
 
 ## Requirements
 
@@ -73,7 +81,7 @@ AI_MODEL=openai/gpt-oss-120b
 # RECOMMENDATION_MODEL=
 ```
 
-For AI features, the configured model must support strict JSON-schema output. Without `GROQ_API_KEY`, AI features report that they are not configured. `AGREEMENT_EXTRACTION_MODEL` applies to agreement and legal features, and `RECOMMENDATION_MODEL` to the AI ranking of a renter's recommendation shortlist; both fall back to `AI_MODEL`.
+For AI features, the configured model must support strict JSON-schema output. Without `GROQ_API_KEY`, AI features report that they are not configured. On Groq's free tier (about 8,000 tokens per minute) the API can make roughly one AI request per minute, because each request reserves at least 16,000 output tokens; when the limit is hit, AI endpoints answer `503` "busy, try again shortly". See [AI capacity](../docs/operations.md#ai-capacity). `AGREEMENT_EXTRACTION_MODEL` applies to agreement and legal features, and `RECOMMENDATION_MODEL` to the AI ranking of a renter's recommendation shortlist; both fall back to `AI_MODEL`.
 
 Other optional settings:
 
@@ -113,7 +121,7 @@ The password is read from `NEVE_ADMIN_PASSWORD` or prompted for interactively, s
 | `npm run restore-backup` | List or restore backups from object storage. |
 | `npm run eval` | Run the AI evaluation tooling. |
 | `npm run import-legal-sources` | Load `legal-corpus/*.json` as draft legal sources for legal review (see [legal-corpus/README.md](legal-corpus/README.md)). |
-| `npm run seed-demo` | Create the synthetic `[DEMO]` dispute scenario for two existing accounts (see the root README's "Preparing a demo"). |
+| `npm run seed-demo` | Create the synthetic `[DEMO]` dispute scenario for two existing accounts (see [Demo data](../docs/operations.md#demo-data)). |
 
 Backup and restore need R2 configured. To restore:
 
@@ -133,19 +141,31 @@ npm run eval -- --check                 # exit 1 if a score drops below eval/bas
 npm run eval -- --save                  # store the run as an AI evaluation run (needs MongoDB and an admin)
 ```
 
+Loading the legal corpus (nothing is approved by the script; a legal reviewer who didn't draft a source must approve it in the app):
+
+```bash
+npm run import-legal-sources -- --dry-run legal-corpus/*.json
+npm run import-legal-sources -- --as admin@example.com --submit legal-corpus/*.json
+```
+
 ## Structure
 
 - `src/app.js` — middleware, API routes, and error handling
 - `src/server.js` — database connection and server startup
 - `src/config/` — environment, database, Firebase, and storage configuration
+- `src/middleware/` — authentication, roles and permissions, rate limits, request validation
 - `src/routes/`, `src/controllers/`, `src/services/`, `src/models/` — API and domain implementation
-- `test/` — automated tests
-- `scripts/` — administration and backup utilities
+- `src/services/aiClient.service.js` — the one place AI models are called (strict schemas, error mapping, usage recording)
+- `test/` — automated tests (offline; about 430)
+- `scripts/` — create-admin, backup, restore-backup, importLegalSources, seedDemo
 - `eval/` — AI evaluation runner, datasets, and regression baseline
+- `legal-corpus/` — official Bangladesh legal texts, imported as drafts for legal review
+
+The layers and request lifecycle are described in [docs/architecture.md](../docs/architecture.md).
 
 ## API overview
 
-API routes are mounted under `/api/v1`. The health endpoint is `GET /api/v1/health`. Route groups, as mounted in `src/app.js`:
+API routes are mounted under `/api/v1`. The health endpoint is `GET /api/v1/health`. Every endpoint, with its access rules, is in [docs/api-reference.md](../docs/api-reference.md). Route groups, as mounted in `src/app.js`:
 
 | Area | Paths under `/api/v1` |
 |---|---|
@@ -158,7 +178,7 @@ API routes are mounted under `/api/v1`. The health endpoint is `GET /api/v1/heal
 | Administration | `/admin/dashboard`, `/admin/moderation`, `/admin/audit-logs`, `/admin/users`, `/admin/trust-approval`, `/admin/privacy`, `/admin/ai-evaluations`, `/admin/verifications`, `/admin/system`, `/admin/legal-sources`, `/admin/security`, `/admin` (platform settings), `/review-moderation` |
 | Public platform info | `GET /platform`, `GET /platform/privacy-policy` |
 
-Rate limits are counted per client IP over 15-minute windows: 100 requests across the API, 20 on `/auth` and `/users`, and a separate budget of 120 for `/uploads`, enough for a full listing's media. AI endpoints such as agreement extraction, Legal Copilot, and recommendation ranking have their own lower limits.
+Rate limits are counted per client IP over 15-minute windows: 100 requests across the API, 20 on `/auth` and `/users`, and a separate budget of 120 for `/uploads`, enough for a full listing's media. AI endpoints have their own lower limits: 10 for agreement extraction, risk analysis and legal suggestions; 10 for recommendation ranking; and 40 for Legal Copilot questions.
 
 Firebase ID tokens authenticate renters, landlords, and legal reviewers; admins use the session cookie described above. The backend applies role and resource-level authorization; UI route restrictions are not a substitute for these checks. Private uploads use signed URLs and require a configured object-storage integration.
 
@@ -187,6 +207,8 @@ Never commit `.env` or anything in `secrets/`; both are gitignored.
 - **Admin sign-in succeeds but the admin is signed straight back out, or requests fail with `CSRF_CHECK_FAILED`:** the browser isn't storing or sending the admin cookie, or the request's origin differs from `CLIENT_URL`. Check that `CLIENT_URL` is the exact frontend origin. If the frontend and API are on unrelated domains, set `ADMIN_COOKIE_SAMESITE=none` and use HTTPS (see [Deployment settings](#deployment-settings)). In production the cookie is `Secure`, so the API must be served over HTTPS.
 - **Every user gets "Too many requests" in production:** the API is behind a proxy without `TRUST_PROXY_HOPS` set, so all users share the proxy's IP.
 - **An upload fails with "The file's contents don't match its type":** the file isn't really the format its extension claims, for example a renamed HTML or HEIC file. Convert it to a supported format and upload it again.
-- **Uploads or AI features are unavailable:** verify the corresponding optional R2 or Groq credentials and configuration.
+- **Uploads or AI features are unavailable:** verify the corresponding optional R2 or Groq credentials and configuration, and that **AI features** is ticked in Admin → Platform settings.
+- **AI features answer `503` "busy":** Groq's per-minute token limit was reached. Wait about a minute between AI requests on the free tier, or use a paid tier.
+- **Legal Copilot finds no sources:** the legal sources are imported but not approved. A legal reviewer must approve them under Legal review → Legal sources.
 - **Emails are not sent:** `EMAIL_PROVIDER`, `EMAIL_API_KEY`, and `EMAIL_FROM` must all be set.
 - **Nearby places or travel times fail:** the public Overpass and routing services can be slow or rate-limited; list fallback servers in `OVERPASS_API_URL` or point the routing URLs at your own instances.
