@@ -1,4 +1,4 @@
-import { findMeterReadingIssues, findPaymentConflicts } from "./evidenceChecks.service.js";
+import { findListingAgreementConflicts, findMeterReadingIssues, findPaymentConflicts } from "./evidenceChecks.service.js";
 import { buildFactStates, findUnmetRequirements } from "./evidenceFacts.service.js";
 import { maintenanceFlags } from "./evidenceGraphRecords.service.js";
 
@@ -42,7 +42,7 @@ export function findExtractionMismatches(agreement) {
     return mismatches;
 }
 
-// extra: { maintenanceRequests } for records kept outside the agreement.
+// extra: { maintenanceRequests, property } for records kept outside the agreement.
 export function analyzeAgreementEvidence(agreement, allLinks, recordLinks = [], conditionReports = [], extra = {}) {
     // AI proposals count only once a participant accepts them.
     const links = allLinks.filter((link) => (link.reviewStatus ?? "accepted") === "accepted");
@@ -194,6 +194,7 @@ export function analyzeAgreementEvidence(agreement, allLinks, recordLinks = [], 
     const maintenance = maintenanceFlags(extra.maintenanceRequests ?? []);
     missingInformation.push(...maintenance.missingInformation);
     potentialConflicts.push(...maintenance.potentialConflicts);
+    potentialConflicts.push(...findListingAgreementConflicts(agreement, extra.property));
     for (const link of recordLinks) {
         if (link.relationship === "contradicts") {
             potentialConflicts.push({

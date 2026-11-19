@@ -530,6 +530,19 @@ export default function EvidenceGraph() {
                                     >
                                         <Badge tone={f.kind === "Conflict" ? "rose" : f.kind === "Uncertain" ? "amber" : "gray"}>{f.kind}</Badge> {f.message}
                                     </button>
+                                    {f.values?.length > 0 && (
+                                        <div className="mt-1 space-y-1 rounded-lg border border-line p-2 text-xs">
+                                            {f.values.map((v) => (
+                                                <p key={v.source}>
+                                                    <span className="font-semibold">{v.label}:</span> {money(v.amountBdt)}
+                                                    {v.source === "listing" && v.listingUpdatedAt ? ` (listing last edited ${date(v.listingUpdatedAt)})` : ""}
+                                                    {v.sourcePage ? ` · page ${v.sourcePage}` : ""}
+                                                    {v.sourceText ? <span className="block italic text-muted">“{v.sourceText.slice(0, 200)}”</span> : null}
+                                                </p>
+                                            ))}
+                                            {f.caveat && <p className="text-muted">{f.caveat}</p>}
+                                        </div>
+                                    )}
                                 </li>
                             ))}
                         </ul>

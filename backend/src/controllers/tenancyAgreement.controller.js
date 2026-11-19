@@ -1092,6 +1092,15 @@ export async function revokeAgreementShare(req, res, next) {
     }
 }
 
+// The advertised amounts of an agreement's listing, for comparing with the agreement.
+function listingPricing(propertyId) {
+    if (!propertyId) return null;
+    return Property.findById(propertyId)
+        .setOptions({ includeDeleted: true })
+        .select("pricing.monthlyRent pricing.securityDeposit pricing.advanceRent updatedAt")
+        .lean();
+}
+
 export async function getAgreementEvidenceGraph(req, res, next) {
     try {
         const agreement = await getAccessibleAgreement(req, res);
@@ -1100,7 +1109,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
         }
 
         await saveAuditedChange(agreement, req, "evidence_graph_viewed");
-        const [recordLinks, conditionReports, maintenanceRequests] = await Promise.all([
+        const [recordLinks, conditionReports, maintenanceRequests, listing] = await Promise.all([
             TenancyRecordLink.find({ agreement: agreement._id }).sort({ createdAt: 1 }).lean(),
             ConditionReport.find({ agreement: agreement._id })
                 .select("stage entries")
@@ -1110,6 +1119,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
                 .sort({ createdAt: 1 })
                 .limit(200)
                 .lean(),
+            listingPricing(agreement.property),
         ]);
         const recordGraph = buildRecordGraphParts({ agreement, maintenanceRequests, conditionReports });
         const [messages, links] = await Promise.all([
@@ -1323,7 +1333,7 @@ export async function getAgreementEvidenceGraph(req, res, next) {
             agreementId: agreement._id,
             nodes,
             edges,
-            analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports, { maintenanceRequests }),
+            analysis: analyzeAgreementEvidence(agreement, links, recordLinks, conditionReports, { maintenanceRequests, property: listing }),
             disclaimer:
                 "User-entered records and links are not independently verified and do not determine legal liability.",
         });
@@ -1350,11 +1360,16 @@ export async function getAgreementEvidenceReport(req, res, next) {
             req,
             format === "pdf" ? "evidence_report_pdf_generated" : "evidence_report_generated"
         );
-        const [recordLinks, conditionReports] = await Promise.all([
+        const [recordLinks, conditionReports, maintenanceRequests, listing] = await Promise.all([
             TenancyRecordLink.find({ agreement: agreement._id }).sort({ createdAt: 1 }).lean(),
             ConditionReport.find({ agreement: agreement._id })
                 .select("stage entries._id entries.kind entries.meterType entries.reading entries.recordedAt entries.supersedes")
                 .lean(),
+            MaintenanceRequest.find({ agreement: agreement._id })
+                .select("title status responsibility evidenceFiles history.responsibility history.evidenceFiles")
+                .limit(200)
+                .lean(),
+            listingPricing(agreement.property),
         ]);
         const [messages, messageCount, links] = await Promise.all([
             InquiryMessage.find({ inquiry: agreement.inquiry })
@@ -1398,6 +1413,8 @@ export async function getAgreementEvidenceReport(req, res, next) {
             generatedAt: new Date(),
             messageCount,
             messageLimit: 500,
+            maintenanceRequests,
+            property: listing,
         });
 
         if (format === "pdf") {
