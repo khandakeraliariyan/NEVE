@@ -1,7 +1,8 @@
 # NEVE: Pitch
 
-**International AI Builders Congress 2026, JusticeSphere AI track**
+**International AI Builders Congress 2026: Idea to Unicorn, JusticeSphere AI domain**
 Challenges: ContractMind, Legal Copilot and Risk Sentinel, with supporting GovernanceIQ capabilities.
+All three are built and working, not concepts.
 
 **NEVE: evidence-based legal intelligence for rental ecosystems.**
 *From fragmented rental documents to explainable legal intelligence.*
@@ -28,6 +29,12 @@ into traceable, reviewable information:
 - **Contradiction detection** compares the listing, the agreement record, the agreement document, payment records, meter readings and maintenance updates. Every conflict shows both values with their sources.
 - **Risk Sentinel** gives one prioritized view of what needs checking across agreements. Each item links to its source, and participants can resolve or dismiss items with a recorded reason.
 
+These five features are the product. The landing page and the renter and
+landlord menus lead with them. Property search, itemized costs and
+neighborhood data are how many renters first arrive, and they feed the same
+records (for example, the listing price that contradiction detection checks
+against the agreement).
+
 ## 3. What makes it different
 
 Most legal AI tools give answers. NEVE gives **traceable findings**: every
@@ -40,9 +47,9 @@ the system can be, and what a human decided about it. It separates what is
 | Criterion | What we show |
 |---|---|
 | **Innovation (20%)** | An evidence graph across contract, payments, maintenance and law; cross-record contradiction detection with source-linked values; a decision trace on every finding; cross-language retrieval between English questions and Bangla statutes. |
-| **Technical execution (20%)** | Next.js and Express/MongoDB; Groq models with strict schema output; quote verification; citation allowlisting; 432 automated tests; a reproducible evaluation suite with regression baselines (see [docs/evaluation-methodology.md](docs/evaluation-methodology.md)). |
+| **Technical execution (20%)** | Next.js and Express/MongoDB; Groq models with strict schema output; quote verification; citation allowlisting; 432 automated tests; a reproducible evaluation suite with regression baselines (see [evaluation-methodology.md](evaluation-methodology.md)). |
 | **Business model and global readiness (20%)** | See section 6. Jurisdiction is a property of every legal source, so a new country is a new reviewed corpus, not a rewrite. |
-| **Real-world impact and ethical AI (20%)** | Built for a common, under-served problem. PII masking before AI calls, human review, audit trails and neutral wording; legal sources approved by people. See [docs/responsible-ai.md](docs/responsible-ai.md). |
+| **Real-world impact and ethical AI (20%)** | Built for a common, under-served problem. PII masking before AI calls, human review, audit trails and neutral wording; legal sources approved by people. See [responsible-ai.md](responsible-ai.md). |
 | **Scalability and NRB collaboration (10%)** | A stateless API with private object storage, background jobs and per-feature model settings. Non-resident Bangladeshis who rent out property at home are a natural landlord segment and collaboration channel (a hypothesis to test). |
 | **Presentation (10%)** | One end-to-end synthetic dispute, live; see [HACKATHON_DEMO_SCRIPT.md](HACKATHON_DEMO_SCRIPT.md). |
 

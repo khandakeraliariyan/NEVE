@@ -7,7 +7,7 @@ import { ruleFindings } from "../src/services/contractRisk.service.js";
 import { buildRecordGraphParts } from "../src/services/evidenceGraphRecords.service.js";
 import { analyzeAgreementEvidence } from "../src/services/evidenceGraphAnalysis.service.js";
 
-// The demo script (HACKATHON_DEMO_SCRIPT.md) relies on these flags appearing
+// The demo script (docs/HACKATHON_DEMO_SCRIPT.md) relies on these flags appearing
 // for the seeded scenario, with or without an AI model.
 test("the seeded demo scenario produces the findings the demo script shows", async () => {
     const ids = { renterId: new mongoose.Types.ObjectId(), landlordId: new mongoose.Types.ObjectId() };

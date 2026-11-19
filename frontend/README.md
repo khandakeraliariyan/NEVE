@@ -1,6 +1,8 @@
 # NEVE Frontend
 
-The frontend is the NEVE web application, built with Next.js App Router and React. It provides public property discovery and authenticated workflows for renters, landlords, legal reviewers, and administrators. The API remains responsible for authorization and business rules.
+The frontend is the NEVE web application, built with Next.js App Router and React. Its core is legal intelligence for tenancies: agreement risk checks (ContractMind), Legal Copilot, the evidence graph, contradiction detection and Risk Sentinel. The landing page and the renter and landlord menus lead with these. It also provides public property discovery, and authenticated workflows for renters, landlords, legal reviewers, and administrators. The API remains responsible for authorization and business rules.
+
+More documentation: [features](../docs/features.md), [user guide](../docs/user-guide.md), [architecture](../docs/architecture.md#frontend), [development](../docs/development.md). The index is [docs/README.md](../docs/README.md).
 
 ## Requirements
 
@@ -49,7 +51,8 @@ The app runs at `http://localhost:5173`. Configure the backend's `CLIENT_URL` to
 ## Structure
 
 - `src/app/` — App Router routes and layouts, grouped into public, auth, and workspace experiences
-- `src/views/` — page-level UI
+- `src/views/` — page-level UI by area; the legal intelligence pages are in `views/tenancy/` (risk check, evidence graph, flag review, Risk Sentinel) and `views/legal/` (Legal Copilot, legal library, legal sources, AI oversight)
+- `src/views/public/Landing.jsx` — the home page, which leads with the legal intelligence features
 - `src/components/` — reusable UI components
 - `src/context/` and `src/hooks/` — shared state and hooks
 - `src/lib/` — API client (`api.js`), admin session (`adminSession.js`), Firebase, and utility modules
@@ -67,11 +70,11 @@ Routes live in `src/app/` in three route groups. The group name in parentheses d
 | `(workspace)`: shared | `/dashboard`, `/notifications`, `/settings`, `/verification`, `/invitations`, `/copilot`, `/legal-library`, `/compliance` |
 | `(workspace)`: renter | `/renter`, `/saved`, `/saved-searches`, `/recommendations`, `/inquiries`, `/viewings` |
 | `(workspace)`: landlord | `/listings`, `/listings/new`, `/listings/[id]/edit`, `/listings/[id]/media`, `/listings/[id]/claims`, `/listings/viewings`, `/listings/warnings` |
-| `(workspace)`: tenancy | `/agreements`, `/agreements/[agreementId]` with `/documents`, `/clauses`, `/risks`, `/evidence`, `/condition`, `/maintenance`, `/cases`; `/cases/[caseId]` |
+| `(workspace)`: tenancy | `/agreements`, `/agreements/[agreementId]` with `/documents`, `/clauses`, `/risks`, `/evidence`, `/condition` (and `/condition/compare`), `/maintenance`, `/cases`; `/cases/[caseId]`; `/risk-sentinel` |
 | `(workspace)`: legal reviewer | `/legal-review`, `/legal-review/ai-oversight`, `/legal-review/ai-evaluations` |
 | `(workspace)`: admin | `/admin` with `/users`, `/verifications`, `/moderation`, `/appeals`, `/reviewers`, `/legal-sources`, `/audit-logs`, `/security`, `/data-retention`, `/settings`, `/system`, `/system-errors`, `/ai-usage`, `/ai-evaluations` |
 
-Workspace navigation is role-aware (see `src/nav.js`). Admins sign in with a password through the admin portal rather than Firebase; admin accounts are created with the backend's `npm run create-admin` script.
+Workspace navigation is role-aware (see `src/nav.js`). Renters and landlords see a **Legal intelligence** group (Risk Sentinel, Legal Copilot, Legal library) right after the dashboard, then **Tenancy** (Agreements & evidence, Obligations & deadlines, invitations). The public menu starts with **Legal AI**, which links to the home page's `#legal-ai` section. Admins sign in with a password through the admin portal rather than Firebase; admin accounts are created with the backend's `npm run create-admin` script.
 
 ## Integration notes
 
@@ -100,4 +103,5 @@ Workspace navigation is role-aware (see `src/nav.js`). Admins sign in with a pas
 
 - **Sign-in is unavailable:** check the Firebase web configuration and the backend's Firebase Admin setup.
 - **API calls fail:** verify the backend is running, the API base URL is correct, and the backend's `CLIENT_URL` matches the frontend origin exactly, including the port.
+- **An AI feature says it is busy:** the backend hit Groq's per-minute token limit. Wait about a minute and try again (see [AI capacity](../docs/operations.md#ai-capacity)).
 - **Admin sign-in succeeds but you are signed straight back out:** the browser isn't keeping the admin cookie. Check `CLIENT_URL`, and see the cookie notes in the [backend guide](../backend/README.md#deployment-settings).

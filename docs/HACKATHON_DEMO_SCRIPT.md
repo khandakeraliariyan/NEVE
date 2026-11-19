@@ -14,7 +14,8 @@
 | Seed the scenario | `cd backend && npm run seed-demo -- --renter <renter email> --landlord <landlord email> --confirm` | The output gives the agreement ID. `--reset` replaces an earlier demo. |
 | Legal corpus | `npm run import-legal-sources -- --as <admin email> --submit legal-corpus/*.json`. Then the legal reviewer compares each source with the official page and approves it. | Legal library shows both sources as approved. |
 | Run the risk check once | As the renter, open the agreement, go to **Risk check** and select **Run risk check** (rule checks work without AI). | Findings appear (see step 2). |
-| Warm up Copilot | Ask the step 4 question once beforehand. | It answers with citations, or the keyword fallback lists sections. |
+| Warm up Copilot | Ask the step 3 question once beforehand. | It answers with citations, or the keyword fallback lists sections. **Read the answer against section 10:** in one test Copilot wrongly said a deposit was allowed. If it gets it wrong, show the cited section text instead of the answer, or use the recording. |
+| AI pacing | On Groq's free tier, leave about a minute between AI actions (risk check with AI, Copilot). A paid tier removes this limit. | A "busy, try again shortly" message means the limit was hit. |
 | Photo for step 5 | A synthetic photo of a stained ceiling, **not** of a real home or person. | It's on the presenting laptop. |
 | Fallback | Screen-record the whole flow. Use it if the network or an AI call fails. | The recording plays offline. |
 | Data | Every record starts with `[DEMO]`. Show nothing real. | — |
@@ -31,9 +32,12 @@
 > connects them, and shows what is documented, disputed, uncertain or
 > missing."
 
+Show the home page's **Legal intelligence** section (the **Legal AI** link in
+the top menu): the five features this demo walks through.
+
 ### 2. ContractMind: understand the agreement (60 s)
 
-As the **renter**, open `[DEMO] Road 12 flat tenancy` and go to **Risk check**.
+As the **renter**, open **Agreements & evidence** in the sidebar, then `[DEMO] Road 12 flat tenancy`, and go to **Risk check**.
 
 - Point at **"Deposit return isn't described"** (high priority). Show the original deposit clause quoted beside it: *"The landlord may deduct any amount for damage from the deposit."*
 - Show **"Why it was flagged"**: no refund or return wording appears in any deposit clause.
@@ -45,7 +49,7 @@ As the **renter**, open `[DEMO] Road 12 flat tenancy` and go to **Risk check**.
 
 ### 3. Legal Copilot: understand the law (60 s)
 
-Open **Legal Copilot**, attach the agreement, and ask:
+Open **Legal Copilot** from the sidebar's **Legal intelligence** group, attach the agreement, and ask:
 
 > *How much advance or deposit can a landlord take?*
 
@@ -78,7 +82,7 @@ Still in the flags panel:
 
 ### 6. Risk Sentinel: one view of what needs attention (45 s)
 
-Open **Risk Sentinel**. Show open items by category, high priority first, each with the reason for its priority and a link back to its source. Then switch to **Resolved & dismissed** to show the reviewed flag.
+Open **Risk Sentinel** (first item under **Legal intelligence** in the sidebar). Show open items by category, high priority first, each with the reason for its priority and a link back to its source. Then switch to **Resolved & dismissed** to show the reviewed flag.
 
 ### 7. Evidence it works (30 s)
 

@@ -1,5 +1,6 @@
 // Top navigation for public pages.
 export const PUBLIC_NAV = [
+    { to: "/#legal-ai", label: "Legal AI" },
     { to: "/properties", label: "Find Homes", end: true },
     { to: "/compare", label: "Compare" },
 ];
@@ -26,11 +27,16 @@ const RENTER_NAV = [
         ],
     },
 ];
+const LANDLORD_OVERVIEW_NAV = [
+    {
+        title: "Overview",
+        items: [{ to: "/dashboard", label: "Dashboard" }],
+    },
+];
 const LANDLORD_NAV = [
     {
         title: "Portfolio & assets",
         items: [
-            { to: "/dashboard", label: "Dashboard" },
             { to: "/listings", label: "My properties", end: true },
             { to: "/listings/new", label: "Create property" },
             { to: "/listings/warnings", label: "Listing warnings" },
@@ -54,17 +60,23 @@ const TENANCY_NAV = [
         ],
     },
 ];
-// Renters and landlords also see tenancy invitations.
+// Legal intelligence is Neve's core, so renters and landlords see it first.
+// Agreement risk checks and the evidence graph open from each agreement.
 const PARTY_TENANCY_NAV = (invitationsLabel) => [
+    {
+        title: "Legal intelligence",
+        items: [
+            { to: "/risk-sentinel", label: "Risk Sentinel" },
+            { to: "/copilot", label: "Legal Copilot" },
+            { to: "/legal-library", label: "Legal library" },
+        ],
+    },
     {
         title: "Tenancy",
         items: [
-            { to: "/agreements", label: "Tenancy dashboard", end: true },
-            { to: "/risk-sentinel", label: "Risk Sentinel" },
+            { to: "/agreements", label: "Agreements & evidence", end: true },
             { to: "/compliance", label: "Obligations & deadlines" },
             { to: "/invitations", label: invitationsLabel },
-            { to: "/copilot", label: "Legal Copilot" },
-            { to: "/legal-library", label: "Legal library" },
         ],
     },
 ];
@@ -127,9 +139,9 @@ export function workspaceNav(role) {
 function roleNav(role) {
     switch (role) {
         case "renter":
-            return [...RENTER_NAV, ...PARTY_TENANCY_NAV("Invitations")];
+            return [RENTER_NAV[0], ...PARTY_TENANCY_NAV("Invitations"), ...RENTER_NAV.slice(1)];
         case "landlord":
-            return [...LANDLORD_NAV, ...PARTY_TENANCY_NAV("Invite a renter")];
+            return [...LANDLORD_OVERVIEW_NAV, ...PARTY_TENANCY_NAV("Invite a renter"), ...LANDLORD_NAV];
         case "legal_reviewer":
             return [...TENANCY_NAV, ...REVIEWER_NAV];
         case "admin":

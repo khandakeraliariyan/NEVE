@@ -16,6 +16,45 @@ const PROPERTY_TYPES = [
     ["house", "House"],
 ];
 
+// The legal intelligence features, in the order a dispute usually unfolds.
+const LEGAL_AI = [
+    {
+        tag: "ContractMind",
+        title: "Agreement risk check",
+        text: "Reads your agreement in English or Bangla, including scans, extracts clauses and obligations, and flags ambiguous, missing, one-sided or contradictory terms. Each finding quotes the clause and explains why it was flagged.",
+        note: "A prompt to check, not a verdict",
+        to: "/agreements",
+    },
+    {
+        tag: "Legal Copilot",
+        title: "Ask the law, get citations",
+        text: "Ask about rent, advances, repairs or eviction in English or Bangla. Answers cite only legal sources a legal reviewer has approved: the Premises Rent Control Act, 1991 and the leases chapter of the Transfer of Property Act, 1882.",
+        note: "Legal information, not legal advice",
+        to: "/copilot",
+    },
+    {
+        tag: "Evidence graph",
+        title: "See how the records connect",
+        text: "Links clauses, payments, maintenance requests, condition records, photos and messages, and marks what supports, contradicts or is missing from each one.",
+        note: "Shows the records; doesn't decide fault",
+        to: "/agreements",
+    },
+    {
+        tag: "Contradiction detection",
+        title: "Catch records that disagree",
+        text: "Compares the listing, the agreement, payment records, meter readings and maintenance updates. Every conflict shows each value and where it came from.",
+        note: "Differences can be legitimate, so they can be reviewed",
+        to: "/agreements",
+    },
+    {
+        tag: "Risk Sentinel",
+        title: "One list of what needs attention",
+        text: "A prioritized view across your tenancies. Each item says why it's ranked where it is, links to its source, and can be resolved or dismissed with a recorded reason.",
+        note: "Priorities explained; decisions stay with people",
+        to: "/risk-sentinel",
+    },
+];
+
 const PILLARS = [
     {
         n: "01",
@@ -46,6 +85,18 @@ const RECORDS = [
 
 // Every answer restates what Neve already says elsewhere on this page or in the app.
 const FAQS = [
+    [
+        "Is Legal Copilot legal advice?",
+        "No. It answers from approved legal sources and cites the sections it used, but it can be wrong. Check the cited text, and talk to a lawyer before acting on anything important.",
+    ],
+    [
+        "Which laws does Neve use?",
+        "The official text of the Premises Rent Control Act, 1991 and Chapter V (leases) of the Transfer of Property Act, 1882. A legal reviewer must approve each source before Neve uses it.",
+    ],
+    [
+        "Does Neve decide who is right in a dispute?",
+        "No. It shows what each record says and what is documented, disputed, uncertain or missing. People make the decisions, and every flag they review keeps their reason.",
+    ],
     [
         "Are the costs on Neve a quote?",
         "No. Monthly and move-in totals are estimates built from the landlord's itemized charges. Costs the landlord hasn't provided are shown as unknown, never as zero.",
@@ -119,7 +170,7 @@ export default function Landing() {
                                 style={delay(200)}
                                 className="glass-dark inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-1.5 text-xs text-white/85"
                             >
-                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-taupe-soft" /> Rental discovery & tenancy records
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-taupe-soft" /> Legal intelligence for renting in Bangladesh
                             </span>
                             <h1 className="mt-6 max-w-3xl text-5xl text-white md:text-7xl">
                                 <WordReveal text="Find your place." delay={300} />
@@ -127,21 +178,33 @@ export default function Landing() {
                                 <WordReveal text="Know your rights." delay={520} className="text-taupe-soft" />
                             </h1>
                             <p data-reveal="up" style={delay(800)} className="mt-5 max-w-xl text-white/70">
-                                Neve brings published rental listings, itemized move-in costs, neighborhood data and private tenancy records together in one place.
+                                Neve checks your tenancy agreement, answers questions from Bangladesh&apos;s rental law with citations, connects your records, and
+                                flags what is disputed or missing. Then find a home with itemized costs.
                             </p>
+                            <div data-reveal="up" style={delay(900)} className="mt-7 flex flex-wrap gap-3">
+                                <Link href="/copilot" className="inline-flex rounded-full bg-white px-6 py-3 text-sm font-medium text-night hover:bg-canvas">
+                                    <RollText>Ask Legal Copilot →</RollText>
+                                </Link>
+                                <a href="#legal-ai" className="inline-flex rounded-full border border-white/30 px-6 py-3 text-sm font-medium text-white hover:bg-white/10">
+                                    See how it works
+                                </a>
+                            </div>
                         </div>
                         <div
                             data-reveal="right"
                             style={delay(900)}
                             className="glass-dark hidden max-w-sm justify-self-end rounded-2xl border border-white/15 p-6 lg:block"
                         >
-                            <p className="font-display text-5xl font-medium tracking-tight">
-                                <Counter value={total ?? "—"} />
-                            </p>
-                            <p className="mt-1 text-sm text-white/70">Published homes with itemized costs</p>
-                            <Link href="/properties" className="mt-5 inline-flex rounded-full bg-white px-5 py-2.5 text-sm font-medium text-night hover:bg-canvas">
-                                <RollText>Explore properties →</RollText>
-                            </Link>
+                            <p className="text-xs uppercase tracking-widest text-white/50">Legal intelligence</p>
+                            <ul className="mt-3 space-y-2 text-sm">
+                                {LEGAL_AI.map((feature) => (
+                                    <li key={feature.tag} className="flex items-center justify-between gap-6">
+                                        <span>{feature.tag}</span>
+                                        <span className="text-xs text-white/50">{feature.title}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <p className="mt-4 text-xs text-white/50">English and Bangla · cited sources · human review</p>
                         </div>
                     </div>
 
@@ -184,6 +247,52 @@ export default function Landing() {
                             Search →
                         </Button>
                     </form>
+                </div>
+            </section>
+
+            {/* Legal intelligence: the core of Neve */}
+            <section id="legal-ai" className="mx-auto max-w-7xl scroll-mt-8 px-4 pt-24 md:px-8">
+                <p data-reveal="up" className="eyebrow">
+                    Legal intelligence
+                </p>
+                <h2 data-reveal="up" style={delay(100)} className="mt-4 max-w-4xl text-4xl leading-tight md:text-5xl">
+                    Understand the agreement, the law and the evidence,{" "}
+                    <span className="text-taupe-deep">with every finding traced to its source.</span>
+                </h2>
+                <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {LEGAL_AI.map((feature, i) => (
+                        <Card key={feature.tag} style={delay(i * 100)} className="group flex flex-col gap-4 transition duration-500 hover:-translate-y-1 hover:shadow-lg">
+                            <span className="self-start rounded-full bg-sage px-3 py-1 text-xs font-medium text-ink/80 transition duration-500 group-hover:bg-forest group-hover:text-white">
+                                {feature.tag}
+                            </span>
+                            <div className="flex-1">
+                                <h3 className="text-2xl">{feature.title}</h3>
+                                <p className="mt-2 text-sm leading-relaxed text-muted">{feature.text}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+                                <span className="text-xs text-muted">{feature.note}</span>
+                                <Link href={feature.to} className="text-sm font-medium text-ink hover:text-taupe-deep">
+                                    Open →
+                                </Link>
+                            </div>
+                        </Card>
+                    ))}
+                    <div
+                        data-reveal="up"
+                        style={delay(LEGAL_AI.length * 100)}
+                        className="flex flex-col justify-between gap-6 rounded-2xl bg-night p-7 text-white"
+                    >
+                        <div>
+                            <p className="text-xs uppercase tracking-widest text-white/50">Built to be checked</p>
+                            <p className="mt-3 text-sm leading-relaxed text-white/75">
+                                Personal details are masked before AI calls, legal sources are approved by people, and every review is audited. Neve never issues
+                                a verdict.
+                            </p>
+                        </div>
+                        <ButtonLink to="/sign-up" variant="light" className="self-start">
+                            Create a free account
+                        </ButtonLink>
+                    </div>
                 </div>
             </section>
 
@@ -374,7 +483,9 @@ export default function Landing() {
                     <div className="absolute inset-0 bg-gradient-to-t from-night/90 via-night/40 to-transparent" aria-hidden="true" />
                     <p className="relative text-xs uppercase tracking-widest text-white/60">For renters</p>
                     <h3 className="relative text-3xl text-white">Find your next home with the full picture</h3>
-                    <p className="relative text-sm text-white/75">Save listings, compare up to four side by side, and get in-app alerts for new matches.</p>
+                    <p className="relative text-sm text-white/75">
+                        Check your agreement before you sign, ask Legal Copilot about your rights, and compare homes with itemized costs.
+                    </p>
                     <ButtonLink to="/properties" variant="light" className="relative mt-3 self-start">
                         Start searching homes
                     </ButtonLink>
@@ -388,7 +499,9 @@ export default function Landing() {
                     <div className="absolute inset-0 bg-gradient-to-t from-night/90 via-night/40 to-transparent" aria-hidden="true" />
                     <p className="relative text-xs uppercase tracking-widest text-white/60">For landlords</p>
                     <h3 className="relative text-3xl text-white">List with clear costs and attract the right renters</h3>
-                    <p className="relative text-sm text-white/75">Publish listings with itemized costs, manage inquiries and viewings, and keep tenancy records.</p>
+                    <p className="relative text-sm text-white/75">
+                        Keep dispute-ready tenancy records, see risks early in Risk Sentinel, and publish listings with itemized costs.
+                    </p>
                     <ButtonLink to="/sign-up" variant="light" className="relative mt-3 self-start">
                         Create an account
                     </ButtonLink>
