@@ -173,9 +173,20 @@ export function validateFlagInput(body, reasons) {
     return { value: { reason: body.reason, note: body.note.trim(), sectionId: body.sectionId ?? null } };
 }
 
-// A light English stemmer, so "increased", "increases" and "increase" match.
-// Bangla and other words are left as they are.
+// Common Bangla case and plural endings: "উচ্ছেদের" -> "উচ্ছেদ", "ভাড়ার" -> "ভাড়া".
+// "দের" is left out: it would also cut words whose root ends in "দ" ("উচ্ছেদের").
+const BANGLA_SUFFIXES = ["গুলোর", "গুলো", "গণের", "য়ের", "টির", "ের", "কে", "টি", "গণ", "র"].map((suffix) => suffix.normalize("NFC"));
+const BANGLA_WORD = /^[ঀ-৿]+$/u;
+
+// A light English stemmer, so "increased", "increases" and "increase" match,
+// and Bangla case endings are dropped the same way on both sides.
 export function stem(word) {
+    if (BANGLA_WORD.test(word)) {
+        for (const suffix of BANGLA_SUFFIXES) {
+            if (word.endsWith(suffix) && word.length - suffix.length >= 3) return word.slice(0, -suffix.length);
+        }
+        return word;
+    }
     if (!/^[a-z]+$/.test(word) || word.length <= 4) return word;
     for (const suffix of ["ments", "ment", "ings", "ing", "ies", "ied", "ed", "es", "s"]) {
         if (word.endsWith(suffix) && word.length - suffix.length >= 3) {
@@ -217,11 +228,58 @@ export function inferTopics(query) {
         .map(([topic]) => topic);
 }
 
+// "Landlord" and "tenant" are left out on purpose: they appear in almost
+// every section, so expanding them only adds noise.
+// English and Bangla words for the same legal idea, taken from the tenancy
+// statutes' own vocabulary (the Premises Rent Control Act's definitions and
+// section headings, and Transfer of Property Act Chapter V). An English
+// question also searches for the Bangla terms and the reverse, so a question
+// in one language can reach a source written in the other. `cues` are
+// English word starts; `en` are English words added for Bangla questions.
+const GLOSSARY = [
+    { cues: ["advance"], en: ["advance"], bn: ["অগ্রীম", "অগ্রিম"] },
+    { cues: ["deposit", "security"], en: ["deposit"], bn: ["জামানত"] },
+    { cues: ["premium", "salami"], en: ["premium"], bn: ["প্রিমিয়াম", "সালামী"] },
+    { cues: ["receipt"], en: ["receipt"], bn: ["রশিদ"] },
+    { cues: ["evict", "eject", "recover possession"], en: ["ejectment", "possession"], bn: ["উচ্ছেদ", "দখল"] },
+    { cues: ["possession", "vacant", "hand over"], en: ["possession"], bn: ["দখল", "খালি"] },
+    { cues: ["repair", "fix", "mainten"], en: ["repairs", "repair"], bn: ["মেরামত"] },
+    { cues: ["standard"], en: [], bn: ["মানসম্মত"] },
+    { cues: ["increas", "raise", "hike"], en: ["increase"], bn: ["বৃদ্ধি"] },
+    { cues: ["electric"], en: [], bn: ["বিদ্যুত", "বিদ্যুৎ"] },
+    { cues: ["supply", "facilit", "amenit", "easement", "cut off"], en: [], bn: ["সরবরাহ", "সুবিধা", "সুখাধিকার"] },
+    { cues: ["refund", "repay"], en: ["refund"], bn: ["ফেরত"] },
+    { cues: ["furniture"], en: [], bn: ["আসবাবপত্র"] },
+    { cues: ["penalt", "fine", "offence", "punish"], en: [], bn: ["দণ্ড", "অর্থদণ্ড", "দণ্ডনীয়"] },
+    { cues: ["notice", "quit"], en: ["notice"], bn: ["নোটিশ"] },
+    { cues: ["sublet", "sub-let", "under-let"], en: ["under-letting", "sublet"], bn: ["উপ-ভাড়া"] },
+    { cues: ["controller"], en: [], bn: ["নিয়ন্ত্রক"] },
+    { cues: ["lease", "tenancy", "term"], en: ["lease"], bn: ["মেয়াদ"] },
+].map((group) => ({
+    cues: group.cues,
+    en: group.en.flatMap(tokenize),
+    bn: group.bn.flatMap(tokenize),
+}));
+
+// The query's own words plus glossary words in the other language.
+export function expandQuery(query) {
+    const text = String(query ?? "").normalize("NFC").toLowerCase();
+    const words = tokenize(query);
+    const terms = new Set(words);
+    for (const group of GLOSSARY) {
+        const english = group.cues.some((cue) => (cue.includes(" ") ? text.includes(cue) : words.some((word) => word.startsWith(cue))));
+        const bangla = group.bn.some((term) => terms.has(term));
+        if (english) group.bn.forEach((term) => terms.add(term));
+        if (bangla) group.en.forEach((term) => terms.add(term));
+    }
+    return terms;
+}
+
 // Ranks approved sections by topic match and shared words with the query.
 // Without a category, topics are inferred from the query's wording and a
 // matching section gets a smaller boost. Heading words count double.
 export function searchSections(sources, { query = "", category = null, limit = 10 } = {}) {
-    const terms = new Set(tokenize(query));
+    const terms = expandQuery(query);
     const inferred = category ? [] : inferTopics(query);
     const results = [];
     for (const source of sources) {

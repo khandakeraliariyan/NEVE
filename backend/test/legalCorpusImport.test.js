@@ -78,3 +78,14 @@ test("Bangla legal text is tokenized into whole words, in either spelling of ড
     assert.equal(searchSections(sources, { query: "অগ্রীম ভাড়া কত মাসের দেওয়া লাগে?" })[0].sectionNumber, "10");
     assert.equal(searchSections(sources, { query: "How much advance rent can the landlord take?" })[0].sectionNumber, "10");
 });
+
+test("questions in one language also search the other language's legal terms", async () => {
+    const { expandQuery, tokenize } = await import("../src/services/legalSource.service.js");
+    assert.deepEqual(tokenize("উচ্ছেদের"), ["উচ্ছেদ"]);
+    assert.deepEqual(tokenize("ভাড়ার রশিদ"), tokenize("ভাড়া রশিদ"));
+    const english = expandQuery("Does the landlord have to give a rent receipt?");
+    assert.ok(english.has(tokenize("রশিদ")[0]));
+    assert.ok(!english.has(tokenize("ভাড়াটিয়া")[0]), "generic party words are not expanded");
+    const bangla = expandQuery("মেরামত না করলে কী হবে?");
+    assert.ok(bangla.has("repair"));
+});
