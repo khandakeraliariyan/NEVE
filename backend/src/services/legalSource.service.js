@@ -162,6 +162,8 @@ export function checkTransition(source, action, actor) {
 const STOP_WORDS = new Set([
     "the", "and", "for", "that", "with", "this", "shall", "will", "any", "are", "from",
     "has", "have", "not", "may", "such", "its", "his", "her", "their", "all", "per", "who",
+    // Common Bangla function words in statutes.
+    ...["এবং", "অথবা", "কোন", "হইবে", "হইলে", "হইতে", "করিতে", "করিয়া", "উক্ত", "তবে", "এই", "সেই", "যাহা", "জন্য", "দ্বারা", "অধীন", "পারিবেন", "থাকে", "থাকিলে", "বলিয়া", "নহে"].map((word) => word.normalize("NFC")),
 ]);
 
 export function validateFlagInput(body, reasons) {
@@ -184,10 +186,14 @@ export function stem(word) {
     return word;
 }
 
+// Combining marks (\p{M}) belong to the word: Bangla vowel signs and the
+// virama are marks, so splitting on them would cut every Bangla word apart.
+// NFC makes the two spellings of letters such as "ড়" compare equal.
 export function tokenize(value) {
     return String(value ?? "")
+        .normalize("NFC")
         .toLowerCase()
-        .split(/[^\p{L}\p{N}]+/u)
+        .split(/[^\p{L}\p{M}\p{N}]+/u)
         .filter((word) => word.length > 2 && !STOP_WORDS.has(word))
         .map(stem);
 }
@@ -195,17 +201,18 @@ export function tokenize(value) {
 // Everyday words that point at a clause topic, for questions that don't
 // say which topic they are about.
 const TOPIC_WORDS = {
-    rent: ["rent", "pay", "payment", "receipt", "increas", "raise", "late", "fine", "ভাড়া"],
-    deposit: ["deposit", "advance", "refund", "return", "back", "deduct", "অগ্রিম", "জামানত"],
-    term: ["term", "renew", "renewal", "expir", "lease", "length", "period"],
-    notice: ["notice", "leav", "vacat", "evict", "terminat", "move", "quit", "notify", "নোটিশ"],
+    rent: ["rent", "pay", "payment", "receipt", "increas", "raise", "late", "fine", "ভাড়া", "রশিদ"],
+    deposit: ["deposit", "advance", "refund", "return", "back", "deduct", "premium", "salami", "অগ্রিম", "অগ্রীম", "জামানত", "সালামী", "প্রিমিয়াম"],
+    term: ["term", "renew", "renewal", "expir", "lease", "length", "period", "মেয়াদ", "নবায়ন"],
+    notice: ["notice", "leav", "vacat", "evict", "terminat", "move", "quit", "notify", "নোটিশ", "উচ্ছেদ"],
     maintenance: ["repair", "fix", "leak", "broken", "damag", "mainten", "plumb", "clean", "মেরামত"],
-    utilities: ["bill", "electric", "electricity", "gas", "water", "utility", "utiliti", "service", "charge"],
+    utilities: ["bill", "electric", "electricity", "gas", "water", "utility", "utiliti", "service", "charge", "বিদ্যুত", "বিদ্যুৎ", "গ্যাস", "পানি"],
 };
+const TOPIC_CUES = Object.entries(TOPIC_WORDS).map(([topic, cues]) => [topic, cues.map((cue) => cue.normalize("NFC"))]);
 
 export function inferTopics(query) {
     const words = tokenize(query);
-    return Object.entries(TOPIC_WORDS)
+    return TOPIC_CUES
         .filter(([, cues]) => words.some((word) => cues.some((cue) => word.startsWith(cue))))
         .map(([topic]) => topic);
 }

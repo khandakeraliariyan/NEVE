@@ -10,6 +10,7 @@
     "create-admin": "node scripts/createAdmin.js",
     "backup": "node scripts/backup.js",
     "restore-backup": "node scripts/restoreBackup.js",
+    "import-legal-sources": "node scripts/importLegalSources.js",
     "eval": "node eval/run.js"
   },
   "keywords": [],
