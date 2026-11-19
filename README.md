@@ -361,6 +361,8 @@ Run each command from its app directory.
 | Backend | `npm run backup` | Back up the database to R2 now. |
 | Backend | `npm run restore-backup` | List or restore backups. |
 | Backend | `npm run eval` | AI evaluation (see [AI features and evaluation](#ai-features-and-evaluation)). |
+| Backend | `npm run import-legal-sources` | Load `backend/legal-corpus/*.json` as draft legal sources for legal review (see [backend/legal-corpus/README.md](backend/legal-corpus/README.md)). |
+| Backend | `npm run seed-demo` | Create the synthetic `[DEMO]` dispute scenario for two existing demo accounts (see [HACKATHON_DEMO_SCRIPT.md](HACKATHON_DEMO_SCRIPT.md)). |
 
 Restoring a backup (needs R2):
 
@@ -382,7 +384,7 @@ Routes live in `frontend/src/app/` in three route groups. The group name in pare
 | `(workspace)`: shared | `/dashboard`, `/notifications`, `/settings`, `/verification`, `/invitations`, `/copilot`, `/legal-library`, `/compliance` |
 | `(workspace)`: renter | `/renter`, `/saved`, `/saved-searches`, `/recommendations`, `/inquiries`, `/viewings` |
 | `(workspace)`: landlord | `/listings`, `/listings/new`, `/listings/[id]/edit`, `/listings/[id]/media`, `/listings/[id]/claims`, `/listings/viewings`, `/listings/warnings` |
-| `(workspace)`: tenancy | `/agreements`, `/agreements/[agreementId]` with `/documents`, `/clauses`, `/risks`, `/evidence`, `/condition` (and `/condition/compare`), `/maintenance`, `/cases`; `/cases/[caseId]` |
+| `(workspace)`: tenancy | `/agreements`, `/agreements/[agreementId]` with `/documents`, `/clauses`, `/risks`, `/evidence`, `/condition` (and `/condition/compare`), `/maintenance`, `/cases`; `/cases/[caseId]`; `/risk-sentinel` |
 | `(workspace)`: legal reviewer | `/legal-review`, `/legal-review/ai-oversight`, `/legal-review/ai-evaluations` |
 | `(workspace)`: admin | `/admin` with `/users`, `/verifications`, `/moderation`, `/appeals`, `/reviewers`, `/legal-sources`, `/audit-logs`, `/security`, `/data-retention`, `/settings`, `/system`, `/system-errors`, `/ai-usage`, `/ai-evaluations` |
 
@@ -463,13 +465,15 @@ Admins change these at runtime under **Admin → Settings**, without editing env
 AI features run on Groq and are optional. When `GROQ_API_KEY` is missing, they report "not configured" and the rest of the app keeps working.
 
 - **Agreement analysis:** text extraction from uploaded agreements (OCR for scans, in English and Bangla), plus clause, obligation, and contract-risk extraction.
-- **Legal Copilot:** answers questions using the stored legal sources, with citations.
+- **Contract risk findings:** each finding shows the original clause wording, why it was flagged, and a decision trace (method, passages, legal sources, limits, human review).
+- **Legal Copilot:** answers questions using the stored legal sources, with citations. Retrieval handles English and Bangla, including English questions about Bangla statutes, through a glossary of statutory terms. `backend/legal-corpus/` holds the official text of the Premises Rent Control Act, 1991 and Chapter V of the Transfer of Property Act, 1882, ready to import for legal review.
+- **Evidence graph and Risk Sentinel:** maintenance requests, condition records and the listing are compared with the agreement and payments. Conflicts show every value with its source; participants can mark a flag resolved or not an issue with a reason. `/risk-sentinel` lists open items across agreements.
 - **Recommendation ranking:** AI ranking of a renter's shortlist, alongside the explainable rule-based match scores.
 - **Oversight:** AI usage and cost are recorded (`AIUsageEvent`). Legal reviewers and admins can review AI output.
 
 AI output is assistance and must be checked against the source documents; it is not legal advice.
 
-The evaluation suite (`backend/eval/`) scores AI tasks against small synthetic datasets. The tasks are agreement extraction, obligation extraction, risk detection, missing information, legal citation, source retrieval, and Copilot answer quality.
+The evaluation suite (`backend/eval/`) scores AI tasks against small datasets. The tasks are agreement extraction, obligation extraction, risk detection, missing information, legal citation, source retrieval (synthetic law and the real corpus, in English and Bangla), evidence-conflict detection, and Copilot answer quality. Datasets, current results, known failures and limits are in [docs/evaluation-methodology.md](docs/evaluation-methodology.md).
 
 ```bash
 npm run eval                           # offline tasks
@@ -534,7 +538,7 @@ Beyond the local setup, a deployment needs:
 ## Testing
 
 ```bash
-cd backend && npm test        # about 400 tests; no database or network needed
+cd backend && npm test        # about 430 tests; no database or network needed
 cd frontend && npm run lint && npm run build
 ```
 
@@ -566,3 +570,5 @@ This guide covers the whole project. The component READMEs repeat the parts spec
 
 - [Frontend README](frontend/README.md): frontend setup, environment variables, scripts, route map, architecture, and security headers
 - [Backend README](backend/README.md): API setup, configuration, deployment settings, admin accounts, scripts, route overview, and security
+- [Evaluation methodology](docs/evaluation-methodology.md) and [Responsible AI](docs/responsible-ai.md)
+- Hackathon: [readiness audit](HACKATHON_READINESS_AUDIT.md), [demo script](HACKATHON_DEMO_SCRIPT.md), [pitch](HACKATHON_PITCH.md)

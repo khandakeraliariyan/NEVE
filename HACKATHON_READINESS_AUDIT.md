@@ -317,4 +317,26 @@ Clause-category changes, schema migrations, new libraries, AI prompts, and the R
 - Expected-legitimate differences in the dataset are not flagged.
 - `npm test`, `npm run eval -- --check`, `npm run lint` (no new errors) and `npm run build` all pass.
 
-**Awaiting approval before any code changes.**
+---
+
+## 11. Progress since the audit (2026-11-19)
+
+Each step was committed separately on branch `ariyan`.
+
+| Step | Status | Notes |
+|---|---|---|
+| M1a: maintenance requests and condition records in the evidence graph | ✅ Done | Edges derived by NEVE are marked `origin: system`; disputed, unphotographed and responsibility-changing requests are flagged |
+| M1b: listing vs agreement contradiction check | ✅ Done | Shows all values with their sources and a caveat; also in the evidence report |
+| M1c: contradiction evaluation dataset | ✅ Done | 25 cases; precision 88.9%, recall 100%; 2 recorded false positives |
+| Legal corpus | ✅ Added; ⚠️ approval pending | Official text of the Premises Rent Control Act, 1991 (Bangla, live official site, 36 sections) and Transfer of Property Act Chapter V (English, Internet Archive copy of the official page). Import with `npm run import-legal-sources`; **a legal reviewer must approve them** |
+| Bangla retrieval bug | ✅ Fixed | Tokenizing split Bangla words at vowel signs, so Bangla text never matched |
+| M2: original clause text and decision trace on risk findings | ✅ Done | Findings store why they were flagged; legal references store how they were matched |
+| M3: evaluation evidence | 🟠 Offline done; live pending | Real-corpus retrieval (recall@3 44.4% → 88.9% after cross-language retrieval); prompt-injection and Bangla cases added to the live datasets; **live runs not done (they cost money and need approval)** |
+| M4: Risk Sentinel and reviewable evidence flags | ✅ Done | `/risk-sentinel`; dismiss or resolve needs a reason, with history and audit |
+| M5: demo seed, demo script, pitch, docs | ✅ Done | `npm run seed-demo`; `HACKATHON_DEMO_SCRIPT.md`, `HACKATHON_PITCH.md`, `docs/` |
+
+**Still open:** the live model evaluations; legal-reviewer approval of the
+corpus and the retrieval labels; checking the Transfer of Property Act text
+against the live page; a fallback screen recording; seeding a deployed
+database; the frontend lint warnings; clause categories (still 7); a
+case-level graph; and OCR measurement.
