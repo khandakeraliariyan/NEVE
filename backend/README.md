@@ -38,7 +38,7 @@ FIREBASE_SERVICE_ACCOUNT_PATH=secrets/firebase-service-account.json
 ADMIN_JWT_SECRET=replace-with-a-random-secret-at-least-32-characters
 ```
 
-`FIREBASE_SERVICE_ACCOUNT_PATH` is relative to the `backend` directory. Put the Firebase service-account file at the configured path; do not commit it. Generate a suitable admin secret with:
+`FIREBASE_SERVICE_ACCOUNT_PATH` is relative to the `backend` directory. Put the Firebase service-account file at the configured path; do not commit it. On hosts where you can't place a file, such as Vercel, set `FIREBASE_SERVICE_ACCOUNT_JSON` to the file's contents or their base64 encoding instead. Generate a suitable admin secret with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
@@ -60,6 +60,8 @@ Two settings depend on how the API is hosted:
 - **`ADMIN_COOKIE_SAMESITE`**: admin sessions live in a cookie, so the frontend and API should share a site, for example `neve.app` and `api.neve.app`, or `localhost` on two ports. The default, `strict`, works for that. If they are on unrelated domains, set it to `none` and serve the API over HTTPS, since browsers accept such cookies only when they are marked `Secure`.
 
 In production (`NODE_ENV=production`), the admin cookie is always `Secure`, so the API must be served over HTTPS.
+
+**Vercel.** `vercel.json` and `api/index.js` run the API as a serverless function (set the project's Root Directory to `backend`). Background jobs then run through Vercel Cron calling `GET /api/v1/cron/:task`, which needs `CRON_SECRET`. Step-by-step instructions and the limits are in [docs/deployment-vercel.md](../docs/deployment-vercel.md).
 
 ## Optional integrations
 
@@ -160,6 +162,8 @@ npm run import-legal-sources -- --as admin@example.com --submit legal-corpus/*.j
 - `scripts/` — create-admin, backup, restore-backup, importLegalSources, seedDemo
 - `eval/` — AI evaluation runner, datasets, and regression baseline
 - `legal-corpus/` — official Bangladesh legal texts, imported as drafts for legal review
+- `assets/fonts/` — Noto Sans and Noto Sans Bengali (OFL), registered for PDF reports so Bangla renders on any host
+- `api/index.js`, `vercel.json` — the Vercel serverless entry point and configuration
 
 The layers and request lifecycle are described in [docs/architecture.md](../docs/architecture.md).
 

@@ -12,6 +12,7 @@ NEVE is an evidence-based legal intelligence platform for renting in Bangladesh.
 | Call the API | [api-reference.md](api-reference.md) |
 | Understand the stored data | [data-model.md](data-model.md) |
 | Deploy and run it | [operations.md](operations.md) |
+| Deploy the frontend and API on Vercel | [deployment-vercel.md](deployment-vercel.md) |
 | Change the code | [development.md](development.md) |
 | Know how well the AI works, and its limits | [evaluation-methodology.md](evaluation-methodology.md) |
 | Know how AI risks are handled | [responsible-ai.md](responsible-ai.md) |
@@ -30,6 +31,7 @@ NEVE is an evidence-based legal intelligence platform for renting in Bangladesh.
 
 **Operations**
 - [operations.md](operations.md): deployment checklist, scheduled jobs, backups, key rotation, AI capacity, loading the legal corpus, monitoring, troubleshooting.
+- [deployment-vercel.md](deployment-vercel.md): step-by-step deployment of both apps on Vercel, with MongoDB Atlas, Vercel Cron and the limits of serverless hosting.
 
 **AI quality and responsibility**
 - [evaluation-methodology.md](evaluation-methodology.md): datasets, metrics, current results and known failures.

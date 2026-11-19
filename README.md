@@ -276,7 +276,7 @@ All settings are validated at startup in `backend/src/config/env.js`, and the AP
 |---|---|
 | `CLIENT_URL` | Exact frontend origin, e.g. `http://localhost:5173`. CORS allows only this origin, and admin requests must come from it. |
 | `MONGODB_URI` | MongoDB connection string. |
-| `FIREBASE_SERVICE_ACCOUNT_PATH` | Path to the Firebase Admin service-account JSON, relative to `backend/`. |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` or `FIREBASE_SERVICE_ACCOUNT_JSON` | The Firebase Admin service account: a path to the JSON file, relative to `backend/`, or (on hosts without a file system for secrets, such as Vercel) the JSON itself or its base64 encoding. One is required. |
 | `ADMIN_JWT_SECRET` | At least 32 characters; signs admin sessions and is the fallback for notification link signing. |
 
 **General and deployment**
@@ -289,6 +289,7 @@ All settings are validated at startup in `backend/src/config/env.js`, and the AP
 | `ADMIN_JWT_EXPIRES_IN` | `8h` | Admin session lifetime. |
 | `ADMIN_COOKIE_SAMESITE` | `strict` | `strict`, `lax`, or `none`. Use `none` (with HTTPS) only when the frontend and API are on unrelated domains. |
 | `NEVE_API_BASE_URL` | `http://localhost:5000/api/v1` | API address used by the evaluation tooling. |
+| `CRON_SECRET` | none | 16+ characters. Turns on `GET /api/v1/cron/:task` for schedulers on serverless hosts (Vercel Cron sends it automatically). Not needed on a normal server, where jobs run on timers. |
 
 **File storage (Cloudflare R2)**: needed for all uploads, media, documents, and backups.
 
@@ -571,7 +572,7 @@ The component guides have more detail: [backend security](backend/README.md#secu
 
 ## Deploying
 
-Beyond the local setup, a deployment needs the items below. The full checklist, backups, key rotation, AI capacity and monitoring are in [docs/operations.md](docs/operations.md).
+Beyond the local setup, a deployment needs the items below. The full checklist, backups, key rotation, AI capacity and monitoring are in [docs/operations.md](docs/operations.md). **To deploy both apps on Vercel**, follow [docs/deployment-vercel.md](docs/deployment-vercel.md): the repository includes `backend/vercel.json`, a serverless entry point (`backend/api/index.js`) and a daily Vercel Cron for the background jobs.
 
 1. **HTTPS for both apps.** In production the admin session cookie is `Secure`, so it is only sent over HTTPS.
 2. **`NODE_ENV=production`** on the API, and a production frontend build (`npm run build`, then `npm start` or your host's Next.js runtime).
