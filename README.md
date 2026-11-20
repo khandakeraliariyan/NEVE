@@ -112,6 +112,7 @@ This list describes the scope represented in the codebase; it is not a guarantee
 - [Commands and scripts](#commands-and-scripts)
 - [Frontend routes](#frontend-routes)
 - [API overview](#api-overview)
+- [API architecture](#api-architecture)
 - [Data model](#data-model)
 - [Background jobs](#background-jobs)
 - [Platform settings](#platform-settings)
@@ -244,13 +245,7 @@ NEVE/
 
 ### Adding an API endpoint
 
-Add it to the route file of its area, `frontend/src/app/api/v1/<area>/[[...path]]/route.js`, with the same `Router()` calls as before:
-
-```js
-router.get("/:thingId", authenticateUser, allowRoles("renter"), getThing);
-```
-
-Each route file ends with `const handler = apiRoutes([{ prefix: "/api/v1/<area>", router }])` and exports `handler` as `GET`, `POST`, `PUT`, `PATCH`, `DELETE` and `HEAD`. For a new area, copy an existing route file. Controllers and middleware keep the `(req, res, next)` signature. `test/routes.test.js` checks that every endpoint is declared once and stays inside its route file's folder.
+Add a `router.get/post/…` line to the route file of its area, `frontend/src/app/api/v1/<area>/[[...path]]/route.js`. [API architecture](#api-architecture) explains how route files work, the middleware you can use, and how to add a new area.
 
 ## Configuration
 
@@ -444,6 +439,130 @@ AI endpoints have their own lower limits: 10 for agreement extraction, risk anal
 3. `PATCH /uploads/:fileId/complete` checks the stored file's size, type, and content signature, then records its SHA-256 hash.
 
 Private files are opened through `GET /uploads/:fileId/access-url`, which returns a URL that expires after 5 minutes.
+
+## API architecture
+
+The API is part of the Next.js app. This section explains how it is put together and how to work on it. Every endpoint, with its access rules, is listed in [docs/api-reference.md](docs/api-reference.md).
+
+### Layers
+
+All paths are inside `frontend/src/`.
+
+| Layer | Where | Job |
+|---|---|---|
+| Route files | `app/api/v1/<area>/[[...path]]/route.js` | Next.js entry points, one per area (44 in all). Each declares its area's routes with `Router()` and lists the middleware and controller for each route. |
+| HTTP layer | `server/http/` | Turns Next.js requests into the `(req, res, next)` calls the rest of the code uses: `router.js` (`Router()`), `route.js` (`apiRoutes()`, `route()`, error handling, security headers), `request.js` and `response.js` (the `req`/`res` objects). |
+| Middleware | `server/middleware/` | Sign-in check, roles, admin-controlled permissions, input validation, rate limits, form bodies. |
+| Controllers | `server/controllers/` | Read the request, load the record, check the caller may access *that* record, call services, shape the response. |
+| Services | `server/services/` | The business logic: contract risk, Copilot, evidence analysis, Risk Sentinel, matching, privacy, notifications, jobs, AI calls. Mostly plain functions that tests call directly. |
+| Models | `server/models/` | Mongoose schemas (see [Data model](#data-model)). |
+| Config | `server/config/` | Validated settings (`env.js`), the database connection, Firebase Admin, R2, fonts. |
+| Startup | `instrumentation.js` | Runs once when a long-running server starts: connects to MongoDB and starts the background jobs. |
+
+### How a request is handled
+
+Take `PATCH /api/v1/reviews/abc123` from a signed-in renter:
+
+1. **Next.js picks the route file** from the URL's folder: `app/api/v1/reviews/[[...path]]/route.js`. Unknown areas go to `app/api/[...path]/route.js`, which answers a JSON 404.
+2. **The route file finds the endpoint.** `apiRoutes()` compares the method and path with the file's routes in the order they are declared; the first match wins (`/mine` must therefore come before `/:id`). `HEAD` uses the `GET` route. No match, including a wrong method, gives a JSON 404 `{"success":false,"message":"Route not found"}`.
+3. **Shared steps run for every endpoint** (`route()` in `server/http/route.js`):
+   - security headers (the same set Helmet sends);
+   - the general rate limit (100 requests per IP per 15 minutes);
+   - the database connection, reused while the server or function stays warm, plus the platform settings. If the database can't be reached, the answer is `503` "temporarily unavailable". The health check skips this step.
+   - JSON body parsing, up to 1 MB. Invalid JSON gives `400`; a larger body gives `413`.
+4. **The route's own middleware runs, in order**, for example `authenticateUser`, then `allowRoles("renter")`. Each either calls `next()` or answers the request (`401`/`403`).
+5. **The controller** loads the review, checks that this renter wrote it, calls the service, and answers with `res.status(200).json({ success: true, ... })`.
+6. **Errors** go to the central error handler: `next(error)`, a thrown error, or a rejected promise.
+   - For a `4xx` status set on the error (`error.status = 422`), the client gets `{ success: false, message }`.
+   - Anything else becomes `500` with a generic message (or the error's `publicMessage`). It is recorded as a `SystemError`, which admins see under **Admin → System errors**. Clients never see stack traces or internal details.
+
+The pages call the API on the same origin (`/api/v1`), so there is no CORS. A cross-site page can't call the API with the admin cookie, because it can't add the `X-Neve-Admin` header without a CORS preflight, which the API never answers.
+
+### Anatomy of a route file
+
+A shortened version of `app/api/v1/reviews/[[...path]]/route.js`:
+
+```js
+import { Router } from "../../../../../server/http/router.js";
+import { apiRoutes } from "../../../../../server/http/route.js";
+import { authenticateUser } from "../../../../../server/middleware/auth.middleware.js";
+import { allowRoles } from "../../../../../server/middleware/role.middleware.js";
+import { getPropertyReviews, createReview, updateReview } from "../../../../../server/controllers/review.controller.js";
+
+const router = Router();
+
+router.get("/properties/:propertyId", getPropertyReviews);                                    // public
+router.post("/properties/:propertyId", authenticateUser, allowRoles("renter"), createReview); // renters only
+router.patch("/:reviewId", authenticateUser, allowRoles("renter"), updateReview);
+
+const handler = apiRoutes([{ prefix: "/api/v1/reviews", router }]);
+
+export const dynamic = "force-dynamic"; // never cache API responses
+export const maxDuration = 300;         // seconds, on Vercel
+export const GET = handler;
+export const POST = handler;
+export const PUT = handler;
+export const PATCH = handler;
+export const DELETE = handler;
+export const HEAD = handler;
+```
+
+- **Paths are relative to the prefix**: `"/:reviewId"` serves `/api/v1/reviews/:reviewId`. `:name` parts become `req.params.name`.
+- **`router.use(...)` adds middleware to every route declared after it**, which is handy when a whole area needs sign-in: `router.use(authenticateUser, allowRoles("admin"))`.
+- **A mount can add middleware for the whole file**, for example `apiRoutes([{ prefix: "/api/v1/auth", middleware: [authLimiter], router }])`.
+- **Only HTTP handlers and route settings may be exported**: no `export default`. `test/routes.test.js` checks this.
+
+### Middleware you can use
+
+| Middleware | File | What it does |
+|---|---|---|
+| `authenticateUser` | `auth.middleware.js` | Requires a signed-in user: a Firebase ID token (`Authorization: Bearer …`) or, for admins, the session cookie plus `X-Neve-Admin: 1`. Sets `req.user`. |
+| `allowRoles("renter", "landlord", …)` | `role.middleware.js` | Loads the user from MongoDB (current role, active account, session not revoked) and allows only the listed roles. Sets `req.neveUser`. |
+| `allowSuspendedRoles(...)` | `role.middleware.js` | Like `allowRoles`, but suspended accounts get through too, e.g. to appeal. |
+| `requirePermission(check, message)` | `role.middleware.js` | Refuses with `403 PERMISSION_DISABLED` when an admin has switched the feature off in platform settings. |
+| `validateRequest(schema)` | `validateRequest.js` | Checks `{ body, params, query }` against a Zod schema; puts the result in `req.validated`, or answers `400` with the field errors. |
+| `authLimiter`, `userLimiter`, `uploadLimiter`, `extractionLimiter`, `copilotLimiter`, `aiRankingLimiter` | `rateLimit.middleware.js` | Extra per-IP limits for sensitive or expensive endpoints, on top of the general limit. |
+| `urlencodedBody({ limitBytes })` | `formBody.middleware.js` | Parses HTML form posts (used by one-click email unsubscribe). |
+
+Inside a controller, `req` has `method`, `headers`, `params`, `query`, `body`, `ip`, `get(name)`, `user` and `neveUser`. `res` supports `status`, `json`, `send`, `set`, `type`, `redirect`, `cookie`, `clearCookie` and `end`, so a PDF can be sent with `res.set("Content-Type", "application/pdf"); res.end(buffer)`.
+
+### Adding an endpoint
+
+1. **Write the controller** in `server/controllers/<area>.controller.js`. Load the record and check that the caller may access it; a role check alone isn't enough. Answer `404` for records the caller can't see, so their existence isn't revealed.
+2. **Put the logic in a service** (`server/services/`), as a plain function where possible, so a unit test can call it without a database.
+3. **Add the route** to the area's route file, with `authenticateUser`, `allowRoles(...)` and, for input, `validateRequest(schema)`. Mind the order: specific paths before `/:id`.
+4. **Add tests** in `test/` for the service and for any new access rule, then run `npm test`.
+5. **Document it** in [docs/api-reference.md](docs/api-reference.md).
+
+### Adding a new area
+
+1. Create the folder `app/api/v1/<new-area>/[[...path]]/` and copy a small route file into it, such as `reviews`.
+2. Change the prefix in `apiRoutes([{ prefix: "/api/v1/<new-area>", router }])` and replace the routes.
+3. Run `npm test`. `test/routes.test.js` checks that every route stays under its folder's prefix, that no endpoint is declared twice, and that the file has no default export. It also counts the endpoints, so update its expected total.
+
+Nested areas work the same way: `admin/system/` is its own route file, and Next.js picks the most specific folder.
+
+### Jobs: timers and cron
+
+- **On a normal server** (`npm run dev`, `npm start`): `src/instrumentation.js` connects to MongoDB and starts the jobs on timers (reminders, digest, retention purge, backups, email delivery). A database lock makes sure only one instance runs a job at a time.
+- **On Vercel**, where there are no timers: Vercel Cron calls `GET /api/v1/cron/all` daily (`frontend/vercel.json`) with `CRON_SECRET`. Without `CRON_SECRET` that endpoint doesn't exist.
+- Admins can start any job under **Admin → System**, and every run is recorded.
+
+### Data layer
+
+- Models are defined with `defineModel()` (`server/models/defineModel.js`), which registers each model once per process, as Next.js may load a file more than once. So after changing a schema, restart `npm run dev`.
+- One MongoDB connection is shared by every route and reused between requests (`server/config/database.js`).
+- Changes to agreements are appended to a hash-chained audit trail, and admin actions to a hash-chained admin audit log. `GET /tenancy/agreements/:id/integrity` and `GET /admin/audit-logs/integrity` verify them. Every target type the admin log records must be listed in `AdminAuditLog`; `test/auditTargets.test.js` checks this.
+
+### AI calls
+
+Every AI feature calls the model through `server/services/aiClient.service.js`:
+
+- **Masked input.** Personal identifiers are removed first (`piiMasking.service.js`); uploaded files are turned into text on the server and masked before the model sees them.
+- **Strict output.** Every answer must match a Zod schema (Groq's strict JSON-schema mode). A cut-off or off-schema answer is discarded. When Groq rejects the output as invalid JSON (`json_validate_failed`), the request is sent once more.
+- **Short labels, not database IDs.** Prompts name records `C1`, `S1`, `P1`… (`idLabels()`), and answers are mapped back to real IDs before any check. Labels the model writes into its text are removed (`stripLabelRefs()`).
+- **Grounding checks.** After the answer arrives, only clauses, sections and records that were actually provided are kept, and extracted clauses are matched against the document text.
+- **Clear failures.** Provider errors become `AIServiceError` kinds (`auth`, `rate_limit`, `bad_request`, `api`). Users see "not configured", "busy, try again" or "couldn't answer"; the provider's real reason goes to the server log. Every call is recorded as an `AIUsageEvent` (feature, model, tokens, time) for **Admin → AI usage**.
 
 ## Data model
 
