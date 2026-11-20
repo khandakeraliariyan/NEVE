@@ -61,6 +61,12 @@ R2_REGION=auto
 
 # AI features (Groq)
 GROQ_API_KEY=
+# Optional: run the AI on Claude instead
+# AI_PROVIDER=anthropic
+# ANTHROPIC_API_KEY=
+# ANTHROPIC_MODEL=claude-sonnet-5-5
+# Local work: allow more than 100 API requests per 15 minutes
+# API_RATE_LIMIT=2000
 AI_MODEL=openai/gpt-oss-120b
 # Optional model overrides:
 # AGREEMENT_EXTRACTION_MODEL=
@@ -111,6 +117,8 @@ Run from `frontend/`.
 | `npm run restore-backup` | List or restore backups from object storage. |
 | `npm run eval` | Run the AI evaluation tooling. |
 | `npm run import-legal-sources` | Load `legal-corpus/*.json` as draft legal sources for legal review (see [legal-corpus/README.md](../frontend/legal-corpus/README.md)). |
+| `npm run seed-listings` | Add 20 realistic published listings with photos (R2 uploads under `seed/`). |
+| `npm run seed-demo-data` | Profiles and activity for demo accounts; `-- --remove` deletes one renter's demo records. |
 | `npm run seed-demo` | Create the synthetic `[DEMO]` dispute scenario for two existing accounts (see [Demo data](operations.md#demo-data)). |
 
 Backup and restore need R2 configured. To restore:
@@ -143,7 +151,7 @@ npm run import-legal-sources -- --as admin@example.com --submit legal-corpus/*.j
 Paths are inside `frontend/`.
 
 - `src/app/api/v1/<area>/[[...path]]/route.js` — the routes of one area (for example `auth`, `properties`, `tenancy`, `admin/system`), declared with `Router()` (see [Adding an endpoint](#adding-an-endpoint))
-- `src/app/api/v1/health/route.js`, `cron/[task]/route.js`, `platform/[[...path]]/route.js` — the health check, the cron endpoint and public platform info
+- `src/app/api/v1/health/[[...path]]/route.js`, `cron/[task]/route.js`, `platform/[[...path]]/route.js` — the health check, the cron endpoint and public platform info
 - `src/app/api/[...path]/route.js` — JSON 404 for unknown API paths
 - `src/server/http/` — `Router()`, `apiRoutes()` and `route()`: request and response objects, security headers, rate limit, database connection, body parsing, error handler
 - `src/instrumentation.js` — database connection and scheduled jobs when running as a long-lived server
@@ -185,7 +193,7 @@ API routes live under `/api/v1`, one route file per area in `src/app/api/v1/`. T
 | Administration | `/admin/dashboard`, `/admin/moderation`, `/admin/audit-logs`, `/admin/users`, `/admin/trust-approval`, `/admin/privacy`, `/admin/ai-evaluations`, `/admin/verifications`, `/admin/system`, `/admin/legal-sources`, `/admin/security`, `/admin` (platform settings), `/review-moderation` |
 | Public platform info | `GET /platform`, `GET /platform/privacy-policy` |
 
-Rate limits are counted per client IP over 15-minute windows: 100 requests across the API, 20 on `/auth` and `/users`, and a separate budget of 120 for `/uploads`, enough for a full listing's media. AI endpoints have their own lower limits: 10 for agreement extraction, risk analysis and legal suggestions; 10 for recommendation ranking; and 40 for Legal Copilot questions.
+Rate limits are counted per client IP over 15-minute windows: 100 requests across the API (`API_RATE_LIMIT`, not counting listing thumbnails, which have their own budget of 1,000), 20 on `/auth` and `/users`, and a separate budget of 120 for `/uploads`, enough for a full listing's media. AI endpoints have their own lower limits: 10 for agreement extraction, risk analysis and legal suggestions; 10 for recommendation ranking; and 40 for Legal Copilot questions.
 
 Firebase ID tokens authenticate renters, landlords, and legal reviewers; admins use the session cookie described above. The API applies role and resource-level authorization; UI route restrictions are not a substitute for these checks. Private uploads use signed URLs and require a configured object-storage integration.
 

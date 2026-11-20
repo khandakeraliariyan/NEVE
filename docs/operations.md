@@ -43,6 +43,7 @@ See [deployment-vercel.md](deployment-vercel.md).
 ### Health
 
 - `GET /api/v1/health` returns `{"success":true,...}`. Use it for load-balancer checks.
+- `GET /api/v1/health/status` checks the database, Firebase, file storage, AI and the app URL, and says what is wrong (for example a wrong database password or an unreadable Firebase key) without showing secrets. Open it first after a deployment.
 - **Admin → Platform health** and **Admin → System** show the state of the database and connected services, recent job runs and their failures, and email deliveries.
 
 ## Scheduled jobs

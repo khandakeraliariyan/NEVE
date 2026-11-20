@@ -68,6 +68,7 @@ Earlier versions deployed two projects: `neve-web` (pages, Root Directory `front
    | `FIELD_ENCRYPTION_KEY` | 32 random bytes, base64 (needed for identity verification) |
    | `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID` | the Firebase web app values; built into the pages, so **redeploy whenever you change them** |
    | `GROQ_API_KEY`, `AI_MODEL` | for AI features (`AI_MODEL` defaults to `openai/gpt-oss-120b`) |
+| `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | optional: `anthropic`, a Claude key and a Claude model (default `claude-sonnet-5-5`), to run the AI features on Claude instead of Groq |
    | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | for uploads |
    | `EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM` | optional: email |
    | `BACKUP_ENABLED`, `RETENTION_PURGE_ENABLED` | optional: `true` to run them in the daily cron |
@@ -112,6 +113,7 @@ Then a legal reviewer, not the importing admin, approves the legal sources in th
 | Check | Expected |
 |---|---|
 | `https://<domain>/api/v1/health` | `{"success":true,...}` |
+| `https://<domain>/api/v1/health/status` | `"success":true`, with every check `"ok":true`. A failing check names the cause, for example a wrong database password. |
 | Open the app and sign up | The workspace opens; no errors in the browser console |
 | Admin sign-in at `/admin/sign-in` | Stays signed in |
 | Upload an agreement | The upload completes (R2 CORS and credentials) |

@@ -190,14 +190,14 @@ When a signed-in user loads a protected resource, the frontend gets a Firebase I
 
 | Area | Technologies |
 |---|---|
-| Web application | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
+| Web application | Next.js 16 (App Router), React 19, Tailwind CSS 4; Plus Jakarta Sans headings, Inter text and Noto Sans Bengali for Bangla |
 | Maps | Leaflet and React Leaflet |
 | Authentication | Firebase Authentication in the browser; Firebase Admin in the API; scrypt-hashed passwords and signed JWT cookies for admins |
 | API | Next.js 16 route handlers (`frontend/src/app/api`) in the same app, with the server code in `frontend/src/server` |
 | Data | MongoDB and Mongoose 9 |
 | Private file storage | Cloudflare R2 via the S3-compatible API |
 | Documents | Tesseract.js OCR (English and Bangla), pdf.js, sharp and @napi-rs/canvas for images and PDF reports |
-| AI features | Groq SDK; optional, with a configurable model per feature |
+| AI features | Groq (default) or Claude via the Anthropic API; optional, with a configurable model per feature |
 | Email | Resend or SendGrid over HTTP |
 | Maps data | OpenStreetMap Overpass (nearby places) and OSRM (walking and driving times) |
 | Validation and API protection | Zod, security headers and per-IP rate limits (`frontend/src/server/http`, `frontend/src/server/middleware`) |
@@ -282,6 +282,7 @@ All settings are validated in `frontend/src/server/config/env.js` when the API l
 |---|---|---|
 | `NODE_ENV` | `development` | `development`, `test`, or `production`. In production the admin cookie is `Secure`, so it needs HTTPS. |
 | `PORT` | `5173` | The app's port, used for local links. The `dev` and `start` scripts listen on 5173. |
+| `API_RATE_LIMIT` | `100` | Requests one visitor may make to the API per 15 minutes (see [rate limits](#api-overview)). Raise it for local work or a demo, because each page makes several calls. |
 | `TRUST_PROXY_HOPS` | `0` | Number of reverse proxies in front of the API (usually `1` on hosting platforms), so rate limits and session IPs use the real client IP. Leave it at `0` when clients connect directly; otherwise they could fake their IP. |
 | `ADMIN_JWT_EXPIRES_IN` | `8h` | Admin session lifetime. |
 | `ADMIN_COOKIE_SAMESITE` | `strict` | `strict`, `lax`, or `none`. Pages and API share an origin, so `strict` fits almost every setup. |
@@ -300,12 +301,12 @@ All settings are validated in `frontend/src/server/config/env.js` when the API l
 | `MAX_FLOOR_PLAN_SIZE_MB` | `10` | Floor plans. |
 | `MAX_TENANCY_EVIDENCE_SIZE_MB` | `15` | Tenancy evidence, verification documents, and legal sources. |
 
-**AI (Groq)**
+**AI (Groq or Claude)**
 
 | Setting | Default | Description |
 |---|---|---|
 | `GROQ_API_KEY` | none | Without it, AI features report "not configured". |
-| `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | `groq`, none, `claude-sonnet-5-5` | Optional. Set `AI_PROVIDER=anthropic` with a key to run the AI features on Claude instead of Groq. |
+| `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | `groq`, none, `claude-sonnet-5-5` | Optional. Set `AI_PROVIDER=anthropic` with a key to run the AI features on Claude instead of Groq. With Claude, the per-feature model settings below are ignored and `ANTHROPIC_MODEL` is used. |
 | `AI_MODEL` | `openai/gpt-oss-120b` | Default model; must support strict JSON-schema output. |
 | `AGREEMENT_EXTRACTION_MODEL` | `AI_MODEL` | Agreement, clause, risk, and legal features. |
 | `RECOMMENDATION_MODEL` | `AI_MODEL` | AI ranking of a renter's recommendation shortlist. |
@@ -380,6 +381,8 @@ Run each command from `frontend/`.
 | `npm run restore-backup` | List or restore backups. |
 | `npm run eval` | AI evaluation (see [AI features and evaluation](#ai-features-and-evaluation)). |
 | `npm run import-legal-sources` | Load `legal-corpus/*.json` as draft legal sources for legal review (see [frontend/legal-corpus/README.md](frontend/legal-corpus/README.md)). |
+| `npm run seed-listings` | Add 20 realistic, published Bangladeshi listings with photos (see [Preparing a demo](#preparing-a-demo)). `-- --dry-run` validates only; `-- --confirm --reset` replaces an earlier seed. |
+| `npm run seed-demo-data` | Prepare demo accounts: profiles, a landlord with listings, and a renter with saved homes, inquiries, viewings, notifications and a review. `-- --remove` deletes one renter's demo records. |
 | `npm run seed-demo` | Create the synthetic `[DEMO]` dispute scenario for two existing demo accounts (see [docs/HACKATHON_DEMO_SCRIPT.md](docs/HACKATHON_DEMO_SCRIPT.md)). |
 
 Restoring a backup (needs R2):
@@ -412,7 +415,7 @@ Workspace navigation is role-aware (`frontend/src/nav.js`). Frontend route check
 
 ## API overview
 
-All routes are under `/api/v1`. The health check is `GET /api/v1/health`. Every endpoint, with its access rules, is listed in [docs/api-reference.md](docs/api-reference.md).
+All routes are under `/api/v1`. The health check is `GET /api/v1/health`; `GET /api/v1/health/status` checks the database, Firebase, storage and AI settings and says what is misconfigured, without showing any secret. Every endpoint, with its access rules, is listed in [docs/api-reference.md](docs/api-reference.md).
 
 | Area | Paths under `/api/v1` |
 |---|---|
@@ -428,7 +431,8 @@ All routes are under `/api/v1`. The health check is `GET /api/v1/health`. Every 
 Responses are JSON with a `success` flag. Errors include a `message`, and some include a machine-readable `code` such as `SESSION_REVOKED`, `PERMISSION_DISABLED`, or `CSRF_CHECK_FAILED`.
 
 **Rate limits** are counted per client IP over 15-minute windows:
-- 100 requests across the API;
+- 100 requests across the API (`API_RATE_LIMIT`), not counting listing thumbnails;
+- a separate budget of 1,000 for listing thumbnails, because every listing card loads its own photo;
 - 20 on `/auth` and `/users`;
 - a separate budget of 120 for `/uploads`, enough for a full listing's media.
 
@@ -557,7 +561,7 @@ Nested areas work the same way: `admin/system/` is its own route file, and Next.
 
 ### AI calls
 
-Every AI feature calls the model through `server/services/aiClient.service.js`:
+Every AI feature calls the model through `server/services/aiClient.service.js` (Groq by default; Claude when `AI_PROVIDER=anthropic`, through `anthropicClient.service.js`):
 
 - **Masked input.** Personal identifiers are removed first (`piiMasking.service.js`); uploaded files are turned into text on the server and masked before the model sees them.
 - **Strict output.** Every answer must match a Zod schema (Groq's strict JSON-schema mode). A cut-off or off-schema answer is discarded. When Groq rejects the output as invalid JSON (`json_validate_failed`), the request is sent once more.
@@ -606,7 +610,7 @@ Admins change these at runtime under **Admin → Settings**, without editing env
 
 ## AI features and evaluation
 
-AI features run on Groq and are optional. When `GROQ_API_KEY` is missing, they report "not configured" and the rest of the app keeps working. How each feature works is in [docs/features.md](docs/features.md), and how AI is called safely (masking, strict schemas, grounding checks) is in [docs/architecture.md](docs/architecture.md#calling-ai-safely).
+AI features run on Groq (or Claude, with `AI_PROVIDER=anthropic`) and are optional. When `GROQ_API_KEY` is missing, they report "not configured" and the rest of the app keeps working. How each feature works is in [docs/features.md](docs/features.md), and how AI is called safely (masking, strict schemas, grounding checks) is in [docs/architecture.md](docs/architecture.md#calling-ai-safely).
 
 - **Agreement analysis:** text extraction from uploaded agreements (OCR for scans, in English and Bangla), plus clause, obligation, and contract-risk extraction.
 - **Contract risk findings:** each finding shows the original clause wording, why it was flagged, and a decision trace (method, passages, legal sources, limits, human review).
@@ -641,8 +645,22 @@ The demo uses one synthetic dispute and the real legal corpus. Run these from `f
    ```
 
    A legal reviewer then compares each source with the official page and approves it under **Legal review → Legal sources**. The person who imported a source can't approve it. Until approval, Legal Copilot and contract-risk findings don't use it.
-2. **Demo accounts.** Sign up a renter and a landlord in the app, since they use Firebase sign-in and the script can't create them.
-3. **Scenario.** Create the `[DEMO]` listing, agreement, payments, maintenance request and condition record:
+2. **Demo listings.** Add 20 realistic listings (Dhaka, Chattogram and Sylhet) with two photos each, uploaded to R2 under `seed/`:
+
+   ```bash
+   npm run seed-listings -- --dry-run
+   npm run seed-listings -- --confirm
+   ```
+
+3. **Demo accounts.** Sign up a renter and a landlord in the app, since they use Firebase sign-in and the script can't create them. Then give them activity, with a landlord who owns six of the listings and a renter with saved homes, inquiries, viewings, a saved search and notifications (use `--keep-profile` to leave a real account's name and details alone):
+
+   ```bash
+   npm run seed-demo-data -- --renter renter@example.com --landlord landlord@example.com --confirm
+   npm run seed-demo-data -- --renter renter@example.com --remove --confirm   # delete that renter's demo records
+   ```
+
+   Notifications are inserted directly, so the demo sends no email.
+4. **Scenario.** Create the `[DEMO]` listing, agreement, payments, maintenance request and condition record:
 
    ```bash
    npm run seed-demo -- --dry-run
@@ -650,7 +668,7 @@ The demo uses one synthetic dispute and the real legal corpus. Run these from `f
    npm run seed-demo -- --renter ... --landlord ... --confirm --reset   # replace an earlier demo
    ```
 
-4. **Walkthrough.** Follow [docs/HACKATHON_DEMO_SCRIPT.md](docs/HACKATHON_DEMO_SCRIPT.md). Leave about a minute between AI actions on Groq's free tier (see [AI features and evaluation](#ai-features-and-evaluation)), and keep a recording as a fallback.
+5. **Walkthrough.** Follow [docs/HACKATHON_DEMO_SCRIPT.md](docs/HACKATHON_DEMO_SCRIPT.md). Leave about a minute between AI actions on Groq's free tier (see [AI features and evaluation](#ai-features-and-evaluation)), and keep a recording as a fallback.
 
 All demo names, places and amounts are invented. Don't seed a database that holds real user data.
 
@@ -718,6 +736,7 @@ Set these in Vercel → project → Settings → Environment Variables (Producti
 | `CRON_SECRET` | a random value: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `ADMIN_JWT_SECRET`, `FIELD_ENCRYPTION_KEY` | the same values as your local `.env` (changing `FIELD_ENCRYPTION_KEY` makes stored ID numbers unreadable) |
 | `GROQ_API_KEY` | Groq key |
+| `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | optional: `anthropic`, a Claude key and `claude-sonnet-5-5`, to run the AI on Claude |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_REGION=auto` | Cloudflare R2 |
 | `EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM` | Resend or SendGrid |
 | `OVERPASS_API_URL` | `https://overpass-api.de/api/interpreter` (comma-separate fallbacks) |
@@ -734,6 +753,7 @@ Don't set `NODE_ENV`, `PORT`, `FIREBASE_SERVICE_ACCOUNT_PATH`, `NEVE_API_BASE_UR
 - **Cloudflare R2 → bucket → CORS policy** allows the app's origin with `GET` and `PUT`, so browsers can upload.
 - **Resend**: in test mode (`EMAIL_FROM=onboarding@resend.dev`) emails reach only the Resend account owner. Verify a domain and send from an address on it.
 - **Groq**: the free tier (8,000 tokens per minute) can't run the AI risk check or legal-source suggestions; use a paid tier.
+- **Check the deployment**: open `/api/v1/health/status`. Anything with `"ok": false` comes with a hint, such as a wrong database password or an unreadable Firebase key.
 - **Data**: a new database needs an admin (`npm run create-admin`) and the legal corpus imported and approved by a legal reviewer (see [Preparing a demo](#preparing-a-demo)).
 - **Secrets that were ever shared** (in chats, screenshots or messages) should be rotated: the database password and the Groq, Resend and R2 keys. Changing `ADMIN_JWT_SECRET` signs everyone out.
 
@@ -741,7 +761,7 @@ Don't set `NODE_ENV`, `PORT`, `FIREBASE_SERVICE_ACCOUNT_PATH`, `NEVE_API_BASE_UR
 
 ```bash
 cd frontend
-npm test                      # 450 unit tests; no database or network needed
+npm test                      # 455 unit tests; no database or network needed
 npm run eval -- --check
 npm run lint && npm run build
 npm run test:e2e              # Selenium browser smoke tests; start the app first
@@ -814,6 +834,8 @@ Not yet verified: the full live (model-backed) evaluation, which costs money, an
 | `npm run dev` stops with "OS file watch limit reached" (or `ENOSPC`) | Your system's file-watcher limit is used up, often by the editor watching `node_modules`. Exclude `node_modules` and `.next` from the editor's file watcher (in VS Code, `files.watcherExclude`), or raise `fs.inotify.max_user_watches`. |
 | VS Code's Source Control lists thousands of `.next` or `node_modules` files | Those are generated files. Check that they sit inside `frontend/` (where `.gitignore` covers them), delete any copy at the repository root, and reload the window. |
 | API requests fail and the log says "Environment configuration is invalid" | The logged field list; `ADMIN_JWT_SECRET` must be at least 32 characters, and `CLIENT_URL` must be a full URL. |
+| You deployed and want to know what is misconfigured | Open `/api/v1/health/status`. It reports the database, Firebase, storage, AI and app URL, with a hint for each failure and no secrets. |
+| Listing photos show a grey placeholder, or pages show "Too many requests" locally | The shared API limit (100 per 15 minutes) is used up by page loads. Set `API_RATE_LIMIT=2000` in `frontend/.env` and restart. Photos need the listing's files in R2. |
 | Database connection fails, or every API request returns `503` | MongoDB is running and `MONGODB_URI` points at it. For the local snap: `sudo snap start --enable mongodb-server-replicaset`. For Atlas: "Could not connect to any servers… IP that isn't whitelisted" means your public IP isn't under Atlas → Network Access. |
 | Firebase initialization fails | The service-account path is relative to `frontend/`, and the file is readable. |
 | Sign-in is unavailable | The `NEXT_PUBLIC_FIREBASE_*` settings (set before building), the sign-in methods turned on in Firebase (Authentication → Sign-in method), and the app's domain in Firebase's authorized domains. |

@@ -12,7 +12,7 @@ cd frontend && npm run dev     # pages and API on :5173, reloads on change
 
 Optional services (R2, Groq, email) can be left unset; their features report "not configured".
 
-**Use a separate database for experiments**, for example `MONGODB_URI=mongodb://localhost:27017/neve_dev`. Scripts such as `seed-demo` and `import-legal-sources` write to whatever `MONGODB_URI` points at.
+**Use a separate database for experiments**, for example `MONGODB_URI=mongodb://localhost:27017/neve_dev`. Scripts such as `seed-demo`, `seed-listings`, `seed-demo-data` and `import-legal-sources` write to whatever `MONGODB_URI` points at (`seed-listings` also uploads photos to the R2 bucket in your settings).
 
 ## Repository layout
 
