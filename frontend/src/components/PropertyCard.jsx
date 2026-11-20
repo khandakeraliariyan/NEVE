@@ -1,13 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { label, money } from "../lib/format";
 import { useCompare } from "../lib/compare";
 
 const TINTS = ["#d9cfc4", "#c9bdb1", "#e4dccf", "#b8aea4", "#d4ccc2"];
 
-// Listing APIs return file IDs, not image URLs, so cards use a tinted placeholder.
-export function PropertyImage({ property, className = "", children }) {
+// Listing APIs return file IDs, not image URLs. A listing with photos loads its first one from the
+// thumbnail endpoint (it redirects to a short-lived link); the tinted placeholder shows behind it
+// and stays when there is no photo or the photo fails to load.
+// `tryPhoto` asks for the photo even when the data has no image list (the compare table).
+export function PropertyImage({ property, className = "", children, tryPhoto = false }) {
+    const [failed, setFailed] = useState(false);
+    const hasPhoto = (tryPhoto || (property?.images?.length ?? 0) > 0) && !failed;
     const seed = String(property?._id ?? "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
     const tint = TINTS[seed % TINTS.length];
     return (
@@ -20,6 +26,16 @@ export function PropertyImage({ property, className = "", children }) {
                 <svg viewBox="0 0 120 80" className="absolute inset-0 m-auto h-1/2 w-1/2 text-night/10" fill="currentColor">
                     <path d="M60 8 10 44h12v28h28V52h20v20h28V44h12z" />
                 </svg>
+                {hasPhoto && (
+                    <img
+                        src={`/api/v1/property-images/${property._id}/thumbnail`}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        onError={() => setFailed(true)}
+                        className="absolute inset-0 h-full w-full object-cover"
+                    />
+                )}
             </div>
             {children}
         </div>

@@ -37,7 +37,7 @@ const util = (utility, billing, monthlyAmount = null) => ({ utility, billing, mo
 // landlord: index into LANDLORDS. rent and other money are in BDT per month unless noted.
 const LISTINGS = [
     { l: 0, type: "apartment", title: "Bright 3-bedroom flat near Dhanmondi Lake, Road 27", area: "Dhanmondi", city: "Dhaka", ll: [23.7569, 90.3756], bed: 3, bath: 3, sqft: 1650, floor: 5, furn: "unfurnished", rent: 55000, service: 3500, maint: 0,
-      amenities: ["Lift", "Generator backup", "Gas line", "Car parking", "24/7 security", "CCTV"], utils: [util("gas", "included"), util("water", "included"), util("electricity", "estimated", 3500), util("internet", "not_disclosed")],
+      amenities: ["Lift", "Generator backup", "Gas line", "Car parking", "24/7 security", "CCTV"], utils: [util("gas", "included"), util("water", "included"), util("electricity", "estimated", 3500), util("internet", "fixed", 1000)],
       desc: "Corner flat on the fifth floor with cross ventilation and a view of the lake. Five minutes on foot from Rabindra Sarobar. Tiled floors, a separate dining area and a servant's room." },
     { l: 0, type: "apartment", title: "Renovated 2-bedroom apartment, Mohammadpur Town Hall", area: "Mohammadpur", city: "Dhaka", ll: [23.7662, 90.3589], bed: 2, bath: 2, sqft: 1050, floor: 3, furn: "unfurnished", rent: 28000, service: 2000, maint: 0,
       amenities: ["Lift", "Gas line", "Generator backup", "Rooftop access"], utils: [util("gas", "fixed", 1000), util("water", "included"), util("electricity", "estimated", 2200)],
@@ -49,13 +49,13 @@ const LISTINGS = [
       amenities: ["Lift", "Generator backup", "Gas line", "Car parking", "24/7 security", "Rooftop access"], utils: [util("gas", "fixed", 1000), util("water", "included"), util("electricity", "estimated", 3000)],
       desc: "Open, airy flat in a well-kept building on Road 11. Near the Uttara Metro Rail station, Sector 7 market and several schools. Two balconies facing south." },
     { l: 1, type: "apartment", title: "Modern 3-bedroom apartment in Bashundhara R/A, Block C", area: "Bashundhara R/A", city: "Dhaka", ll: [23.8193, 90.4526], bed: 3, bath: 3, sqft: 1600, floor: 7, furn: "unfurnished", rent: 45000, service: 4000, maint: 0,
-      amenities: ["Lift", "Generator backup", "Gas line", "Car parking", "CCTV", "Community hall"], utils: [util("gas", "included"), util("water", "included"), util("electricity", "estimated", 3500), util("internet", "not_disclosed")],
+      amenities: ["Lift", "Generator backup", "Gas line", "Car parking", "CCTV", "Community hall"], utils: [util("gas", "included"), util("water", "included"), util("electricity", "estimated", 3500), util("internet", "fixed", 1000)],
       desc: "Seventh-floor flat with open views and plenty of daylight. Close to Evercare Hospital, North South University and the Block C mosque. Parking space included." },
     { l: 1, type: "house", title: "Independent 4-bedroom duplex with garden, Uttara Sector 13", area: "Uttara", city: "Dhaka", ll: [23.8627, 90.3892], bed: 4, bath: 4, sqft: 2800, floor: 0, furn: "unfurnished", rent: 85000, service: 0, maint: 5000,
       amenities: ["Private garden", "Car parking", "Generator backup", "Gas line", "Boundary wall", "Rooftop access"], utils: [util("gas", "included"), util("water", "included"), util("electricity", "not_disclosed")],
       desc: "A standalone duplex on a 5-katha plot with a small lawn and a covered car porch. Suitable for a large family or a small office. Quiet street, ten minutes from the airport road." },
     { l: 0, type: "apartment", title: "Premium 3-bedroom flat with balcony, Gulshan 2", area: "Gulshan", city: "Dhaka", ll: [23.7925, 90.4078], bed: 3, bath: 4, sqft: 2100, floor: 8, furn: "unfurnished", rent: 95000, service: 8000, maint: 0,
-      amenities: ["Lift", "Generator backup", "Gas line", "Car parking (2)", "24/7 security", "Gym", "CCTV"], utils: [util("gas", "included"), util("water", "included"), util("electricity", "estimated", 6000), util("internet", "not_disclosed")],
+      amenities: ["Lift", "Generator backup", "Gas line", "Car parking (2)", "24/7 security", "Gym", "CCTV"], utils: [util("gas", "included"), util("water", "included"), util("electricity", "estimated", 6000), util("internet", "fixed", 1000)],
       desc: "High-floor apartment near Gulshan Circle 2 with two large balconies, a master bedroom with a dressing room, and a shared gym on the roof. Two covered parking spaces." },
     { l: 1, type: "apartment", title: "Cozy 2-bedroom flat in Banani near Road 11", area: "Banani", city: "Dhaka", ll: [23.7940, 90.4043], bed: 2, bath: 2, sqft: 1250, floor: 4, furn: "furnished", rent: 60000, service: 5000, maint: 0,
       amenities: ["Furnished", "AC in bedrooms", "Lift", "Generator backup", "Gas line", "Wi-Fi ready"], utils: [util("gas", "included"), util("water", "included"), util("electricity", "estimated", 5000), util("internet", "fixed", 1200)],
@@ -133,8 +133,9 @@ export function buildProperty(item, landlordId, index, imageIds = []) {
         monthlyRent: rent,
         securityDeposit: item.type === "shared_room" ? rent : rent * 2,
         advanceRent: rent,
-        monthlyServiceCharge: item.service || null,
-        monthlyMaintenanceCharge: item.maint || null,
+        // An explicit 0 means "no such charge"; an empty value would show as undisclosed.
+        monthlyServiceCharge: item.service,
+        monthlyMaintenanceCharge: item.maint,
         utilities: item.utils,
         otherFees: item.type === "room" || item.type === "shared_room" ? [] : [{ name: "Agreement stamp and registration", amount: 2500, frequency: "one_time", refundable: false, notes: "Paid once when signing." }],
     };

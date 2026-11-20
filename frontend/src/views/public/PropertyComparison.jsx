@@ -120,7 +120,7 @@ export default function PropertyComparison() {
                                     </th>
                                     {items.map((p) => (
                                         <th key={p.id} className="px-4 py-4 text-left align-top font-normal">
-                                            <PropertyImage property={{ _id: p.id }} className="mb-3 h-28 rounded-xl">
+                                            <PropertyImage property={{ _id: p.id }} tryPhoto className="mb-3 h-28 rounded-xl">
                                                 <button
                                                     type="button"
                                                     onClick={() => compare.remove(String(p.id))}

@@ -11,12 +11,13 @@ import {
 import { authenticateUser } from "../../../../../server/middleware/auth.middleware.js";
 import { allowRoles } from "../../../../../server/middleware/role.middleware.js";
 import { apiRoutes } from "../../../../../server/http/route.js";
+import { thumbnailLimiter } from "../../../../../server/middleware/rateLimit.middleware.js";
 
 const router = Router();
 
 // Public listing image endpoint.
 router.get("/:propertyId", getPropertyImages);
-router.get("/:propertyId/thumbnail", getPropertyThumbnail);
+router.get("/:propertyId/thumbnail", thumbnailLimiter, getPropertyThumbnail);
 
 // Only authenticated users can manage property images.
 router.post(

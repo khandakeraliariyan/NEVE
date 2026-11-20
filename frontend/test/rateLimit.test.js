@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { env } from "../src/server/config/env.js";
 import { route, setPreflight } from "../src/server/http/route.js";
 import { apiLimiter, uploadLimiter, UPLOAD_RATE_LIMIT } from "../src/server/middleware/rateLimit.middleware.js";
 
@@ -30,7 +31,7 @@ test("a full listing's uploads fit the limit and don't use the general budget", 
 
     const otherResponse = await other(request("/api/v1/other"));
     assert.equal(otherResponse.status, 200);
-    assert.equal(otherResponse.headers.get("ratelimit-remaining"), "99");
+    assert.equal(otherResponse.headers.get("ratelimit-remaining"), String(env.API_RATE_LIMIT - 1));
 
     for (let index = needed; index < UPLOAD_RATE_LIMIT; index += 1) {
         await presign(request("/api/v1/uploads/presign", { method: "POST" }));
@@ -42,4 +43,22 @@ test("a full listing's uploads fit the limit and don't use the general budget", 
     // Another client has its own budget.
     const elsewhere = await presign(request("/api/v1/uploads/presign", { method: "POST", headers: { "x-forwarded-for": "198.51.100.4" } }));
     assert.equal(elsewhere.status, 200);
+});
+
+test("listing thumbnails don't use the general API budget", async (t) => {
+    setPreflight((req, res, next) => next());
+    apiLimiter.reset();
+    t.after(() => setPreflight(null));
+
+    const thumbnail = route("/api/v1/property-images/:id/thumbnail", ok);
+    const other = route("/api/v1/other", ok);
+
+    // A page of cards asks for far more thumbnails than the general limit allows.
+    for (let index = 0; index < 150; index += 1) {
+        const response = await thumbnail(request("/api/v1/property-images/abc123/thumbnail"));
+        assert.equal(response.status, 200);
+    }
+    const response = await other(request("/api/v1/other"));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("ratelimit-remaining"), String(env.API_RATE_LIMIT - 1));
 });

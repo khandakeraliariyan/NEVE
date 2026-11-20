@@ -22,14 +22,16 @@ const CATEGORIES = ["healthcare", "education", "groceries", "transport", "bankin
 
 function Gallery({ property }) {
     const [active, setActive] = useState(0);
-    const images = property.images ?? [];
+    // The listing holds file IDs; the media endpoint turns them into short-lived image links.
+    const media = useApi(() => api.get(`/property-images/${property.id}`, null, { auth: false }), [property.id]);
+    const images = media.data?.images ?? [];
     if (!images.length) {
         return <PropertyImage property={{ _id: property.id }} className="h-80 rounded-2xl md:h-[420px]" />;
     }
     return (
         <div className="grid gap-3 md:grid-cols-[2fr_1fr]">
             <img src={images[active].url} alt={images[active].name ?? property.title} className="h-80 w-full rounded-2xl object-cover md:h-[420px]" />
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-2 content-start gap-3 md:grid-cols-2">
                 {images.slice(0, 4).map((image, index) => (
                     <button key={image.id} type="button" onClick={() => setActive(index)} className={`overflow-hidden rounded-xl ${index === active ? "ring-2 ring-forest" : ""}`}>
                         <img loading="lazy" decoding="async" src={image.url} alt={image.name ?? ""} className="h-32 w-full object-cover md:h-[202px]" />

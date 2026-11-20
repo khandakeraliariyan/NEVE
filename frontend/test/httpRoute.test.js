@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, beforeEach } from "node:test";
 
+import { env } from "../src/server/config/env.js";
 import { notFound, route, setPreflight } from "../src/server/http/route.js";
 import { clientIp, matchPattern } from "../src/server/http/request.js";
 import { urlencodedBody } from "../src/server/middleware/formBody.middleware.js";
@@ -85,7 +86,7 @@ test("middleware runs in order and a stack that never responds ends in a 404", a
 
     const unknown = await notFound(new Request("http://localhost/api/v1/nothing-here"));
     assert.equal(unknown.status, 404);
-    assert.equal(unknown.headers.get("ratelimit-limit"), "100");
+    assert.equal(unknown.headers.get("ratelimit-limit"), String(env.API_RATE_LIMIT));
 });
 
 test("responses carry headers, cookies, binary bodies and redirects", async () => {

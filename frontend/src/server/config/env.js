@@ -86,6 +86,8 @@ const baseSchema = z.object({
         .default("https://routing.openstreetmap.de/routed-car"),
     // AI features run on Groq. Without a key they report "not configured".
     GROQ_API_KEY: z.string().optional(),
+    // Requests one visitor may make to the API per 15 minutes (uploads and thumbnails have their own limits).
+    API_RATE_LIMIT: z.coerce.number().int().min(10).default(100),
     // Optional: run the AI features on Claude instead (AI_PROVIDER=anthropic).
     AI_PROVIDER: z.enum(["groq", "anthropic"]).default("groq"),
     ANTHROPIC_API_KEY: z.string().optional(),

@@ -1,5 +1,7 @@
 import { isIP } from "node:net";
 
+import { env } from "../config/env.js";
+
 const WINDOW_MS = 15 * 60 * 1000;
 
 // A full listing holds 30 media files, and each file takes two upload requests.
@@ -70,14 +72,18 @@ export function createLimiter(name, limit, { windowMs = WINDOW_MS, skip = () => 
 }
 
 const isUploadRequest = (req) => req.path === "/api/v1/uploads" || req.path.startsWith("/api/v1/uploads/");
+// Every listing card loads its own thumbnail, so a page of homes makes dozens of these.
+export const THUMBNAIL_RATE_LIMIT = 1000;
+const isThumbnailRequest = (req) => /^\/api\/v1\/property-images\/[^/]+\/thumbnail$/.test(req.path);
 
-// Applied to every API request. Uploads have their own limiter, so they don't
-// also use up the budget for the rest of the API.
-export const apiLimiter = createLimiter("api", 100, { skip: isUploadRequest });
+// Applied to every API request. Uploads and listing thumbnails have their own
+// limiters, so they don't also use up the budget for the rest of the API.
+export const apiLimiter = createLimiter("api", env.API_RATE_LIMIT, { skip: (req) => isUploadRequest(req) || isThumbnailRequest(req) });
 
 export const authLimiter = createLimiter("auth", 20);
 export const userLimiter = createLimiter("user", 20);
 export const uploadLimiter = createLimiter("upload", UPLOAD_RATE_LIMIT);
+export const thumbnailLimiter = createLimiter("thumbnail", THUMBNAIL_RATE_LIMIT);
 
 // Each extraction is a paid model call on a whole document.
 export const extractionLimiter = createLimiter("extraction", 10);
