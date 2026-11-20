@@ -22,10 +22,12 @@ export default function SignIn() {
 
     const [adminRedirect, setAdminRedirect] = useState(false);
 
+    // Remember that an admin landed here, since signing them out clears the role.
+    if (status === "ready" && role === "admin" && !adminRedirect) setAdminRedirect(true);
+
     useEffect(() => {
         // Admins have their own portal and can't use this page, even with a password.
         if (status === "ready" && role === "admin") {
-            setAdminRedirect(true);
             signOut();
             return;
         }

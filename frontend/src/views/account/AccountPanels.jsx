@@ -263,7 +263,7 @@ function PhotoControls({ profile, setProfile }) {
     return (
         <div className="flex flex-wrap items-center gap-4 border-t border-line py-3 text-sm">
             {src ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                 
                 <img src={src} alt="Your profile photo" className="h-16 w-16 rounded-full object-cover" referrerPolicy="no-referrer" />
             ) : (
                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-mist text-xl font-semibold text-muted">

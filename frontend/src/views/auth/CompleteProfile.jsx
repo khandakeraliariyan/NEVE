@@ -17,17 +17,14 @@ const ROLE_OPTIONS = [
 export default function CompleteProfile() {
     const { status, role, setProfile, firebaseUser } = useAuth();
     const router = useRouter();
-    const [displayName, setDisplayName] = useState("");
+    // Google accounts come with a name; offer it as the default until the user types their own.
+    const [nameInput, setDisplayName] = useState(null);
+    const displayName = nameInput ?? firebaseUser?.displayName ?? "";
     const [selectedRole, setSelectedRole] = useState(null);
     const platform = usePlatformInfo();
     const landlordClosed = platform?.landlordSignupsOpen === false;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
-
-    // Google accounts come with a name; offer it as the default.
-    useEffect(() => {
-        if (firebaseUser?.displayName) setDisplayName((current) => current || firebaseUser.displayName);
-    }, [firebaseUser]);
 
     useEffect(() => {
         if (status === "ready") router.replace(homePathForRole(role));

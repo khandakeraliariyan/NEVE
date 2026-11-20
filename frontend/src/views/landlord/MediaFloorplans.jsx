@@ -45,7 +45,7 @@ export default function MediaFloorplans() {
     }, [id]);
 
     useEffect(() => {
-        load();
+        queueMicrotask(load);
     }, [load]);
 
     async function handleFiles(fileList) {

@@ -8,12 +8,9 @@ const config = [
             "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
             // Plain apostrophes in JSX text render fine.
             "react/no-unescaped-entities": "off",
-            // Newer React Compiler-era checks the code predates; surfaced, not blocking.
-            "react-hooks/set-state-in-effect": "warn",
-            "react-hooks/refs": "warn",
-            "react-hooks/purity": "warn",
-            // Cell values passed to <Row cells> are keyed inside Row.
-            "react/jsx-key": "warn",
+            // Photos are user uploads on short-lived signed storage URLs from varying hosts,
+            // which next/image can't optimise (it needs a fixed host list), so plain <img> is right.
+            "@next/next/no-img-element": "off",
         },
     },
     {

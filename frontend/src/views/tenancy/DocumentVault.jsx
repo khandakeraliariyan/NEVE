@@ -57,7 +57,7 @@ function Preview({ agreementId, doc, version, onClose }) {
             {link.loading && <p className="text-xs text-muted">Opening…</p>}
             <ErrorBox error={link.error} />
             {data?.url && data.mimeType?.startsWith("image/") && (
-                // eslint-disable-next-line @next/next/no-img-element
+                 
                 <img src={data.url} alt={doc.title} className="max-h-[480px] w-full rounded-lg object-contain" />
             )}
             {data?.url && (data.mimeType === "application/pdf" || data.mimeType === "text/plain") && <iframe src={data.url} title={doc.title} className="h-[480px] w-full rounded-lg border border-line bg-white" />}

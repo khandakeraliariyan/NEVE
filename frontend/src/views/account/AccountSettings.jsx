@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
 import { useApi } from "../../hooks/useApi";
@@ -191,10 +191,12 @@ function DocumentDeletionCard() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
 
-    useEffect(() => {
+    // Picking (or closing) a document always starts the form from a clean slate.
+    function select(fileId) {
+        setSelected(fileId);
         setReason("");
         setError(null);
-    }, [selected]);
+    }
 
     const files = documents.data?.data ?? [];
     const requestByFile = new Map((requests.data?.data ?? []).map((r) => [String(r.fileId), r]));
@@ -205,7 +207,7 @@ function DocumentDeletionCard() {
         setError(null);
         try {
             await api.post(`/privacy/documents/${selected}/deletion-requests`, { reason: reason.trim() });
-            setSelected(null);
+            select(null);
             await Promise.all([documents.reload(), requests.reload()]);
         } catch (err) {
             setError(err);
@@ -240,7 +242,7 @@ function DocumentDeletionCard() {
                                     <Badge tone={REQUEST_TONE[request.status] ?? "green"}>Deletion {label(request.status)}</Badge>
                                 ) : null}
                                 {!open && selected !== file._id && (
-                                    <Button variant="ghost" onClick={() => setSelected(file._id)}>
+                                    <Button variant="ghost" onClick={() => select(file._id)}>
                                         Request deletion
                                     </Button>
                                 )}
@@ -255,7 +257,7 @@ function DocumentDeletionCard() {
                                         <Button type="submit" variant="danger" disabled={busy || !reason.trim()}>
                                             {busy ? "Sending…" : "Send request"}
                                         </Button>
-                                        <Button type="button" variant="ghost" onClick={() => setSelected(null)}>
+                                        <Button type="button" variant="ghost" onClick={() => select(null)}>
                                             Cancel
                                         </Button>
                                     </div>

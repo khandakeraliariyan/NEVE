@@ -32,7 +32,7 @@ function Gallery({ property }) {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-2">
                 {images.slice(0, 4).map((image, index) => (
                     <button key={image.id} type="button" onClick={() => setActive(index)} className={`overflow-hidden rounded-xl ${index === active ? "ring-2 ring-forest" : ""}`}>
-                        <img src={image.url} alt={image.name ?? ""} className="h-32 w-full object-cover md:h-[202px]" />
+                        <img loading="lazy" decoding="async" src={image.url} alt={image.name ?? ""} className="h-32 w-full object-cover md:h-[202px]" />
                     </button>
                 ))}
             </div>
@@ -40,7 +40,7 @@ function Gallery({ property }) {
                 <div className="flex gap-2 overflow-x-auto md:col-span-2">
                     {images.slice(4).map((image, i) => (
                         <button key={image.id} type="button" onClick={() => setActive(i + 4)} className="shrink-0">
-                            <img src={image.url} alt="" className="h-16 w-24 rounded-lg object-cover" />
+                            <img loading="lazy" decoding="async" src={image.url} alt="" className="h-16 w-24 rounded-lg object-cover" />
                         </button>
                     ))}
                 </div>

@@ -21,7 +21,7 @@ function useHealth() {
         }
     }, []);
     useEffect(() => {
-        check();
+        queueMicrotask(check);
     }, [check]);
     return { ...state, check };
 }

@@ -27,8 +27,6 @@ function Viewer({ entry }) {
     // Access links are short-lived, so fetch one when the file is opened, never store it.
     useEffect(() => {
         let cancelled = false;
-        setUrl(null);
-        setError(null);
         api.get(`/uploads/${file._id}/access-url`)
             .then((payload) => !cancelled && setUrl(payload.url ?? payload.data?.url ?? null))
             .catch((err) => !cancelled && setError(err));

@@ -11,8 +11,8 @@ export default function LazySection({ children, className = "", minHeight = 200 
         const node = ref.current;
         if (!node || visible) return undefined;
         if (!("IntersectionObserver" in window)) {
-            setVisible(true);
-            return undefined;
+            const timer = setTimeout(() => setVisible(true), 0);
+            return () => clearTimeout(timer);
         }
         const observer = new IntersectionObserver(
             (entries) => {

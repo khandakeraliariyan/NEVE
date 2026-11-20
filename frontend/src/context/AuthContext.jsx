@@ -20,7 +20,7 @@ export function AuthProvider({ children }) {
     const [firebaseUser, setFirebaseUser] = useState(null);
     const [profile, setProfile] = useState(null);
     // "loading" | "signed_out" | "needs_profile" | "ready" | "error"
-    const [status, setStatus] = useState("loading");
+    const [status, setStatus] = useState(() => (auth ? "loading" : "signed_out"));
     const [error, setError] = useState(null);
     // Why the user was signed out, e.g. an admin who used Google. Shown on sign-in pages.
     const [notice, setNotice] = useState(null);
@@ -65,9 +65,7 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         // A saved admin session is restored first; Firebase then has nothing to add.
         if (hasAdminSession()) {
-            loadProfile();
-        } else if (!auth) {
-            setStatus("signed_out");
+            queueMicrotask(loadProfile);
         }
 
         const unsubscribe = auth

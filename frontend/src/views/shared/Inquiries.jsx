@@ -146,12 +146,6 @@ function Thread({ inquiry, isLandlord, me, onChanged }) {
     const [reporting, setReporting] = useState(null);
     const bottomRef = useRef(null);
 
-    useEffect(() => {
-        setDraft("");
-        setError(null);
-        setReporting(null);
-    }, [inquiry._id]);
-
     const messages = [...(thread.data?.data ?? [])].reverse();
     const all = thread.data?.initialMessage ? [thread.data.initialMessage, ...messages] : messages;
 
@@ -353,7 +347,7 @@ export default function Inquiries() {
                             <button type="button" className="mb-3 text-sm text-forest underline lg:hidden" onClick={() => select(null)}>
                                 ← All inquiries
                             </button>
-                            <Thread inquiry={selected} isLandlord={isLandlord} me={me} onChanged={list.reload} />
+                            <Thread key={selected._id} inquiry={selected} isLandlord={isLandlord} me={me} onChanged={list.reload} />
                         </>
                     ) : (
                         <Card className="flex min-h-[20rem] items-center justify-center text-sm text-muted">Select an inquiry to read the conversation.</Card>
