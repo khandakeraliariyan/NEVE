@@ -1,5 +1,5 @@
 
-import express from "express";
+import { Router } from "../http/router.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
@@ -12,7 +12,7 @@ import {
     deleteReviewReply
 } from "../controllers/review.controller.js";
 
-const router = express.Router();
+const router = Router();
 
 // Public: read reviews for a property.
 router.get(

@@ -1,6 +1,6 @@
 # NEVE Backend
 
-The backend is the NEVE REST API. It is built with Node.js, Express 5, MongoDB/Mongoose, and Firebase Admin. Its core is legal intelligence for tenancies:
+The backend is the NEVE REST API. It is a Next.js app with route handlers only (no pages), built on MongoDB/Mongoose and Firebase Admin. Its core is legal intelligence for tenancies:
 - agreement extraction and contract-risk checks (ContractMind);
 - Legal Copilot over approved legal sources;
 - the evidence graph and contradiction detection;
@@ -61,7 +61,7 @@ Two settings depend on how the API is hosted:
 
 In production (`NODE_ENV=production`), the admin cookie is always `Secure`, so the API must be served over HTTPS.
 
-**Vercel.** `vercel.json` and `api/index.js` run the API as a serverless function (set the project's Root Directory to `backend`). Background jobs then run through Vercel Cron calling `GET /api/v1/cron/:task`, which needs `CRON_SECRET`. Step-by-step instructions and the limits are in [docs/deployment-vercel.md](../docs/deployment-vercel.md).
+**Vercel.** The API deploys as a Next.js project (set the project's Root Directory to `backend`); each route file becomes a serverless function, and `vercel.json` sets the region and the cron. Background jobs then run through Vercel Cron calling `GET /api/v1/cron/:task`, which needs `CRON_SECRET`. Step-by-step instructions and the limits are in [docs/deployment-vercel.md](../docs/deployment-vercel.md).
 
 ## Optional integrations
 
@@ -115,8 +115,10 @@ The password is read from `NEVE_ADMIN_PASSWORD` or prompted for interactively, s
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start the API with Nodemon. |
-| `npm start` | Start the API. |
+| `npm run dev` | Start the API on port 5000, reloading on change. |
+| `npm run build` | Build the API for production. |
+| `npm start` | Serve the build on port 5000; background jobs run on timers. |
+| `npm run lint` | Run ESLint. |
 | `npm test` | Run the Node.js test suite. |
 | `npm run create-admin` | Create or update an admin account (see [Admin accounts](#admin-accounts)). |
 | `npm run backup` | Back up the database to object storage now. |
@@ -152,24 +154,37 @@ npm run import-legal-sources -- --as admin@example.com --submit legal-corpus/*.j
 
 ## Structure
 
-- `src/app.js` — middleware, API routes, and error handling
-- `src/server.js` — database connection and server startup
+- `src/app/api/[...path]/route.js` — the one Next.js route: passes every API request to the matching endpoint
+- `src/routes/` — route definitions by area (`*.routes.js`), collected in order in `routes/index.js` (see [Adding an endpoint](#adding-an-endpoint))
+- `src/http/` — `Router()` and `route()`: request and response objects, security headers, rate limit, database connection, body parsing, error handler
+- `src/proxy.js` — CORS for `CLIENT_URL`, including preflights
+- `src/instrumentation.js` — database connection and scheduled jobs when running as a long-lived server
 - `src/config/` — environment, database, Firebase, and storage configuration
 - `src/middleware/` — authentication, roles and permissions, rate limits, request validation
-- `src/routes/`, `src/controllers/`, `src/services/`, `src/models/` — API and domain implementation
+- `src/controllers/`, `src/services/`, `src/models/` — API and domain implementation
 - `src/services/aiClient.service.js` — the one place AI models are called (strict schemas, error mapping, usage recording)
-- `test/` — automated tests (offline; about 430)
+- `test/` — automated tests (offline; about 440)
 - `scripts/` — create-admin, backup, restore-backup, importLegalSources, seedDemo
 - `eval/` — AI evaluation runner, datasets, and regression baseline
 - `legal-corpus/` — official Bangladesh legal texts, imported as drafts for legal review
 - `assets/fonts/` — Noto Sans and Noto Sans Bengali (OFL), registered for PDF reports so Bangla renders on any host
-- `api/index.js`, `vercel.json` — the Vercel serverless entry point and configuration
+- `next.config.mjs`, `vercel.json` — packages kept external, files included in the deployed functions, region and cron
 
 The layers and request lifecycle are described in [docs/architecture.md](../docs/architecture.md).
 
+### Adding an endpoint
+
+Add it to the route file for its area in `src/routes/`, the same way as with Express:
+
+```js
+router.get("/:thingId", authenticateUser, allowRoles("renter"), getThing);
+```
+
+`Router()` (`src/http/router.js`) supports `use`, `get`, `post`, `put`, `patch` and `delete`; `router.use(...)` applies to the routes declared after it. A new route file is mounted in `src/routes/index.js`, where order matters: the first matching endpoint handles a request. Controllers and middleware keep the `(req, res, next)` signature: `req` has `method`, `headers`, `params`, `query`, `body`, `ip` and `get()`, and `res` supports `status`, `json`, `send`, `set`, `redirect`, `cookie`, `clearCookie` and `end`. Before an endpoint's own handlers, `src/http/route.js` sets the security headers, applies the general rate limit, connects to the database, loads platform settings and parses JSON bodies (1 MB).
+
 ## API overview
 
-API routes are mounted under `/api/v1`. The health endpoint is `GET /api/v1/health`. Every endpoint, with its access rules, is in [docs/api-reference.md](../docs/api-reference.md). Route groups, as mounted in `src/app.js`:
+API routes are mounted under `/api/v1` in `src/routes/index.js`. The health endpoint is `GET /api/v1/health`. Every endpoint, with its access rules, is in [docs/api-reference.md](../docs/api-reference.md). Route groups, as mounted in `src/routes/index.js`:
 
 | Area | Paths under `/api/v1` |
 |---|---|
@@ -196,9 +211,9 @@ The main protections, and where they live:
 - **Authorization** (`src/middleware/role.middleware.js`): each request loads the user's current role from MongoDB, and inactive accounts and revoked sessions are refused. Controllers also check ownership of the record involved, for example whether the user manages this listing or takes part in this agreement.
 - **Input handling**: request data is checked against Zod schemas or explicit allowlists before it reaches the database. Listing edits accept only a fixed set of fields, so ownership, status, and media can't be changed through them. Search text is escaped before it is used in a regular expression.
 - **Uploads** (`src/services/fileUpload.service.js`): each purpose has its own allowlist of file types and size limit, which the signed upload URL enforces. When an upload completes, the API checks the stored size and type, then reads the file's first bytes to confirm it really is a JPEG, PNG, WebP, PDF, MP4, WebM, or text file. Files that don't match are deleted and the upload fails. Listing photos are attached only through `/property-images/:propertyId/:fileId/attach`, which checks that the file was uploaded for that listing.
-- **HTTP hardening** (`src/app.js`): Helmet's security headers, CORS restricted to `CLIENT_URL`, a 1 MB JSON body limit, and rate limits. Server errors are logged for admins, and clients see only a generic message.
+- **HTTP hardening** (`src/http/route.js`, `src/proxy.js`): Helmet's set of security headers, CORS restricted to `CLIENT_URL`, a 1 MB JSON body limit, and rate limits. Server errors are logged for admins, and clients see only a generic message.
 - **Sensitive data**: NID/passport numbers and dates of birth are encrypted with AES-256-GCM when `FIELD_ENCRYPTION_KEY` is set. Access to tenancy records is logged, and private files are served only through signed URLs that expire after 5 minutes.
-- **Dependencies**: `package.json` uses npm `overrides` to pin patched versions of `glob` and `minimatch`, which `firebase-admin` and `nodemon` would otherwise pull in at vulnerable versions. Remove the overrides once those packages ship fixed releases. Run `npm audit` after changing dependencies.
+- **Dependencies**: `package.json` uses npm `overrides` to pin patched versions of `glob` and `minimatch`, which `firebase-admin` would otherwise pull in at vulnerable versions. Remove the overrides once those packages ship fixed releases. Run `npm audit` after changing dependencies.
 
 Never commit `.env` or anything in `secrets/`; both are gitignored.
 

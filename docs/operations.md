@@ -29,7 +29,8 @@ Every environment variable, with its default, is listed in the [root README's Co
 # API
 cd backend
 npm ci
-npm start                      # node src/server.js
+npm run build
+npm start                      # serves the API on port 5000
 
 # Frontend
 cd frontend

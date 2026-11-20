@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const maintenanceEventSchema = new mongoose.Schema(
     {
@@ -145,4 +146,4 @@ const maintenanceRequestSchema = new mongoose.Schema(
 maintenanceRequestSchema.index({ agreement: 1, createdAt: -1 });
 maintenanceRequestSchema.index({ property: 1, status: 1, createdAt: -1 });
 
-export default mongoose.model("MaintenanceRequest", maintenanceRequestSchema);
+export default defineModel("MaintenanceRequest", maintenanceRequestSchema);

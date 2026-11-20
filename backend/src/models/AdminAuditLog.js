@@ -1,5 +1,6 @@
 
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 import { logChainPlugin } from "../services/logChain.service.js";
 
 const idOf = (value) => (value == null ? null : String(value._id ?? value));
@@ -70,7 +71,7 @@ adminAuditLogSchema.plugin(logChainPlugin, {
 adminAuditLogSchema.index({ createdAt: -1 });
 adminAuditLogSchema.index({ actor: 1, createdAt: -1 });
 
-const AdminAuditLog = mongoose.model(
+const AdminAuditLog = defineModel(
     "AdminAuditLog",
     adminAuditLogSchema
 );

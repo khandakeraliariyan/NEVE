@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // Platform settings an admin changes without a deploy. One document
 // (_id "platform").
@@ -52,4 +53,4 @@ const platformSettingSchema = new mongoose.Schema(
     { timestamps: true, versionKey: false }
 );
 
-export default mongoose.model("PlatformSetting", platformSettingSchema);
+export default defineModel("PlatformSetting", platformSettingSchema);

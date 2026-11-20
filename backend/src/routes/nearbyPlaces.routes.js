@@ -1,7 +1,7 @@
-import express from "express";
+import { Router } from "../http/router.js";
 import { getPropertyNearbyPlaces } from "../controllers/nearbyPlaces.controller.js";
 
-const router = express.Router();
+const router = Router();
 
 router.get("/:propertyId", getPropertyNearbyPlaces);
 

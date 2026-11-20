@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // One email send, stored so it can be retried. Jobs that run out
 // of attempts become "dead" (the dead-letter queue shown to admins).
@@ -40,4 +41,4 @@ const notificationDeliverySchema = new mongoose.Schema(
 notificationDeliverySchema.index({ status: 1, nextAttemptAt: 1 });
 notificationDeliverySchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0 });
 
-export default mongoose.model("NotificationDelivery", notificationDeliverySchema);
+export default defineModel("NotificationDelivery", notificationDeliverySchema);

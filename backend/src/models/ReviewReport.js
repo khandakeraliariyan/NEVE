@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const reviewReportSchema = new mongoose.Schema(
     {
@@ -64,7 +65,7 @@ reviewReportSchema.index(
 
 reviewReportSchema.index({ status: 1, createdAt: -1 });
 
-const ReviewReport = mongoose.model(
+const ReviewReport = defineModel(
     "ReviewReport",
     reviewReportSchema
 );

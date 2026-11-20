@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const viewingRequestSchema = new mongoose.Schema(
     {
@@ -108,7 +109,7 @@ viewingRequestSchema.index({
     status: 1,
 });
 
-const ViewingRequest = mongoose.model(
+const ViewingRequest = defineModel(
     "ViewingRequest",
     viewingRequestSchema
 );

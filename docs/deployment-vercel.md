@@ -4,14 +4,14 @@ NEVE runs on Vercel as **two projects from the same GitHub repository**:
 
 | Project | Root directory | What it is | Example URL |
 |---|---|---|---|
-| `neve-web` | `frontend` | Next.js app | `https://neve-web.vercel.app` |
-| `neve-api` | `backend` | Express API as one serverless function (`backend/api/index.js`) | `https://neve-api.vercel.app` |
+| `neve-web` | `frontend` | Next.js app (pages) | `https://neve-web.vercel.app` |
+| `neve-api` | `backend` | Next.js app (API route handlers) | `https://neve-api.vercel.app` |
 
 The general deployment checklist is in [operations.md](operations.md#deployment-checklist). This page covers what is specific to Vercel.
 
 ## How the API runs on Vercel
 
-- `backend/vercel.json` sends every request to `api/index.js`, which passes it to the same Express app that `npm run dev` runs. Functions run in Singapore (`sin1`), the region closest to Bangladesh, for up to 300 seconds.
+- The API is one Next.js route (`backend/src/app/api/[...path]/route.js`), deployed as a serverless function running the same code as `npm run dev`. `backend/vercel.json` runs it in Singapore (`sin1`), the region closest to Bangladesh, for up to 300 seconds (`maxDuration`).
 - **Database.** The connection is opened on an instance's first request and reused while the instance is warm.
 - **Firebase credentials.** These come from the `FIREBASE_SERVICE_ACCOUNT_JSON` variable instead of a file.
 - **Scheduled jobs.** Vercel has no background timers, so **Vercel Cron** calls `GET /api/v1/cron/all` once a day at 02:00 UTC (08:00 in Dhaka, the default digest hour). That one call runs every enabled job:
@@ -22,7 +22,7 @@ The general deployment checklist is in [operations.md](operations.md#deployment-
   - email retries.
 
   The call must carry `CRON_SECRET`, which Vercel adds automatically.
-- **Bundled files.** OCR language data, the PDF library and the fonts for PDF reports (`backend/assets/fonts`) are bundled with the function, so Bangla OCR and Bangla PDF reports work without system packages.
+- **Bundled files.** OCR language data, the PDF library and the fonts for PDF reports (`backend/assets/fonts`) are copied into the functions (`backend/next.config.mjs`), so Bangla OCR and Bangla PDF reports work without system packages.
 
 ## Before you start
 
@@ -50,7 +50,7 @@ The general deployment checklist is in [operations.md](operations.md#deployment-
 ## Step 1: deploy the API
 
 1. In Vercel, select **Add New → Project** and import the repository.
-2. Set **Root Directory** to `backend`. Set **Framework Preset** to **Other**, and leave the build command empty.
+2. Set **Root Directory** to `backend`. **Framework Preset** should be detected as **Next.js**.
 3. Add the environment variables below, for Production. Use a placeholder for `CLIENT_URL` for now, for example `https://example.com`; you'll set the real value in step 3.
 
    | Variable | Value |

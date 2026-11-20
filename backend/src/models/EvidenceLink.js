@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const relationshipEventSchema = new mongoose.Schema(
     {
@@ -67,4 +68,4 @@ evidenceLinkSchema.index(
     { unique: true }
 );
 
-export default mongoose.model("EvidenceLink", evidenceLinkSchema);
+export default defineModel("EvidenceLink", evidenceLinkSchema);

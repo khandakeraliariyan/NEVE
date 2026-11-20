@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { answerQualityLabels, compareWithBaseline, conflictLabels, extractionLabels, findingLabel, loadDataset, obligationLabels, runTask } from "../eval/runner.js";
+import { answerQualityLabels, compareWithBaseline, conflictLabels, loadDataset, obligationLabels, runTask } from "../eval/runner.js";
 import { AI_EVALUATION_TASKS } from "../src/services/aiEvaluation.service.js";
 
 const baseline = JSON.parse(await readFile(new URL("../eval/baseline.json", import.meta.url), "utf8"));

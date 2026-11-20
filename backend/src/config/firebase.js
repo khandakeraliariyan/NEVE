@@ -3,23 +3,35 @@ import { getAuth } from "firebase-admin/auth";
 import { env } from "./env.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseServiceAccountJson } from "./serviceAccount.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 function loadServiceAccount() {
     if (env.FIREBASE_SERVICE_ACCOUNT_JSON) return parseServiceAccountJson(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    const serviceAccountPath = path.resolve(__dirname, "../../", env.FIREBASE_SERVICE_ACCOUNT_PATH);
+    // Relative paths are relative to backend/, where Next.js runs.
+    const serviceAccountPath = path.resolve(/*turbopackIgnore: true*/ process.cwd(), env.FIREBASE_SERVICE_ACCOUNT_PATH);
     return JSON.parse(readFileSync(serviceAccountPath, "utf8"));
 }
 
-const firebaseApp = getApps().length
-    ? getApp()
-    : initializeApp({
-          credential: cert(loadServiceAccount()),
-      });
+let auth = null;
 
-export const firebaseAuth = getAuth(firebaseApp);
-export { firebaseApp };
+// Firebase Admin starts on first use, not on import, so building the app and
+// loading modules don't need the credentials.
+export function getFirebaseAuth() {
+    if (!auth) {
+        const firebaseApp = getApps().length ? getApp() : initializeApp({ credential: cert(loadServiceAccount()) });
+        auth = getAuth(firebaseApp);
+    }
+    return auth;
+}
+
+// Use like the Auth instance itself: firebaseAuth.verifyIdToken(token).
+export const firebaseAuth = new Proxy(
+    {},
+    {
+        get(_target, property) {
+            const instance = getFirebaseAuth();
+            const value = Reflect.get(instance, property, instance);
+            return typeof value === "function" ? value.bind(instance) : value;
+        },
+    }
+);

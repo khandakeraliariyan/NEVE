@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 
 import {
   saveProperty,
@@ -11,7 +11,7 @@ import { allowRoles } from "../middleware/role.middleware.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { paginationRequestSchema } from "../validators/common.validator.js";
 
-const router = express.Router();
+const router = Router();
 
 router.use(authenticateUser, allowRoles("renter"));
 

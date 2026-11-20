@@ -1,6 +1,6 @@
 # API reference
 
-This is every HTTP endpoint of the NEVE API, generated from `backend/src/routes/` and `backend/src/app.js`. For how requests are authenticated and checked, see [architecture.md](architecture.md). For what each feature does, see [features.md](features.md).
+This is every HTTP endpoint of the NEVE API, generated from `backend/src/routes/` (collected in `backend/src/routes/index.js`). For how requests are authenticated and checked, see [architecture.md](architecture.md). For what each feature does, see [features.md](features.md).
 
 ## Conventions
 
@@ -61,7 +61,6 @@ The legal intelligence endpoints are under [`/tenancy`](#tenancy) (risk analysis
 
 ### `/auth`
 
-Routes: `auth.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -73,7 +72,6 @@ Routes: `auth.routes.js`
 
 ### `/users`
 
-Routes: `user.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -101,7 +99,6 @@ Routes: `user.routes.js`
 
 ### `/properties`
 
-Routes: `propertyDetail.routes.js`, `property.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -129,7 +126,6 @@ Routes: `propertyDetail.routes.js`, `property.routes.js`
 
 ### `/property-trust`
 
-Routes: `propertyTrust.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -137,7 +133,6 @@ Routes: `propertyTrust.routes.js`
 
 ### `/inquiries`
 
-Routes: `inquiry.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -153,7 +148,6 @@ Routes: `inquiry.routes.js`
 
 ### `/viewings`
 
-Routes: `viewing.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -171,7 +165,6 @@ Routes: `viewing.routes.js`
 
 ### `/matching`
 
-Routes: `matching.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -179,7 +172,6 @@ Routes: `matching.routes.js`
 
 ### `/reviews`
 
-Routes: `review.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -192,7 +184,6 @@ Routes: `review.routes.js`
 
 ### `/review-moderation`
 
-Routes: `reviewModeration.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -203,7 +194,6 @@ Routes: `reviewModeration.routes.js`
 
 ### `/landlord/dashboard`
 
-Routes: `landlordDashboard.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -212,7 +202,6 @@ Routes: `landlordDashboard.routes.js`
 
 ### `/notifications`
 
-Routes: `notification.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -227,7 +216,6 @@ Routes: `notification.routes.js`
 
 ### `/property-reports`
 
-Routes: `propertyReport.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -240,7 +228,6 @@ Routes: `propertyReport.routes.js`
 
 ### `/duplicate-listings`
 
-Routes: `duplicateListing.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -248,7 +235,6 @@ Routes: `duplicateListing.routes.js`
 
 ### `/property-images`
 
-Routes: `propertyImage.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -259,7 +245,6 @@ Routes: `propertyImage.routes.js`
 
 ### `/nearby-places`
 
-Routes: `nearbyPlaces.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -267,7 +252,6 @@ Routes: `nearbyPlaces.routes.js`
 
 ### `/uploads`
 
-Routes: `fileUpload.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -277,7 +261,6 @@ Routes: `fileUpload.routes.js`
 
 ### `/saved-properties`
 
-Routes: `savedProperty.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -287,7 +270,6 @@ Routes: `savedProperty.routes.js`
 
 ### `/saved-searches`
 
-Routes: `savedSearch.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -299,7 +281,6 @@ Routes: `savedSearch.routes.js`
 
 ### `/renter-preferences`
 
-Routes: `renterPreference.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -308,7 +289,6 @@ Routes: `renterPreference.routes.js`
 
 ### `/recommendations`
 
-Routes: `propertyMatching.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -318,7 +298,6 @@ Routes: `propertyMatching.routes.js`
 
 ### `/listing-consistency`
 
-Routes: `listingConsistency.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -329,7 +308,6 @@ Routes: `listingConsistency.routes.js`
 
 ### `/evidence-graph`
 
-Routes: `evidenceGraph.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -341,7 +319,6 @@ Routes: `evidenceGraph.routes.js`
 
 ### `/tenancy`
 
-Routes: `tenancyAgreement.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -427,7 +404,6 @@ Routes: `tenancyAgreement.routes.js`
 
 ### `/admin/dashboard`
 
-Routes: `adminDashboard.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -440,7 +416,6 @@ Routes: `adminDashboard.routes.js`
 
 ### `/admin/moderation`
 
-Routes: `adminModeration.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -456,7 +431,6 @@ Routes: `adminModeration.routes.js`
 
 ### `/admin/audit-logs`
 
-Routes: `adminAudit.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -465,7 +439,6 @@ Routes: `adminAudit.routes.js`
 
 ### `/admin/users`
 
-Routes: `adminUser.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -479,7 +452,6 @@ Routes: `adminUser.routes.js`
 
 ### `/admin/trust-approval`
 
-Routes: `adminTrustApproval.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -488,7 +460,6 @@ Routes: `adminTrustApproval.routes.js`
 
 ### `/privacy`
 
-Routes: `privacy.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -501,7 +472,6 @@ Routes: `privacy.routes.js`
 
 ### `/admin/privacy`
 
-Routes: `adminPrivacy.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -513,7 +483,6 @@ Routes: `adminPrivacy.routes.js`
 
 ### `/admin/ai-evaluations`
 
-Routes: `aiEvaluation.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -523,7 +492,6 @@ Routes: `aiEvaluation.routes.js`
 
 ### `/verification`
 
-Routes: `verification.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -535,7 +503,6 @@ Routes: `verification.routes.js`
 
 ### `/admin/verifications`
 
-Routes: `adminVerification.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -545,7 +512,6 @@ Routes: `adminVerification.routes.js`
 
 ### `/admin/system`
 
-Routes: `adminSystem.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -564,7 +530,6 @@ Routes: `adminSystem.routes.js`
 
 ### `/legal-sources`
 
-Routes: `legalSource.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -574,7 +539,6 @@ Routes: `legalSource.routes.js`
 
 ### `/admin/legal-sources`
 
-Routes: `adminLegalSource.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -590,7 +554,6 @@ Routes: `adminLegalSource.routes.js`
 
 ### `/legal-review`
 
-Routes: `legalReview.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -608,7 +571,6 @@ Routes: `legalReview.routes.js`
 
 ### `/copilot`
 
-Routes: `legalCopilot.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -624,7 +586,6 @@ Routes: `legalCopilot.routes.js`
 
 ### `/admin/security`
 
-Routes: `adminSecurity.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|
@@ -636,7 +597,6 @@ Routes: `adminSecurity.routes.js`
 
 ### `/admin`
 
-Routes: `platformSettings.routes.js`
 
 | Method | Path | Access | Handler | Notes |
 |---|---|---|---|---|

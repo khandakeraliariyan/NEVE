@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const uploadedFileSchema = new mongoose.Schema(
     {
@@ -114,4 +115,4 @@ const uploadedFileSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-export default mongoose.model("UploadedFile", uploadedFileSchema);
+export default defineModel("UploadedFile", uploadedFileSchema);

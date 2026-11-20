@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // One AI model call: which feature made it, the model that answered,
 // tokens, latency and an estimated cost. Append-only, so re-running an
@@ -39,6 +40,6 @@ aiUsageEventSchema.index({ feature: 1, createdAt: -1 });
 // Usage detail is kept for about 13 months.
 aiUsageEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 400 * 24 * 60 * 60, name: "ai_usage_ttl" });
 
-const AIUsageEvent = mongoose.model("AIUsageEvent", aiUsageEventSchema);
+const AIUsageEvent = defineModel("AIUsageEvent", aiUsageEventSchema);
 
 export default AIUsageEvent;

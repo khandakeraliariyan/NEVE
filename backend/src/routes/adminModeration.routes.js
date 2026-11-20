@@ -1,5 +1,5 @@
 
-import express from "express";
+import { Router } from "../http/router.js";
 
 import {
     updateReportStatus,
@@ -22,7 +22,7 @@ import {
     getListingModeration,
 } from "../controllers/listingSuspension.controller.js";
 
-const router = express.Router();
+const router = Router();
 
 router.use(authenticateUser);
 router.use(allowRoles("admin"));

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 import { PROPERTY_TYPES } from "../constants/propertyTypes.js";
 
 const savedSearchSchema = new mongoose.Schema(
@@ -60,4 +61,4 @@ savedSearchSchema.index(
     { unique: true, collation: { locale: "en", strength: 2 } }
 );
 
-export default mongoose.model("SavedSearch", savedSearchSchema);
+export default defineModel("SavedSearch", savedSearchSchema);

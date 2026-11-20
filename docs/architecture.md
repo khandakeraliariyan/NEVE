@@ -10,9 +10,9 @@ Browser
   │    - renders pages, keeps sign-in state
   │    - sends a Firebase ID token, or the admin session cookie
   ▼
-Express API (backend/)  ── /api/v1 ──────────────────────────────────────────
-  │  middleware: Helmet, CORS (CLIENT_URL only), rate limits, JSON body limit
-  │  routes → auth + role middleware → controllers → services → models
+Next.js API (backend/)  ── /api/v1 ──────────────────────────────────────────
+  │  proxy.js: CORS (CLIENT_URL only); route(): security headers, rate limits, JSON body limit
+  │  route files → auth + role middleware → controllers → services → models
   │
   ├── MongoDB (Mongoose)            all application data
   ├── Firebase Admin                verifies user ID tokens
@@ -30,18 +30,18 @@ The browser never talks to MongoDB, and files go straight between the browser an
 
 | Layer | Folder | Responsibility |
 |---|---|---|
-| Startup | `src/server.js` | Connects to MongoDB, loads platform settings, starts background jobs, listens on `PORT`. |
-| App | `src/app.js` | Security headers, CORS, rate limits, body parsing, route mounting, the 404 handler and the error handler (which records unexpected errors as `SystemError` without leaking details). |
+| Startup | `src/instrumentation.js` | On a long-running server (`npm start`), connects to MongoDB and starts background jobs. |
+| HTTP | `src/http/`, `src/proxy.js` | `route()` turns an endpoint into a Next.js route handler: request and response objects for the `(req, res, next)` controllers, security headers, the rate limit, the database connection and platform settings, body parsing, and the error handler (which records unexpected errors as `SystemError` without leaking details). `proxy.js` handles CORS. |
 | Config | `src/config/` | `env.js` validates every environment variable with Zod at startup; the API refuses to start on invalid values. Also the database, Firebase and R2 clients. |
 | Middleware | `src/middleware/` | `authenticateUser` (Firebase token or admin cookie, plus session and account checks), `allowRoles` / `allowSuspendedRoles` / `requirePermission`, rate limiters, and `validateRequest` (Zod). |
-| Routes | `src/routes/` | 41 route files mapping paths to controllers. Listed in [api-reference.md](api-reference.md). |
+| Routes | `src/routes/` | 41 route files mapping paths to controllers, collected in `routes/index.js`. One Next.js catch-all route (`src/app/api/[...path]/route.js`) sends each request to the first matching endpoint; unknown paths get a JSON 404. Listed in [api-reference.md](api-reference.md). |
 | Controllers | `src/controllers/` | Parse the request, load the record, check the caller may access that record, call services, shape the response. |
 | Services | `src/services/` | Domain logic, mostly pure functions that tests can call directly: contract risk, Copilot, evidence analysis, Risk Sentinel, matching, privacy, notifications, jobs. |
 | Models | `src/models/` | Mongoose schemas. See [data-model.md](data-model.md). |
 
 ### Request lifecycle
 
-1. **Global middleware.** Helmet headers, CORS limited to `CLIENT_URL`, the per-IP rate limit, and a 1 MB JSON limit.
+1. **Shared steps.** CORS limited to `CLIENT_URL` (`proxy.js`), then in `route()`: Helmet's set of security headers, the per-IP rate limit, the database connection, and a 1 MB JSON limit.
 2. **Authentication** (`authenticateUser`):
    - For renters, landlords and legal reviewers, it verifies the Firebase ID token with Firebase Admin.
    - For admins, it verifies the signed JWT in the httpOnly cookie. Cookie requests must carry `X-Neve-Admin: 1`, and any `Origin` they send must equal `CLIENT_URL` (CSRF protection).
@@ -146,7 +146,7 @@ Edges NEVE derives itself are marked `origin: system`, so the interface can show
 
 ### Background jobs
 
-`systemJobs.service.js` starts these when the API boots, and records each run as a `SystemJobRun`. Admins can also start them from **Admin → System**. On serverless hosts such as Vercel, where `api/index.js` handles requests and there are no timers, a scheduler calls `GET /api/v1/cron/:task` instead (see [deployment-vercel.md](deployment-vercel.md)).
+`systemJobs.service.js` starts these when a long-running API server boots (`src/instrumentation.js`), and records each run as a `SystemJobRun`. Admins can also start them from **Admin → System**. On serverless hosts such as Vercel, where there are no timers, a scheduler calls `GET /api/v1/cron/:task` instead (see [deployment-vercel.md](deployment-vercel.md)).
 
 | Job | Schedule | Enabled by |
 |---|---|---|

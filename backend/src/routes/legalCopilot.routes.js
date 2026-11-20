@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 
 import {
     askQuestion,
@@ -15,7 +15,7 @@ import { authenticateUser } from "../middleware/auth.middleware.js";
 import { copilotLimiter } from "../middleware/rateLimit.middleware.js";
 import { allowRoles, requirePermission } from "../middleware/role.middleware.js";
 
-const router = express.Router();
+const router = Router();
 
 router.use(authenticateUser, allowRoles("renter", "landlord", "legal_reviewer"));
 router.use(

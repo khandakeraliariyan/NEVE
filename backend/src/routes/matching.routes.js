@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router } from "../http/router.js";
 
 import { getRecommendations } from "../controllers/matching.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";

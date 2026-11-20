@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const listingWarningSchema = new mongoose.Schema(
     {
@@ -110,4 +111,4 @@ const listingWarningSchema = new mongoose.Schema(
 listingWarningSchema.index({ property: 1, type: 1, status: 1 });
 listingWarningSchema.index({ "appeal.status": 1, "appeal.submittedAt": 1 });
 
-export default mongoose.model("ListingWarning", listingWarningSchema);
+export default defineModel("ListingWarning", listingWarningSchema);

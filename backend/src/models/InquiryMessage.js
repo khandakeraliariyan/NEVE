@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const inquiryMessageSchema = new mongoose.Schema(
     {
@@ -35,4 +36,4 @@ const inquiryMessageSchema = new mongoose.Schema(
 inquiryMessageSchema.index({ inquiry: 1, createdAt: -1 });
 inquiryMessageSchema.index({ recipient: 1, readAt: 1 });
 
-export default mongoose.model("InquiryMessage", inquiryMessageSchema);
+export default defineModel("InquiryMessage", inquiryMessageSchema);

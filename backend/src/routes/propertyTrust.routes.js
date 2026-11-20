@@ -1,10 +1,10 @@
-import express from "express";
+import { Router } from "../http/router.js";
 
 import {
     getPropertyTrustSummary,
 } from "../controllers/propertyTrust.controller.js";
 
-const router = express.Router();
+const router = Router();
 
 router.get("/:propertyId", getPropertyTrustSummary);
 

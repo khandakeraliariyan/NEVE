@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // The latest contract-risk analysis of one agreement. Findings are
 // prompts for the parties to check wording, never verdicts that a clause is
@@ -88,4 +89,4 @@ const contractRiskAnalysisSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-export default mongoose.model("ContractRiskAnalysis", contractRiskAnalysisSchema);
+export default defineModel("ContractRiskAnalysis", contractRiskAnalysisSchema);

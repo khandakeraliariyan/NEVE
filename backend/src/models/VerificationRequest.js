@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // An identity, property-ownership or legal-reviewer credential verification
 // that an admin reviews from private documents. Neve records the review outcome; it never decides
@@ -114,6 +115,6 @@ verificationRequestSchema.index(
     { unique: true, partialFilterExpression: { status: "pending" } }
 );
 
-const VerificationRequest = mongoose.model("VerificationRequest", verificationRequestSchema);
+const VerificationRequest = defineModel("VerificationRequest", verificationRequestSchema);
 
 export default VerificationRequest;

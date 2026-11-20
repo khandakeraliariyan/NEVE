@@ -7,7 +7,7 @@ How to work on NEVE's code: local setup, conventions, testing, evaluation, and s
 Follow the [root README's Quick start](../README.md#quick-start): Node.js 20.9 or later, MongoDB, a Firebase project, `backend/.env` and `frontend/.env.local`. Then:
 
 ```bash
-cd backend && npm run dev      # API on :5000, restarts on change
+cd backend && npm run dev      # API on :5000, reloads on change
 cd frontend && npm run dev     # web app on :5173
 ```
 
@@ -19,7 +19,7 @@ Optional services (R2, Groq, email) can be left unset; their features report "no
 
 ```text
 backend/
-  src/        app code: config, middleware, routes, controllers, services, models
+  src/        app/api (route files), http, config, middleware, controllers, services, models
   test/       node:test suites (*.test.js), offline
   eval/       AI evaluation: runner, datasets, baseline.json, results/ (gitignored)
   scripts/    create-admin, backup, restore-backup, importLegalSources, seedDemo
@@ -54,7 +54,7 @@ docs/         this documentation
 
 ```bash
 cd backend
-npm test                                  # all suites, offline (about 430 tests)
+npm test                                  # all suites, offline (about 440 tests)
 node --test test/riskSentinel.test.js     # one suite
 ```
 
@@ -101,7 +101,7 @@ Run `--check` before committing changes to rules, retrieval or evidence checks. 
 
 1. Add the handler to the right controller in `src/controllers/`. Load the record and check the caller may access it.
 2. Put the logic in a service, as a pure function where possible.
-3. Register the route in `src/routes/<area>.routes.js` with `authenticateUser`, `allowRoles(...)` and, for input, `validateRequest(schema)`.
+3. Register the route in `src/routes/<area>.routes.js` with `authenticateUser`, `allowRoles(...)` and, for input, `validateRequest(schema)`. A new route file also needs a line in `src/routes/index.js`.
 4. Add tests for the service, and for access rules when they're new.
 5. Regenerate or edit [api-reference.md](api-reference.md).
 

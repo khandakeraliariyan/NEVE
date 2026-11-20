@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 
 import {
     getLegalSourcePack,
@@ -6,7 +6,7 @@ import {
     searchLegalSources,
 } from "../controllers/legalSource.controller.js";
 
-const router = express.Router();
+const router = Router();
 
 // Public: approved legal-source packs and section search.
 router.get("/", getLegalSourcePack);

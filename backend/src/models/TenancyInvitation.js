@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // A landlord's invitation to a renter to start a tenancy record for one of
 // their properties. The renter accepts it while signed in with the invited
@@ -41,4 +42,4 @@ tenancyInvitationSchema.index(
     { unique: true, partialFilterExpression: { status: "pending" } }
 );
 
-export default mongoose.model("TenancyInvitation", tenancyInvitationSchema);
+export default defineModel("TenancyInvitation", tenancyInvitationSchema);

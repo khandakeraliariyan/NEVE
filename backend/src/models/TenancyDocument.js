@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // A document in an agreement's evidence vault: amendments, receipts,
 // photos, notices, correspondence and more. Files are never replaced: a new
@@ -81,4 +82,4 @@ const tenancyDocumentSchema = new mongoose.Schema(
 tenancyDocumentSchema.index({ agreement: 1, category: 1, createdAt: -1 });
 tenancyDocumentSchema.index({ "versions.file": 1 });
 
-export default mongoose.model("TenancyDocument", tenancyDocumentSchema);
+export default defineModel("TenancyDocument", tenancyDocumentSchema);

@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 import {
     addAgreementClause,
     addAgreementEvidenceLink,
@@ -100,7 +100,7 @@ import {
 
 import { getRiskSentinel, reviewEvidenceFlag } from "../controllers/riskSentinel.controller.js";
 
-const router = express.Router();
+const router = Router();
 
 router.use(
     authenticateUser,

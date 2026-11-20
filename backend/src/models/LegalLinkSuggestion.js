@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // A proposed link between an agreement clause and a section of an approved
 // legal source. It becomes a real link (TenancyRecordLink) only when a renter
@@ -36,4 +37,4 @@ const legalLinkSuggestionSchema = new mongoose.Schema(
 
 legalLinkSuggestionSchema.index({ agreement: 1, clause: 1, section: 1 }, { unique: true });
 
-export default mongoose.model("LegalLinkSuggestion", legalLinkSuggestionSchema);
+export default defineModel("LegalLinkSuggestion", legalLinkSuggestionSchema);

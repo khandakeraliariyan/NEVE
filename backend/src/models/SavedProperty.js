@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const savedPropertySchema = new mongoose.Schema(
     {
@@ -25,4 +26,4 @@ savedPropertySchema.index(
     { unique: true }
 );
 
-export default mongoose.model("SavedProperty", savedPropertySchema);
+export default defineModel("SavedProperty", savedPropertySchema);

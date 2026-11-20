@@ -4,3 +4,4 @@
 secrets/
 eval/results/
 node_modules/
+.next/

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const rewriteSuggestionSchema = new mongoose.Schema(
     {
@@ -464,4 +465,4 @@ const tenancyAgreementSchema = new mongoose.Schema(
 tenancyAgreementSchema.index({ renter: 1, createdAt: -1 });
 tenancyAgreementSchema.index({ landlord: 1, createdAt: -1 });
 
-export default mongoose.model("TenancyAgreement", tenancyAgreementSchema);
+export default defineModel("TenancyAgreement", tenancyAgreementSchema);

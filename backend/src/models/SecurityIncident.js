@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // A security or privacy incident an admin is tracking: what happened, how
 // serious it is, who it affects, and each step taken until it is closed.
@@ -37,4 +38,4 @@ const securityIncidentSchema = new mongoose.Schema(
 
 securityIncidentSchema.index({ createdAt: -1 });
 
-export default mongoose.model("SecurityIncident", securityIncidentSchema);
+export default defineModel("SecurityIncident", securityIncidentSchema);

@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 
 import { getPersonalizedRecommendations } from "../controllers/propertyMatching.controller.js";
 import { getAIRanking, runAIRanking } from "../controllers/aiRanking.controller.js";
@@ -7,7 +7,7 @@ import { authenticateUser } from "../middleware/auth.middleware.js";
 import { aiRankingLimiter } from "../middleware/rateLimit.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
-const router = express.Router();
+const router = Router();
 
 router.use(authenticateUser, allowRoles("renter"));
 

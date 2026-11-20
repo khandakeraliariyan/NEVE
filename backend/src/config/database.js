@@ -1,13 +1,14 @@
 import mongoose from "mongoose";
 import { env } from "./env.js";
 
-let connecting = null;
+// The pending or open connection, shared by every route bundle in the process.
+const state = (globalThis.__neveDatabase ??= { connecting: null });
 
 // Connects once and reuses the connection. Safe to call on every request,
-// which a serverless function (api/index.js) does: warm instances reuse the
+// which every API route does (see http/route.js): warm instances reuse the
 // open connection, and a failed attempt is retried on the next call.
 export function connectDatabase() {
-    connecting ??= mongoose
+    state.connecting ??= mongoose
         .connect(env.MONGODB_URI, {
             // On Windows "localhost" can resolve to IPv6 (::1) first, while
             // mongod listens on IPv4 by default. Prefer IPv4 to skip that detour.
@@ -28,8 +29,8 @@ export function connectDatabase() {
             });
         })
         .catch((error) => {
-            connecting = null;
+            state.connecting = null;
             throw error;
         });
-    return connecting;
+    return state.connecting;
 }

@@ -16,13 +16,13 @@ export function normalizeMessage(message) {
         .slice(0, 300);
 }
 
-// The route, e.g. /api/v1/tenancy/agreements/:agreementId. By the time the
-// app-level error handler runs Express has reset req.baseUrl, so the template
-// is only used while the mount path is known; otherwise the request path is
-// used with IDs and numbers replaced.
+// The route, e.g. /api/v1/tenancy/agreements/:agreementId, from the pattern
+// the endpoint was declared with (see http/route.js). Without one the request
+// path is used with IDs and numbers replaced.
 export function routeTemplate(req) {
     if (!req) return null;
-    if (req.route?.path && req.baseUrl) return `${req.baseUrl}${req.route.path}`.slice(0, 300);
+    const pattern = req.route?.path;
+    if (pattern && (req.baseUrl || pattern.startsWith("/api/"))) return `${req.baseUrl ?? ""}${pattern}`.slice(0, 300);
     const path = String(req.originalUrl ?? req.url ?? "").split("?")[0];
     return (
         path

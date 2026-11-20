@@ -1,5 +1,6 @@
 
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const propertyViewEventSchema = new mongoose.Schema(
     {
@@ -33,7 +34,7 @@ propertyViewEventSchema.index({
     viewedAt: -1
 });
 
-const PropertyViewEvent = mongoose.model(
+const PropertyViewEvent = defineModel(
     "PropertyViewEvent",
     propertyViewEventSchema
 );

@@ -1,4 +1,5 @@
-import express from "express";
+import { Router } from "../http/router.js";
+import { urlencodedBody } from "../middleware/formBody.middleware.js";
 
 import {
     getMyNotifications,
@@ -15,13 +16,13 @@ import {
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
-const router = express.Router();
+const router = Router();
 
 // Email unsubscribe links work without signing in; the signed token says who.
 router.get("/unsubscribe", showUnsubscribe);
 router.post(
     "/unsubscribe",
-    express.urlencoded({ extended: false, limit: "2kb" }),
+    urlencodedBody({ limitBytes: 2 * 1024 }),
     confirmUnsubscribe
 );
 

@@ -182,7 +182,7 @@ NEVE has two applications that work together:
 Person using browser
         │
         ▼
-Next.js frontend (frontend/) ── HTTP requests + Firebase ID token ──► Express API (backend/)
+Next.js frontend (frontend/) ── HTTP requests + Firebase ID token ──► Next.js API (backend/)
                                 (admins: httpOnly session cookie)       │
                                                                         ├── MongoDB
                                                                         ├── Firebase Admin
@@ -206,14 +206,14 @@ When a signed-in user loads a protected resource, the frontend gets a Firebase I
 | Web application | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
 | Maps | Leaflet and React Leaflet |
 | Authentication | Firebase Authentication in the browser; Firebase Admin in the API; scrypt-hashed passwords and signed JWT cookies for admins |
-| API | Node.js and Express 5 |
+| API | Next.js 16 route handlers (`backend/src/app/api`) on Node.js |
 | Data | MongoDB and Mongoose 9 |
 | Private file storage | Cloudflare R2 via the S3-compatible API |
 | Documents | Tesseract.js OCR (English and Bangla), pdf.js, sharp and @napi-rs/canvas for images and PDF reports |
 | AI features | Groq SDK; optional, with a configurable model per feature |
 | Email | Resend or SendGrid over HTTP |
 | Maps data | OpenStreetMap Overpass (nearby places) and OSRM (walking and driving times) |
-| Validation and API protection | Zod, Helmet, CORS, and express-rate-limit |
+| Validation and API protection | Zod, security headers, CORS (`backend/src/proxy.js`), and per-IP rate limits |
 
 ## Project structure
 
@@ -231,13 +231,17 @@ NEVE/
 │       ├── hooks/             reusable hooks such as useApi
 │       ├── lib/               api.js (API client), adminSession.js, firebase.js, utilities
 │       └── nav.js             role-aware workspace navigation
-└── backend/                   Express REST API
+└── backend/                   REST API (Next.js route handlers, no pages)
+    ├── next.config.mjs        server packages and files included in the deployed functions
+    ├── vercel.json            Vercel region and the daily cron
     ├── src/
-    │   ├── server.js          database connection, scheduled jobs, startup
-    │   ├── app.js             middleware, route mounting, error handling
+    │   ├── app/api/[...path]/ one catch-all Next.js route that runs the whole API
+    │   ├── routes/            HTTP route definitions (about 40 groups), collected in routes/index.js
+    │   ├── proxy.js           CORS: only CLIENT_URL may call the API from a browser
+    │   ├── instrumentation.js database connection and scheduled jobs on a long-running server
+    │   ├── http/              route(): request/response objects, middleware chain, security headers, error handler
     │   ├── config/            env.js (validated settings), database, Firebase, R2
     │   ├── middleware/        authentication, roles, rate limits, request validation
-    │   ├── routes/            HTTP route definitions (about 40 groups)
     │   ├── controllers/       request handling
     │   ├── services/          domain logic: property, tenancy, evidence, legal, privacy, admin, AI
     │   ├── models/            Mongoose models (see Data model)
@@ -246,6 +250,7 @@ NEVE/
     ├── scripts/               create-admin, backup, restore-backup, importLegalSources, seedDemo
     ├── eval/                  AI evaluation runner, datasets, and baseline
     ├── legal-corpus/          official Bangladesh tenancy law text, ready to import for legal review
+    ├── assets/fonts/          fonts for PDF reports
     └── secrets/               Firebase service-account file (gitignored)
 docs/                          full documentation (start at docs/README.md) and hackathon material
 ```
@@ -375,8 +380,10 @@ Run each command from its app directory.
 | Frontend | `npm run build` | Production build. |
 | Frontend | `npm start` | Serve the production build on port 5173. |
 | Frontend | `npm run lint` | ESLint. |
-| Backend | `npm run dev` | API with automatic restarts (nodemon). |
-| Backend | `npm start` | API. |
+| Backend | `npm run dev` | API on port 5000, reloads on change. |
+| Backend | `npm run build` | Production build of the API. |
+| Backend | `npm start` | Serve the API build on port 5000; background jobs run on timers. |
+| Backend | `npm run lint` | ESLint. |
 | Backend | `npm test` | Node.js test suite. |
 | Backend | `npm run create-admin` | Create or update an admin (see [Admin accounts](#admin-accounts)). |
 | Backend | `npm run backup` | Back up the database to R2 now. |
@@ -561,10 +568,10 @@ All demo names, places and amounts are invented. Don't seed a database that hold
 - Listing photos can only be attached to the listing they were uploaded for.
 
 **HTTP hardening**
-- API: Helmet headers, CORS limited to `CLIENT_URL`, a 1 MB JSON body limit, and per-IP rate limits. Clients never see internal error details.
+- API: the Helmet set of security headers (`backend/src/http/route.js`), CORS limited to `CLIENT_URL` (`backend/src/proxy.js`), a 1 MB JSON body limit, and per-IP rate limits. Clients never see internal error details.
 - Frontend (`frontend/next.config.mjs`): anti-framing (CSP `frame-ancestors` and `X-Frame-Options`), `nosniff`, `Referrer-Policy`, a `Permissions-Policy`, and HSTS in production.
 
-**Dependencies**: both apps report 0 `npm audit` vulnerabilities. npm `overrides` pin patched transitive versions until upstream releases include them: `@grpc/grpc-js` in the frontend, and `glob` and `minimatch` in the backend. Remove them once `firebase`, `firebase-admin`, and `nodemon` ship fixed releases.
+**Dependencies**: both apps report 0 `npm audit` vulnerabilities. npm `overrides` pin patched transitive versions until upstream releases include them: `@grpc/grpc-js` in the frontend, and `glob` and `minimatch` in the backend. Remove them once `firebase` and `firebase-admin` ship fixed releases.
 
 **Secrets**: `.env` files and `backend/secrets/` are gitignored and have never been committed.
 
@@ -572,7 +579,7 @@ The component guides have more detail: [backend security](backend/README.md#secu
 
 ## Deploying
 
-Beyond the local setup, a deployment needs the items below. The full checklist, backups, key rotation, AI capacity and monitoring are in [docs/operations.md](docs/operations.md). **To deploy both apps on Vercel**, follow [docs/deployment-vercel.md](docs/deployment-vercel.md): the repository includes `backend/vercel.json`, a serverless entry point (`backend/api/index.js`) and a daily Vercel Cron for the background jobs.
+Beyond the local setup, a deployment needs the items below. The full checklist, backups, key rotation, AI capacity and monitoring are in [docs/operations.md](docs/operations.md). **To deploy both apps on Vercel**, follow [docs/deployment-vercel.md](docs/deployment-vercel.md): both apps are Next.js projects, and `backend/vercel.json` adds a daily Vercel Cron for the background jobs.
 
 1. **HTTPS for both apps.** In production the admin session cookie is `Secure`, so it is only sent over HTTPS.
 2. **`NODE_ENV=production`** on the API, and a production frontend build (`npm run build`, then `npm start` or your host's Next.js runtime).
@@ -586,8 +593,9 @@ Beyond the local setup, a deployment needs the items below. The full checklist, 
 ## Testing
 
 ```bash
-cd backend && npm test        # 432 tests; no database or network needed
+cd backend && npm test        # 444 tests; no database or network needed
 cd backend && npm run eval -- --check
+cd backend && npm run lint && npm run build
 cd frontend && npm run lint && npm run build
 ```
 

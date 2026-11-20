@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const communicationReportSchema = new mongoose.Schema(
     {
@@ -74,7 +75,7 @@ communicationReportSchema.index(
 );
 communicationReportSchema.index({ status: 1, createdAt: -1 });
 
-export default mongoose.model(
+export default defineModel(
     "CommunicationReport",
     communicationReportSchema
 );
