@@ -8,6 +8,8 @@
 //   npm run seed-demo-data -- --dry-run
 //   npm run seed-demo-data -- --confirm
 //   npm run seed-demo-data -- --confirm --reset    (replaces earlier demo activity)
+//   npm run seed-demo-data -- --renter you@gmail.com --keep-profile --confirm
+//       attaches the demo activity to a real account without changing its name or details
 //
 // The three accounts must already exist in Firebase (see secrets/local-accounts.txt).
 // This script looks up their IDs by email and never touches passwords.
@@ -97,8 +99,8 @@ export function buildActivity({ renter, landlord, listings, saved }) {
         note(renter, "inquiry_replied", "Imran Hossain replied", "Your inquiry about the Dhanmondi Lake flat has a reply."),
         note(renter, "viewing_request_confirmed", "Viewing confirmed", "Your viewing of the Dhanmondi Lake flat is confirmed for Thursday."),
         note(renter, "matching_listing_available", "New home matches your search", "A 3-bedroom flat in Bashundhara R/A fits 2-3 bed flats in Dhaka under 50k."),
-        note(landlord, "inquiry_received", "New inquiry", "Tasnim Rahman asked about the Lalmatia Block D flat."),
-        note(landlord, "viewing_request_received", "New viewing request", "Tasnim Rahman requested a viewing of the Gulshan 2 flat."),
+        note(landlord, "inquiry_received", "New inquiry", `${renter.displayName} asked about the Lalmatia Block D flat.`),
+        note(landlord, "viewing_request_received", "New viewing request", `${renter.displayName} requested a viewing of the Gulshan 2 flat.`),
     ];
 
     return { inquiries, messages, viewings, savedProperties, searches, preference, review, notifications };
@@ -150,11 +152,10 @@ async function main() {
         const { uid, email, photoURL } = firebase[role];
         const person = PEOPLE[role];
         const profile = { bio: person.bio, ...(person.renter && { renter: person.renter }), ...(person.landlord && { landlord: person.landlord }), ...(person.reviewer && { reviewer: person.reviewer }) };
-        users[role] = await User.findOneAndUpdate(
-            { firebaseUid: uid },
-            { $set: { email, displayName: person.displayName, phoneNumber: person.phoneNumber, photoURL: photoURL ?? null, role: role === "reviewer" ? "legal_reviewer" : role, profile, isActive: true } },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
+        const fields = { email, displayName: person.displayName, phoneNumber: person.phoneNumber, photoURL: photoURL ?? null, role: role === "reviewer" ? "legal_reviewer" : role, profile, isActive: true };
+        // --keep-profile: a real account keeps its own name and details; the profile above is used only if it has none yet.
+        const update = flag("keep-profile") ? { $setOnInsert: fields } : { $set: fields };
+        users[role] = await User.findOneAndUpdate({ firebaseUid: uid }, update, { upsert: true, new: true, setDefaultsOnInsert: true });
     }
     const ids = [users.renter._id, users.landlord._id];
 
