@@ -8,12 +8,8 @@
 export async function register() {
     if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
-    const { recordSystemError } = await import("./services/systemErrors.service.js");
-    // Keep crashes outside a request visible to admins too.
-    process.on("unhandledRejection", (reason) => {
-        console.error("Unhandled rejection:", reason);
-        recordSystemError({ error: reason instanceof Error ? reason : new Error(String(reason)), source: "process" });
-    });
+    const { recordUnhandledRejections } = await import("./services/systemErrors.service.js");
+    recordUnhandledRejections();
 
     if (process.env.VERCEL) return;
 

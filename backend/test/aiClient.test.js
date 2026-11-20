@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { mock } from "node:test";
 import Groq from "groq-sdk";
 import { z } from "zod";
 
@@ -102,7 +102,9 @@ test("truncated or off-schema answers come back unparsed", async () => {
     assert.equal(parseStructured("", Schema), null);
 });
 
-test("Groq errors become AIServiceError kinds and are recorded", async () => {
+test("Groq errors become AIServiceError kinds, are recorded and are logged", async (t) => {
+    const logged = mock.method(console, "error", () => {});
+    t.after(() => logged.mock.restore());
     const cases = [
         [new Groq.AuthenticationError(401, { message: "bad key" }, "bad key", new Headers()), "auth"],
         [new Groq.RateLimitError(429, { message: "slow down" }, "slow down", new Headers()), "rate_limit"],
@@ -120,6 +122,55 @@ test("Groq errors become AIServiceError kinds and are recorded", async () => {
             return true;
         });
         assert.ok(records[0].error instanceof AIServiceError);
+        // The provider's reason stays in the server log; users only see a short message.
+        const line = String(logged.mock.calls.at(-1).arguments[0]);
+        assert.match(line, new RegExp(`contract_risk.*${kind}`));
+        assert.ok(line.includes(error.message));
     }
     assert.throws(() => createAIClient({ feature: "not_a_feature" }), TypeError);
+});
+
+test("output that fails Groq's JSON validation is asked for once more", async (t) => {
+    const warned = mock.method(console, "warn", () => {});
+    const logged = mock.method(console, "error", () => {});
+    t.after(() => {
+        warned.mock.restore();
+        logged.mock.restore();
+    });
+    const invalidJson = () => new Groq.BadRequestError(400, { error: { code: "json_validate_failed", message: "Failed to generate JSON." } }, "400 Failed to generate JSON", new Headers());
+    const sequence = (...results) => {
+        const calls = [];
+        return {
+            calls,
+            chat: { completions: { create: async (params) => {
+                calls.push(params);
+                const next = results[calls.length - 1];
+                if (next instanceof Error) throw next;
+                return next;
+            } } },
+        };
+    };
+
+    // Fails once, then works: the caller gets the answer.
+    const flaky = sequence(invalidJson(), completion(JSON.stringify(valid)));
+    const records = [];
+    const result = await createAIClient({ feature: "legal_copilot", groq: flaky, record: async (r) => records.push(r) })
+        .generate({ system: "s", user: "u", schema: Schema, schemaName: "a" });
+    assert.deepEqual(result.parsed, valid);
+    assert.equal(flaky.calls.length, 2);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].error, undefined);
+
+    // Fails twice: it gives up as a bad request.
+    const broken = sequence(invalidJson(), invalidJson(), completion(JSON.stringify(valid)));
+    await assert.rejects(
+        createAIClient({ feature: "legal_copilot", groq: broken, record: async () => {} }).generate({ system: "s", user: "u", schema: Schema, schemaName: "a" }),
+        (error) => error instanceof AIServiceError && error.kind === "bad_request"
+    );
+    assert.equal(broken.calls.length, 2);
+
+    // Other bad requests aren't repeated.
+    const other = sequence(new Groq.BadRequestError(400, { message: "too long" }, "too long", new Headers()), completion(JSON.stringify(valid)));
+    await assert.rejects(createAIClient({ feature: "legal_copilot", groq: other, record: async () => {} }).generate({ system: "s", user: "u", schema: Schema, schemaName: "a" }));
+    assert.equal(other.calls.length, 1);
 });

@@ -65,3 +65,12 @@ export async function recordSystemError({ error, req = null, status = 500, sourc
         console.error("Record system error failed:", recordError.message);
     }
 }
+
+// Records promise rejections nobody handled, so crashes outside a request
+// are visible to admins too. Called once at server start-up.
+export function recordUnhandledRejections() {
+    process.on("unhandledRejection", (reason) => {
+        console.error("Unhandled rejection:", reason);
+        recordSystemError({ error: reason instanceof Error ? reason : new Error(String(reason)), source: "process" });
+    });
+}

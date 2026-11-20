@@ -34,6 +34,7 @@ You get:
 - The conversation so far and a new question.
 
 How to answer:
+- Answer in the language of the new question: Bangla questions in Bangla, English questions in English. Write terms, followUpQuestions and any explanation in that language too; quote a section's own words in its original language if that helps.
 - Answer the question directly first, in short paragraphs a non-lawyer can follow. Explain legal terms you use.
 - Every statement about what the law says must be backed by a provided section. List those sections in citedSectionIds. Never cite, quote or name a law or section that wasn't provided, and never invent one.
 - When you explain what the agreement says, list the clauses you relied on in citedClauseIds.
@@ -78,13 +79,20 @@ export function retrieveSections(sources, question, history = []) {
 const money = (value) => (value === null || value === undefined ? "not recorded" : `BDT ${value}`);
 const day = (value) => (value ? new Date(value).toISOString().slice(0, 10) : "not recorded");
 
+// The model gets short labels (L1, L2… for sections, C1, C2… for clauses)
+// instead of database IDs: neighbouring IDs differ only in their last
+// characters, and models copy them wrongly, citing the section next to the
+// one they used. normalizeAnswer maps the labels back.
+export const sectionLabel = (index) => `L${index + 1}`;
+export const clauseLabel = (index) => `C${index + 1}`;
+
 export function describeAgreement(agreement) {
     if (!agreement) return "";
     const clauses = activeAgreementClauses(agreement)
         .slice(0, 80)
         .map(
-            (clause) =>
-                `- clauseId ${clause._id} (${clause.category}${clause.heading ? `, "${clause.heading}"` : ""}${clause.reviewStatus === "proposed" ? ", not yet confirmed by the parties" : ""}): ${maskPersonalIdentifiers(clause.text).text.slice(0, 2500)}`
+            (clause, index) =>
+                `- clauseId ${clauseLabel(index)} (${clause.category}${clause.heading ? `, "${clause.heading}"` : ""}${clause.reviewStatus === "proposed" ? ", not yet confirmed by the parties" : ""}): ${maskPersonalIdentifiers(clause.text).text.slice(0, 2500)}`
         )
         .join("\n");
     const obligations = (agreement.obligations ?? [])
@@ -105,8 +113,8 @@ export function describeSections(sections) {
     if (!sections.length) return "(no approved section matched this question)";
     return sections
         .map(
-            (s) =>
-                `- sectionId ${s.sectionId}: ${s.title}${s.citation ? ` (${s.citation})` : ""}, version ${s.version}, section ${s.sectionNumber}${s.heading ? ` "${s.heading}"` : ""}:\n${s.text.slice(0, 3000)}`
+            (s, index) =>
+                `- sectionId ${sectionLabel(index)}: ${s.title}${s.citation ? ` (${s.citation})` : ""}, version ${s.version}, section ${s.sectionNumber}${s.heading ? ` "${s.heading}"` : ""}:\n${s.text.slice(0, 3000)}`
         )
         .join("\n\n");
 }
@@ -177,15 +185,28 @@ export function citationFor(section) {
 // Keeps only citations to sections and clauses that were provided, and
 // downgrades the coverage when the model claimed sources it didn't cite.
 export function normalizeAnswer(raw, { sections, agreement }) {
-    const sectionsById = new Map(sections.map((s) => [String(s.sectionId), s]));
-    const clausesById = new Map(activeAgreementClauses(agreement).map((c) => [String(c._id), c]));
-    const citations = [...new Set((raw?.citedSectionIds ?? []).map(String))].filter((id) => sectionsById.has(id)).map((id) => citationFor(sectionsById.get(id)));
-    const clauseRefs = [...new Set((raw?.citedClauseIds ?? []).map(String))]
-        .filter((id) => clausesById.has(id))
-        .map((id) => {
-            const clause = clausesById.get(id);
-            return { clauseId: clause._id, heading: clause.heading ?? "", category: clause.category ?? "" };
-        });
+    // Labels from the prompt (L1, C1…), and database IDs for older callers.
+    const sectionsById = new Map(sections.flatMap((s, index) => [[sectionLabel(index), s], [String(s.sectionId), s]]));
+    const clausesById = new Map(activeAgreementClauses(agreement).flatMap((c, index) => [[clauseLabel(index), c], [String(c._id), c]]));
+    const resolve = (ids, byId, key) => {
+        const seen = new Set();
+        // Also accept a label with extra words, such as "sectionId L3" or "L3: Deposit".
+        const lookup = (id) => {
+            const text = String(id).trim();
+            const token = text.match(/\b(?:[LC]\d+|[a-f0-9]{24})\b/i)?.[0] ?? "";
+            // Labels are upper case (L3, C1); database IDs are lower-case hex.
+            return byId.get(text) ?? byId.get(token.toUpperCase()) ?? byId.get(token.toLowerCase());
+        };
+        return (ids ?? [])
+            .map(lookup)
+            .filter((item) => item && !seen.has(String(item[key])) && seen.add(String(item[key])));
+    };
+    const citations = resolve(raw?.citedSectionIds, sectionsById, "sectionId").map(citationFor);
+    const clauseRefs = resolve(raw?.citedClauseIds, clausesById, "_id").map((clause) => ({
+        clauseId: clause._id,
+        heading: clause.heading ?? "",
+        category: clause.category ?? "",
+    }));
     let grounding = raw?.coverage ?? "not_covered";
     if (grounding === "sourced" && !citations.length) grounding = sections.length ? "partial" : "not_covered";
     const droppedCitations = (raw?.citedSectionIds ?? []).length - citations.length;

@@ -71,8 +71,13 @@ test("messages mask personal data, keep alternation, and carry the sections", ()
     });
     assert.deepEqual(messages.map((m) => m.role), ["user", "assistant", "user"]);
     const last = messages.at(-1).content;
-    assert.ok(last.includes(`sectionId ${depositSection}`));
-    assert.ok(last.includes(`clauseId ${clauseId}`));
+    // Short labels, not database IDs, so the model can't confuse neighbouring IDs.
+    const depositIndex = sections.findIndex((s) => String(s.sectionId) === String(depositSection));
+    assert.ok(depositIndex >= 0);
+    assert.ok(last.includes(`sectionId L${depositIndex + 1}:`));
+    assert.ok(last.includes("clauseId C1 ("));
+    assert.ok(!last.includes(String(depositSection)));
+    assert.ok(!last.includes(String(clauseId)));
     assert.ok(!last.includes("Rejected clause"));
     assert.ok(!last.includes("01712345678"));
 });
@@ -98,6 +103,26 @@ test("answers keep only provided citations and are downgraded when sources are m
 
     const unsourced = normalizeAnswer({ answer: "x", citedSectionIds: [], citedClauseIds: [], terms: [], followUpQuestions: [], coverage: "sourced", suggestProfessional: true }, { sections: [], agreement: null });
     assert.equal(unsourced.grounding, "not_covered");
+
+    // The labels the model sees map back to the right section and clause.
+    const depositIndex = sections.findIndex((s) => String(s.sectionId) === String(depositSection));
+    const labelled = normalizeAnswer(
+        { answer: "a", citedSectionIds: [`L${depositIndex + 1}`, `L${depositIndex + 1}`, "L99"], citedClauseIds: ["C1"], terms: [], followUpQuestions: [], coverage: "sourced", suggestProfessional: false },
+        { sections, agreement }
+    );
+    assert.equal(labelled.citations.length, 1);
+    assert.equal(String(labelled.citations[0].sectionId), String(depositSection));
+    assert.equal(String(labelled.clauseRefs[0].clauseId), String(clauseId));
+    assert.equal(labelled.grounding, "partial");
+
+    // A label with extra words still counts.
+    const wordy = normalizeAnswer(
+        { answer: "a", citedSectionIds: [`sectionId L${depositIndex + 1}`], citedClauseIds: ["clauseId C1"], terms: [], followUpQuestions: [], coverage: "sourced", suggestProfessional: false },
+        { sections, agreement }
+    );
+    assert.equal(String(wordy.citations[0]?.sectionId), String(depositSection));
+    assert.equal(String(wordy.clauseRefs[0]?.clauseId), String(clauseId));
+    assert.equal(wordy.grounding, "sourced");
     assert.equal(unsourced.suggestProfessional, true);
 });
 

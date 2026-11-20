@@ -72,6 +72,14 @@ export function toStrictJsonSchema(schema) {
     return strictify(z.toJSONSchema(schema, { io: "output" }));
 }
 
+// Groq answers 400 json_validate_failed when the model's output didn't match
+// the strict JSON schema. It happens now and then (more often with long
+// Bangla text) and the same request usually works when sent again.
+export function isJsonValidationFailure(error) {
+    return error instanceof Groq.BadRequestError && /json_validate_failed/.test(`${error.error?.error?.code ?? ""} ${error.message}`);
+}
+const JSON_VALIDATION_ATTEMPTS = 2;
+
 function mapError(error) {
     if (error instanceof Groq.AuthenticationError || error instanceof Groq.PermissionDeniedError) {
         return new AIServiceError("auth", error.message);
@@ -120,21 +128,32 @@ export function createAIClient({ feature, groq = null, record = recordAIUsage, n
         async generate({ model = env.AI_MODEL, system, user, messages, schema, schemaName, maxTokens = MIN_OUTPUT_TOKENS, effort = "medium" }) {
             const conversation = messages ?? [{ role: "user", content: Array.isArray(user) ? user.join("\n\n") : user }];
             const startedAt = now();
+            const request = {
+                model,
+                messages: [{ role: "system", content: system }, ...conversation],
+                max_completion_tokens: Math.min(MAX_OUTPUT_TOKENS, Math.max(MIN_OUTPUT_TOKENS, maxTokens)),
+                reasoning_effort: effort,
+                include_reasoning: false,
+                response_format: {
+                    type: "json_schema",
+                    json_schema: { name: schemaName, strict: true, schema: toStrictJsonSchema(schema) },
+                },
+            };
             let completion;
             try {
-                completion = await getProvider().chat.completions.create({
-                    model,
-                    messages: [{ role: "system", content: system }, ...conversation],
-                    max_completion_tokens: Math.min(MAX_OUTPUT_TOKENS, Math.max(MIN_OUTPUT_TOKENS, maxTokens)),
-                    reasoning_effort: effort,
-                    include_reasoning: false,
-                    response_format: {
-                        type: "json_schema",
-                        json_schema: { name: schemaName, strict: true, schema: toStrictJsonSchema(schema) },
-                    },
-                });
+                for (let attempt = 1; ; attempt += 1) {
+                    try {
+                        completion = await getProvider().chat.completions.create(request);
+                        break;
+                    } catch (error) {
+                        if (attempt >= JSON_VALIDATION_ATTEMPTS || !isJsonValidationFailure(error)) throw error;
+                        console.warn(`AI output didn't match the schema (${feature}); asking again.`);
+                    }
+                }
             } catch (error) {
                 const mapped = mapError(error);
+                // Users only see "busy" or "couldn't answer"; keep the provider's reason in the log.
+                console.error(`AI call failed (${feature}, ${model}, ${mapped.kind}): ${mapped.message}`);
                 await record({ feature, model, error: mapped, latencyMs: now() - startedAt });
                 throw mapped;
             }

@@ -22,6 +22,8 @@ if (process.env.NODE_ENV === "production") {
 const nextConfig = {
     reactStrictMode: true,
     poweredByHeader: false,
+    // Don't write AGENTS.md into the project on every dev start.
+    agentRules: false,
     // A stray package-lock.json higher up the disk confuses root detection; pin it here.
     turbopack: { root: path.dirname(fileURLToPath(import.meta.url)) },
     async headers() {

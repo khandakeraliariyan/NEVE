@@ -74,7 +74,7 @@ export function GoogleButton({ label = "Continue with Google", onError }) {
             await signInWithPopup(auth, provider);
         } catch (err) {
             if (err?.code !== "auth/popup-closed-by-user" && err?.code !== "auth/cancelled-popup-request") {
-                onError?.(firebaseMessage(err));
+                onError?.(firebaseMessage(err, { method: "google" }));
             }
         } finally {
             setBusy(false);
@@ -104,7 +104,8 @@ export function OrDivider() {
     );
 }
 
-export function firebaseMessage(error) {
+// `method` is the sign-in method that was tried: "password" or "google".
+export function firebaseMessage(error, { method = "password" } = {}) {
     const code = error?.code ?? "";
     if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")) {
         return "That email and password don't match an account.";
@@ -118,6 +119,10 @@ export function firebaseMessage(error) {
     }
     if (code.includes("popup-blocked")) return "Your browser blocked the Google sign-in popup. Allow popups and try again.";
     if (code.includes("unauthorized-domain")) return "This domain isn't authorized for Google sign-in in Firebase.";
-    if (code.includes("operation-not-allowed")) return "Google sign-in isn't enabled for this Firebase project.";
+    if (code.includes("operation-not-allowed")) {
+        return method === "google"
+            ? "Google sign-in isn't available right now. Please try another way to sign in."
+            : "Email and password sign-in isn't available right now. Please continue with Google.";
+    }
     return error?.message ?? "Something went wrong.";
 }

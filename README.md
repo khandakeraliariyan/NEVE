@@ -597,7 +597,7 @@ Beyond the local setup, a deployment needs the items below. The full checklist, 
 ## Testing
 
 ```bash
-cd backend && npm test        # 444 tests; no database or network needed
+cd backend && npm test        # 446 tests; no database or network needed
 cd backend && npm run eval -- --check
 cd backend && npm run lint && npm run build
 cd frontend && npm run lint && npm run build
@@ -609,7 +609,7 @@ Backend tests use Node's built-in test runner and replace database and storage c
 
 | Check | Result |
 |---|---|
-| Backend tests | 445 of 445 pass, including the HTTP layer, the endpoint table (312 endpoints) and CORS |
+| Backend tests | 446 of 446 pass, including the HTTP layer, the endpoint table (312 endpoints) and CORS |
 | Offline evaluation (`--check`) | no regressions against `eval/baseline.json` |
 | Lint and build | backend: 0 problems, build succeeds without secrets; frontend: 0 errors (24 warnings), build succeeds |
 | Both apps running locally (`npm start`) | API health, CORS preflights from the frontend, JSON 404s for unknown paths and wrong methods, and `503` when the database is unreachable all behave as before; every page tried returns `200` |

@@ -54,7 +54,8 @@ test("copilot answer quality scores hallucinated support as false positives", as
         generate: async ({ messages }) => {
             const prompt = messages.at(-1).content;
             const match = dataset.cases.find((c) => prompt.includes(c.question));
-            const retrieved = [...prompt.matchAll(/sectionId ([a-f0-9]{24})/g)].map((m) => m[1]);
+            // The prompt labels sections L1, L2…; normalizeAnswer maps them back.
+            const retrieved = [...prompt.matchAll(/sectionId (L\d+):/g)].map((m) => m[1]);
             const cited = match.expected[0] === "abstain" ? retrieved.slice(0, 1) : match.expected.map(sectionId);
             return {
                 model: "fake",
