@@ -30,16 +30,30 @@ export default function RevealObserver() {
         );
 
         const scan = () => document.querySelectorAll("[data-reveal]:not(.is-in)").forEach((el) => io.observe(el));
-        scan();
 
+        // Adding classes to server-rendered elements before React has attached to them makes React report a
+        // hydration mismatch. So start only once the page has loaded, with a short pause for hydration to finish.
         let frame = 0;
+        let started = false;
+        let startTimer = 0;
         const mo = new MutationObserver(() => {
+            if (!started) return;
             cancelAnimationFrame(frame);
             frame = requestAnimationFrame(scan);
         });
-        mo.observe(document.body, { childList: true, subtree: true });
+        const start = () => {
+            startTimer = setTimeout(() => {
+                started = true;
+                scan();
+                mo.observe(document.body, { childList: true, subtree: true });
+            }, 500);
+        };
+        if (document.readyState === "complete") start();
+        else window.addEventListener("load", start, { once: true });
 
         return () => {
+            window.removeEventListener("load", start);
+            clearTimeout(startTimer);
             io.disconnect();
             mo.disconnect();
             cancelAnimationFrame(frame);
