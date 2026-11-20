@@ -585,6 +585,38 @@ Beyond the local setup, a deployment needs the items below. The full checklist, 
 6. **Optional services** for the features you want: R2 for files and backups, Groq for AI, an email provider, `API_PUBLIC_URL` for email links, and the retention and backup jobs. On Vercel, set `CRON_SECRET` so the cron endpoint runs the jobs.
 7. **The Firebase project's authorized domains** must include the app's domain.
 
+### Vercel environment variables
+
+Set these in Vercel → project → Settings → Environment Variables (Production, and Preview if you use it). Vercel can import a whole `.env` file at once ("Import .env"). Keep that file in `frontend/secrets/`, which git ignores, for example `frontend/secrets/vercel-production.env`. Never commit it.
+
+| Variable | Value |
+|---|---|
+| `CLIENT_URL`, `API_PUBLIC_URL` | the app's URL, e.g. `https://neve-web.vercel.app` (no trailing slash, no `/api/v1`) |
+| `TRUST_PROXY_HOPS` | `1` |
+| `MONGODB_URI` | the Atlas connection string |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | the service-account file as one line: `base64 -w0 secrets/firebase-service-account.json` (from `frontend/`) |
+| `CRON_SECRET` | a random value: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `ADMIN_JWT_SECRET`, `FIELD_ENCRYPTION_KEY` | the same values as your local `.env` (changing `FIELD_ENCRYPTION_KEY` makes stored ID numbers unreadable) |
+| `GROQ_API_KEY` | Groq key |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_REGION=auto` | Cloudflare R2 |
+| `EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM` | Resend or SendGrid |
+| `OVERPASS_API_URL` | `https://overpass-api.de/api/interpreter` (comma-separate fallbacks) |
+| `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase web app values; redeploy after changing them |
+
+Don't set `NODE_ENV`, `PORT`, `FIREBASE_SERVICE_ACCOUNT_PATH`, `NEVE_API_BASE_URL` or `NEXT_PUBLIC_API_BASE_URL` on Vercel; remove them if an older setup left them.
+
+**Coming from the two-project setup** (`neve-web` and `neve-api`): keep `neve-web`, set its Root Directory to `frontend`, give it the variables above, and pause `neve-api`. Its builds fail without the old `backend` folder. Details are in [docs/deployment-vercel.md](docs/deployment-vercel.md#moving-from-two-projects-to-one).
+
+### Before going live
+
+- **MongoDB Atlas → Network Access** allows `0.0.0.0/0`, because Vercel has no fixed IP addresses. Without it, every API request returns `503`.
+- **Firebase → Authentication → Sign-in method**: Email/Password and Google are both enabled, and the app's domain is under **Authorized domains**.
+- **Cloudflare R2 → bucket → CORS policy** allows the app's origin with `GET` and `PUT`, so browsers can upload.
+- **Resend**: in test mode (`EMAIL_FROM=onboarding@resend.dev`) emails reach only the Resend account owner. Verify a domain and send from an address on it.
+- **Groq**: the free tier (8,000 tokens per minute) can't run the AI risk check or legal-source suggestions; use a paid tier.
+- **Data**: a new database needs an admin (`npm run create-admin`) and the legal corpus imported and approved by a legal reviewer (see [Preparing a demo](#preparing-a-demo)).
+- **Secrets that were ever shared** (in chats, screenshots or messages) should be rotated: the database password and the Groq, Resend and R2 keys. Changing `ADMIN_JWT_SECRET` signs everyone out.
+
 ## Testing
 
 ```bash
