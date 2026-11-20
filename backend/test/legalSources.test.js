@@ -110,14 +110,18 @@ test("rewrite request sends the clause and approved sections", async () => {
     const client = {
         generate: async (params) => {
             request = params;
-            return { stopReason: "end", model: "test-model", parsed: { rewrite: "x", rationale: "y", changes: [], citedSectionIds: [], concerns: [] }, usage: {} };
+            return { stopReason: "end", model: "test-model", parsed: { rewrite: "x", rationale: "y", changes: [], citedSectionIds: ["S1", "S9"], concerns: [] }, usage: {} };
         },
     };
     const sections = searchSections(sources, { query: "advance", category: "deposit" });
-    await requestClauseRewrite({ clause: { category: "deposit", heading: "Advance", text: "Three months advance." }, sections, jurisdiction: "Bangladesh", client, model: "test-model" });
+    const answer = await requestClauseRewrite({ clause: { category: "deposit", heading: "Advance", text: "Three months advance." }, sections, jurisdiction: "Bangladesh", client, model: "test-model" });
     const prompt = request.user;
     assert.match(prompt, /Three months advance/);
-    assert.match(prompt, /sectionId sec10/);
+    // Sections reach the model as short labels; its citations come back as real IDs.
+    assert.match(prompt, /sectionId S1 — Premises Rent Control Act/);
+    assert.ok(!prompt.includes("sectionId sec10"));
+    assert.equal(sections[0].sectionId, "sec10");
+    assert.deepEqual(normalizeRewrite(answer.result, sections).citations.map((c) => c.sectionId), ["sec10"]);
 });
 
 test("legal links are not treated as unmet requirements", () => {

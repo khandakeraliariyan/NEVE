@@ -8,7 +8,7 @@ import TenancyRecordLink from "../models/TenancyRecordLink.js";
 import { isExtractionConfigured } from "./agreementExtraction.service.js";
 import { searchSections } from "./legalSource.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
-import { createAIClient } from "./aiClient.service.js";
+import { createAIClient, idLabels } from "./aiClient.service.js";
 
 // Finds approved legal-source sections relevant to each clause of an
 // agreement. Retrieval ranks approved sections by topic and shared words;
@@ -71,22 +71,24 @@ export function candidatesForClause(clause, sources, limit = CANDIDATES_PER_CLAU
     });
 }
 
-function describeCandidates(candidates) {
+function describeCandidates(candidates, sectionLabels) {
     return candidates
         .map(
             (c) =>
-                `  - sectionId ${c.sectionId}: ${c.title}${c.citation ? ` (${c.citation})` : ""}, version ${c.version}, section ${c.sectionNumber}${c.heading ? ` "${c.heading}"` : ""}: ${c.text.slice(0, 1500)}`
+                `  - sectionId ${sectionLabels.label(c.sectionId)}: ${c.title}${c.citation ? ` (${c.citation})` : ""}, version ${c.version}, section ${c.sectionNumber}${c.heading ? ` "${c.heading}"` : ""}: ${c.text.slice(0, 1500)}`
         )
         .join("\n");
 }
 
 export async function requestLegalSuggestions({ items, client = getDefaultClient(), model = env.AGREEMENT_EXTRACTION_MODEL }) {
+    const clauseLabels = idLabels("C", items.map((item) => item.clause._id));
+    const sectionLabels = idLabels("S", items.flatMap((item) => item.candidates.map((c) => c.sectionId)));
     const body = items
         .map(
             (item) =>
-                `Clause ${item.clause._id} (${item.clause.category}${item.clause.heading ? `, "${item.clause.heading}"` : ""}):\n` +
+                `Clause ${clauseLabels.label(item.clause._id)} (${item.clause.category}${item.clause.heading ? `, "${item.clause.heading}"` : ""}):\n` +
                 `${maskPersonalIdentifiers(item.clause.text).text.slice(0, 3000)}\n` +
-                `Candidate sections:\n${describeCandidates(item.candidates)}`
+                `Candidate sections:\n${describeCandidates(item.candidates, sectionLabels)}`
         )
         .join("\n\n");
     const response = await client.generate({
@@ -99,7 +101,13 @@ export async function requestLegalSuggestions({ items, client = getDefaultClient
         user: `${body}\n\nChoose the relevant sections for each clause.`,
     });
     if (!response.parsed) return { suggestions: [], model: response.model };
-    return { suggestions: response.parsed.suggestions, model: response.model };
+    // Back from labels to real IDs; normalizeSuggestions then checks them.
+    const suggestions = response.parsed.suggestions.map((s) => ({
+        ...s,
+        clauseId: clauseLabels.resolve(s.clauseId),
+        sectionId: sectionLabels.resolve(s.sectionId),
+    }));
+    return { suggestions, model: response.model };
 }
 
 // Keeps only suggestions that point at one of that clause's candidates.

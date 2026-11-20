@@ -19,10 +19,11 @@ const agreement = {
     payments: [{ _id: paymentId, paymentType: "rent", amountBdt: 20000, payer: "renter", paidAt: new Date("2026-02-03"), status: "recorded" }],
 };
 
-test("describes records with their IDs for the model", () => {
+test("describes records with short labels, not database IDs, for the model", () => {
     const text = describeAgreementRecords(agreement);
-    assert.match(text, new RegExp(`clause ${clauseId}`));
-    assert.match(text, new RegExp(`payment ${paymentId}: rent of 20000 BDT`));
+    assert.match(text, /clause C1: \[rent\]/);
+    assert.match(text, /payment P1: rent of 20000 BDT/);
+    assert.ok(!text.includes(clauseId) && !text.includes(paymentId));
 });
 
 test("keeps only real, new targets and clamps confidence", () => {
@@ -55,6 +56,7 @@ test("asks the AI model with the file's masked text and the masked record list",
     };
     const result = await requestEvidenceLinkSuggestions({ agreement, documentText: "--- Page 1 ---\nPaid Tk 20,000", client, model: "test-model" });
     assert.equal(result.model, "test-model");
+    assert.match(params.user[1], /payment P1:/);
     assert.match(params.user[0], /^<document title="Evidence file">\n--- Page 1 ---/);
     assert.match(params.user[1], /Agreement records/);
 });
@@ -64,4 +66,26 @@ test("proposed links don't count until accepted", () => {
     const analysis = analyzeAgreementEvidence(agreement, links, []);
     assert.ok(analysis.uncertainInterpretations.some((flag) => flag.type === "unreviewed_ai_link"));
     assert.equal(analysis.documentedFacts.length, 0);
+});
+
+test("the model's labels come back as the records' real IDs", async () => {
+    const client = {
+        generate: async () => ({
+            stopReason: "end",
+            model: "test-model",
+            usage: {},
+            parsed: {
+                fileSummary: "A receipt",
+                limitations: null,
+                links: [
+                    { targetType: "payment", targetId: "P1", relationship: "supports", explanation: "Same amount.", sourceQuote: "Tk 20,000", confidence: 0.9 },
+                    { targetType: "clause", targetId: "clause C1", relationship: "relates_to", explanation: "About rent.", sourceQuote: null, confidence: 0.5 },
+                    { targetType: "payment", targetId: "P7", relationship: "supports", explanation: "No such payment.", sourceQuote: null, confidence: 0.5 },
+                ],
+            },
+        }),
+    };
+    const { suggestions } = await requestEvidenceLinkSuggestions({ agreement, documentText: "Paid Tk 20,000", client, model: "test-model" });
+    const links = normalizeSuggestions(suggestions, agreement).links;
+    assert.deepEqual(links.map((l) => [l.targetType, l.targetId]), [["payment", paymentId], ["clause", clauseId]]);
 });

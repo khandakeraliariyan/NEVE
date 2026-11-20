@@ -110,6 +110,33 @@ export function parseStructured(content, schema) {
     return result.success ? result.data : null;
 }
 
+// Short labels (C1, S1, …) for the records a prompt lists. Database IDs of
+// records created together differ only in their last characters, and models
+// copy them wrongly, citing the record next to the one they meant. Show
+// label(id) in the prompt and turn the model's answer back with resolve(),
+// which also accepts a label with extra words ("clause C3") and returns any
+// other value unchanged, so the usual checks against real IDs still apply.
+export function idLabels(prefix, ids) {
+    const labelOf = new Map();
+    const idOf = new Map();
+    for (const id of ids) {
+        const key = String(id);
+        if (labelOf.has(key)) continue;
+        const label = `${prefix}${labelOf.size + 1}`;
+        labelOf.set(key, label);
+        idOf.set(label, key);
+    }
+    const pattern = new RegExp(`\\b${prefix}\\d+\\b`, "i");
+    return {
+        label: (id) => labelOf.get(String(id)) ?? String(id),
+        resolve: (value) => {
+            const text = String(value ?? "").trim();
+            const token = text.match(pattern)?.[0]?.toUpperCase();
+            return idOf.get(text) ?? (token ? idOf.get(token) : undefined) ?? text;
+        },
+    };
+}
+
 // Creates a client for one feature. `groq` and `record` are injectable for tests.
 export function createAIClient({ feature, groq = null, record = recordAIUsage, now = () => Date.now() }) {
     if (!AI_FEATURES.includes(feature)) throw new TypeError(`Unknown AI feature: ${feature}`);

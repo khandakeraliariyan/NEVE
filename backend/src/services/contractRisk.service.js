@@ -5,7 +5,7 @@ import { RISK_SEVERITIES, RISK_TYPES } from "../models/ContractRiskAnalysis.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
 import { searchSections } from "./legalSource.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
-import { AIServiceError, createAIClient } from "./aiClient.service.js";
+import { AIServiceError, createAIClient, idLabels } from "./aiClient.service.js";
 
 // Contract Risk Intelligence: finds wording the parties should look at
 // again (ambiguous, missing, contradictory or one-sided terms). Rule checks
@@ -339,9 +339,11 @@ export function sectionsForAgreement(sources, agreement, limit = 12) {
 }
 
 export async function requestRiskReview({ agreement, rules, sections, client = getDefaultClient(), model = env.AGREEMENT_EXTRACTION_MODEL }) {
-    const clauses = activeClauses(agreement)
-        .slice(0, 80)
-        .map((c) => `- clauseId ${c._id} (${c.category}${c.heading ? `, "${c.heading}"` : ""}): ${maskPersonalIdentifiers(c.text).text.slice(0, 2500)}`)
+    const shown = activeClauses(agreement).slice(0, 80);
+    const clauseLabels = idLabels("C", shown.map((c) => c._id));
+    const sectionLabels = idLabels("S", sections.map((s) => s.sectionId));
+    const clauses = shown
+        .map((c) => `- clauseId ${clauseLabels.label(c._id)} (${c.category}${c.heading ? `, "${c.heading}"` : ""}): ${maskPersonalIdentifiers(c.text).text.slice(0, 2500)}`)
         .join("\n");
     const day = (v) => (v ? new Date(v).toISOString().slice(0, 10) : "not recorded");
     const amount = (v) => (v === null || v === undefined ? "not recorded" : `BDT ${v}`);
@@ -350,7 +352,7 @@ export async function requestRiskReview({ agreement, rules, sections, client = g
         `Clauses:\n${clauses || "(none)"}`,
         `Rule-check findings already made:\n${rules.map((f) => `- ${f.type}: ${f.title}`).join("\n") || "(none)"}`,
         `Approved legal-source sections:\n${
-            sections.map((s) => `- sectionId ${s.sectionId}: ${s.title}, section ${s.sectionNumber}${s.heading ? ` "${s.heading}"` : ""}: ${s.text.slice(0, 2000)}`).join("\n") || "(none approved yet)"
+            sections.map((s) => `- sectionId ${sectionLabels.label(s.sectionId)}: ${s.title}, section ${s.sectionNumber}${s.heading ? ` "${s.heading}"` : ""}: ${s.text.slice(0, 2000)}`).join("\n") || "(none approved yet)"
         }`,
         "Review this agreement for the issues described.",
     ].join("\n\n");
@@ -377,7 +379,12 @@ export async function requestRiskReview({ agreement, rules, sections, client = g
         throw new ExtractionError("Risk review returned no output.", 502, { publicMessage: "AI risk review failed." });
     }
     return {
-        findings: response.parsed.findings,
+        // Back from labels to real IDs; normalizeAiFindings then checks them.
+        findings: response.parsed.findings.map((finding) => ({
+            ...finding,
+            clauseIds: (finding.clauseIds ?? []).map(clauseLabels.resolve),
+            citedSectionIds: (finding.citedSectionIds ?? []).map(sectionLabels.resolve),
+        })),
         model: response.model,
         usage: response.usage,
         latencyMs: Date.now() - startedAt,

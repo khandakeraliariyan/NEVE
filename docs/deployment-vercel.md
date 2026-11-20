@@ -50,7 +50,7 @@ The general deployment checklist is in [operations.md](operations.md#deployment-
 ## Step 1: deploy the API
 
 1. In Vercel, select **Add New → Project** and import the repository.
-2. Set **Root Directory** to `backend`. **Framework Preset** should be detected as **Next.js**.
+2. Set **Root Directory** to `backend`. `backend/vercel.json` sets the framework (Next.js), install and build commands, so an existing project that was set to **Other** for the old Express API switches over on its next deploy.
 3. Add the environment variables below, for Production. Use a placeholder for `CLIENT_URL` for now, for example `https://example.com`; you'll set the real value in step 3.
 
    | Variable | Value |

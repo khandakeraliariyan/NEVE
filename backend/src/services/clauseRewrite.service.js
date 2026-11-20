@@ -3,7 +3,7 @@ import { maskPersonalIdentifiers } from "./piiMasking.service.js";
 
 import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
-import { AIServiceError, createAIClient } from "./aiClient.service.js";
+import { AIServiceError, createAIClient, idLabels } from "./aiClient.service.js";
 
 // The AI model suggests balanced wording for one clause, grounded only in approved
 // legal-source sections that were retrieved for it. A suggestion is a draft
@@ -36,11 +36,11 @@ const getDefaultClient = () => {
     return defaultClient;
 };
 
-export function describeSections(sections) {
+export function describeSections(sections, sectionLabels = idLabels("S", sections.map((s) => s.sectionId))) {
     return sections
         .map(
             (section) =>
-                `sectionId ${section.sectionId} — ${section.title}${section.citation ? ` (${section.citation})` : ""}, version ${section.version}, section ${section.sectionNumber}${section.heading ? ` "${section.heading}"` : ""}:\n${section.text.slice(0, 4000)}`
+                `sectionId ${sectionLabels.label(section.sectionId)} — ${section.title}${section.citation ? ` (${section.citation})` : ""}, version ${section.version}, section ${section.sectionNumber}${section.heading ? ` "${section.heading}"` : ""}:\n${section.text.slice(0, 4000)}`
         )
         .join("\n\n");
 }
@@ -52,6 +52,7 @@ export async function requestClauseRewrite({
     client = getDefaultClient(),
     model = env.AGREEMENT_EXTRACTION_MODEL,
 }) {
+    const sectionLabels = idLabels("S", sections.map((s) => s.sectionId));
     const startedAt = Date.now();
     let response;
     try {
@@ -65,7 +66,7 @@ export async function requestClauseRewrite({
             user:
                 `Jurisdiction: ${jurisdiction}\n\n` +
                 `Clause (${clause.category}${clause.heading ? `, "${clause.heading}"` : ""}):\n${maskPersonalIdentifiers(clause.text).text}\n\n` +
-                `Approved legal-source sections:\n${sections.length ? describeSections(sections) : "(none found for this clause)"}\n\n` +
+                `Approved legal-source sections:\n${sections.length ? describeSections(sections, sectionLabels) : "(none found for this clause)"}\n\n` +
                 "Suggest a balanced version of this clause.",
         });
     } catch (error) {
@@ -86,7 +87,8 @@ export async function requestClauseRewrite({
     }
 
     return {
-        result: response.parsed,
+        // Back from labels to real IDs; normalizeRewrite then checks them.
+        result: { ...response.parsed, citedSectionIds: (response.parsed.citedSectionIds ?? []).map(sectionLabels.resolve) },
         model: response.model,
         usage: response.usage,
         latencyMs: Date.now() - startedAt,

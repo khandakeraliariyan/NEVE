@@ -4,7 +4,7 @@ import { env } from "../config/env.js";
 import { ExtractionError } from "./agreementExtraction.service.js";
 import { textDocumentBlock } from "./aiDocument.service.js";
 import { maskPersonalIdentifiers } from "./piiMasking.service.js";
-import { AIServiceError, createAIClient } from "./aiClient.service.js";
+import { AIServiceError, createAIClient, idLabels } from "./aiClient.service.js";
 
 // The AI model reads one evidence file and proposes how it relates to the
 // agreement's clauses, obligations and payment records. Proposals are stored
@@ -53,24 +53,33 @@ const getDefaultClient = () => {
     return defaultClient;
 };
 
-export function describeAgreementRecords(agreement) {
+// Labels per record type: clauses C1…, obligations O1…, payments P1….
+export function agreementRecordLabels(agreement) {
+    return {
+        clause: idLabels("C", (agreement.clauses ?? []).filter((c) => (c.reviewStatus ?? "confirmed") !== "rejected").map((c) => c._id)),
+        obligation: idLabels("O", (agreement.obligations ?? []).map((o) => o._id)),
+        payment: idLabels("P", (agreement.payments ?? []).map((p) => p._id)),
+    };
+}
+
+export function describeAgreementRecords(agreement, labels = agreementRecordLabels(agreement)) {
     const lines = [];
     for (const clause of agreement.clauses ?? []) {
         if ((clause.reviewStatus ?? "confirmed") === "rejected") continue;
         lines.push(
-            `clause ${clause._id}: [${clause.category}] ${clause.heading ? `${clause.heading}: ` : ""}${String(clause.text ?? "").slice(0, 600)}`
+            `clause ${labels.clause.label(clause._id)}: [${clause.category}] ${clause.heading ? `${clause.heading}: ` : ""}${String(clause.text ?? "").slice(0, 600)}`
         );
     }
     for (const obligation of agreement.obligations ?? []) {
         lines.push(
-            `obligation ${obligation._id}: ${obligation.responsibleParty} must ${obligation.description}` +
+            `obligation ${labels.obligation.label(obligation._id)}: ${obligation.responsibleParty} must ${obligation.description}` +
                 `${obligation.amountBdt != null ? `; amount ${obligation.amountBdt} BDT` : ""}` +
                 `${obligation.dueAt ? `; due ${new Date(obligation.dueAt).toISOString().slice(0, 10)}` : ""}; status ${obligation.status}`
         );
     }
     for (const payment of agreement.payments ?? []) {
         lines.push(
-            `payment ${payment._id}: ${payment.paymentType} of ${payment.amountBdt} BDT paid by ${payment.payer} on ` +
+            `payment ${labels.payment.label(payment._id)}: ${payment.paymentType} of ${payment.amountBdt} BDT paid by ${payment.payer} on ` +
                 `${new Date(payment.paidAt).toISOString().slice(0, 10)}${payment.reference ? `; reference ${payment.reference}` : ""}; status ${payment.status}`
         );
     }
@@ -85,7 +94,8 @@ export async function requestEvidenceLinkSuggestions({
     model = env.AGREEMENT_EXTRACTION_MODEL,
 }) {
     // Records can hold text people typed in, so they're masked too.
-    const records = maskPersonalIdentifiers(describeAgreementRecords(agreement) ?? "").text;
+    const labels = agreementRecordLabels(agreement);
+    const records = maskPersonalIdentifiers(describeAgreementRecords(agreement, labels) ?? "").text;
     if (!records) {
         throw new ExtractionError("No records to compare.", 409, {
             publicMessage: "Add clauses, obligations or payment records before asking for suggestions.",
@@ -130,7 +140,14 @@ export async function requestEvidenceLinkSuggestions({
     }
 
     return {
-        suggestions: response.parsed,
+        // Back from labels to real IDs; normalizeSuggestions then checks them.
+        suggestions: {
+            ...response.parsed,
+            links: (response.parsed.links ?? []).map((link) => ({
+                ...link,
+                targetId: labels[link.targetType] ? labels[link.targetType].resolve(link.targetId) : link.targetId,
+            })),
+        },
         model: response.model,
         usage: response.usage,
         latencyMs: Date.now() - startedAt,

@@ -7,6 +7,7 @@ import {
     buildAnalysisReport,
     mergeFindings,
     normalizeAiFindings,
+    requestRiskReview,
     riskSummary,
     ruleFindings,
 } from "../src/services/contractRisk.service.js";
@@ -99,6 +100,31 @@ test("AI findings keep only real clauses and provided sections", () => {
     assert.equal(found[0].clauseIds.length, 1);
     assert.equal(found[0].legalReferences.length, 1);
     assert.equal(found[0].method, "ai");
+});
+
+test("the model sees short labels and its labels come back as real clause and section IDs", async () => {
+    const agreement = fullAgreement();
+    // IDs made together differ only at the end, which is why the model gets labels.
+    const sections = [10, 11].map((n) => ({ sectionId: String(id()), legalSourceId: String(id()), title: "Act", sectionNumber: String(n), version: 1, text: `Section ${n} text.` }));
+    let prompt;
+    const client = {
+        generate: async ({ user }) => {
+            prompt = user;
+            return {
+                stopReason: "end",
+                model: "test-model",
+                usage: {},
+                parsed: { findings: [{ type: "one_sided_term", severity: "high", title: "Repairs fall on tenant", explanation: "x", suggestedAction: "y", questionsToAsk: [], clauseIds: ["C5", "clause C5", "C99"], citedSectionIds: ["S2"] }] },
+            };
+        },
+    };
+    const review = await requestRiskReview({ agreement, rules: [], sections, client, model: "test-model" });
+    assert.match(prompt, /- clauseId C1 \(/);
+    assert.match(prompt, /- sectionId S2: Act, section 11/);
+    assert.ok(!prompt.includes(String(agreement.clauses[0]._id)));
+    const [finding] = normalizeAiFindings(review.findings, { agreement, sections });
+    assert.deepEqual(finding.clauseIds, [String(agreement.clauses[4]._id)]);
+    assert.deepEqual(finding.legalReferences.map((r) => r.sectionNumber), ["11"]);
 });
 
 test("re-runs keep each finding's status and reviewer notes, and sort by severity", () => {

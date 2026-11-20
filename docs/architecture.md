@@ -59,18 +59,22 @@ Every AI call goes through one module, `src/services/aiClient.service.js`:
 
 ```text
 feature service (e.g. contractRisk)
-   │ 1. builds the prompt from stored records only
+   │ 1. builds the prompt from stored records only, naming records by short
+   │    labels (C1, S1, …) from idLabels() instead of database IDs
    │ 2. masks personal identifiers (piiMasking.service.js)
    ▼
 aiClient.generate({ system, user, schema: <Zod>, effort })
    │ 3. converts the Zod schema to a strict JSON schema
-   │ 4. calls Groq with response_format json_schema, strict: true
+   │ 4. calls Groq with response_format json_schema, strict: true; if Groq
+   │    rejects the output as invalid JSON (json_validate_failed), asks once more
    │ 5. validates the reply with the same Zod schema; a mismatch → parsed: null
    │ 6. maps provider errors to AIServiceError (auth, rate_limit, bad_request, api)
+   │    and logs the provider's reason
    │ 7. records an AIUsageEvent: feature, model, tokens, latency, estimated cost
    ▼
 feature service
-   │ 8. post-checks the content: extracted clauses are matched against the
+   │ 8. turns the model's labels back into database IDs, then post-checks
+   │    the content: extracted clauses are matched against the
    │    document text, citations must point at sections that were provided,
    │    clause and record IDs must exist
    ▼
@@ -84,6 +88,7 @@ Key properties:
   - The text is then masked by `aiDocument.service.js`: national ID, passport and phone numbers and email addresses are removed, including numbers written in Bangla digits.
   - The original file is never sent to the model.
 - **Structured output.** Answers must match a schema. A truncated or off-schema answer is discarded rather than guessed at.
+- **Labels, not database IDs.** IDs of records created together differ only in their last characters, and models copied them wrongly, citing the section or clause next to the one they used. Prompts therefore list records as `C1`, `S1`, `P1`… and each feature maps the answer back before checking it.
 - **Grounding checks after the model answers.**
   - Extracted clauses are matched against the document text (`sourceVerified`); contract-risk findings keep only clause IDs that exist in the agreement.
   - Copilot citations are limited to the sections retrieved for that question.

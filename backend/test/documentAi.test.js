@@ -13,6 +13,7 @@ import { DocumentTextError, extractDocumentText, shutdownOcr } from "../src/serv
 import {
     keywordSuggestions,
     normalizeSuggestions,
+    requestLegalSuggestions,
     suggestLegalSourcesForAgreement,
 } from "../src/services/legalSuggestion.service.js";
 import { MASKS, maskPersonalIdentifiers } from "../src/services/piiMasking.service.js";
@@ -198,6 +199,24 @@ test("the model may only choose from the clause's retrieved sections", () => {
     );
     assert.equal(kept.length, 1);
     assert.equal(kept[0].relationship, "contradicts");
+});
+
+test("legal suggestions use short labels and map them back to the real clause and section", async () => {
+    const items = [{ clause: agreement.clauses[0], candidates: [{ sectionId: String(sectionA), title: "Act", version: 1, sectionNumber: "10", text: "Advance.", score: 7 }, { sectionId: String(sectionB), title: "Act", version: 1, sectionNumber: "11", text: "Other.", score: 3 }] }];
+    let prompt;
+    const client = {
+        generate: async ({ user }) => {
+            prompt = user;
+            return { stopReason: "end", model: "test-model", usage: {}, parsed: { suggestions: [{ clauseId: "C1", sectionId: "S1", relationship: "contradicts", explanation: "Advance limit.", confidence: 0.9 }] } };
+        },
+    };
+    const { suggestions } = await requestLegalSuggestions({ items, client, model: "test-model" });
+    assert.match(prompt, /Clause C1 \(/);
+    assert.match(prompt, /sectionId S1:/);
+    assert.ok(!prompt.includes(String(sectionA)));
+    const [kept] = normalizeSuggestions(suggestions, items);
+    assert.equal(kept.clauseId, String(clauseId));
+    assert.equal(String(kept.candidate.sectionId), String(sectionA));
 });
 
 test("with AI, suggestions are saved as proposals with their source, version and section", async () => {

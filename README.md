@@ -575,7 +575,7 @@ All demo names, places and amounts are invented. Don't seed a database that hold
 - API: the Helmet set of security headers (`backend/src/http/route.js`), CORS limited to `CLIENT_URL` (`backend/src/proxy.js`), a 1 MB JSON body limit, and per-IP rate limits. Clients never see internal error details.
 - Frontend (`frontend/next.config.mjs`): anti-framing (CSP `frame-ancestors` and `X-Frame-Options`), `nosniff`, `Referrer-Policy`, a `Permissions-Policy`, and HSTS in production.
 
-**Dependencies**: the frontend reports 0 `npm audit` vulnerabilities. The backend reports 1 low-severity advisory in `fast-xml-parser`, which the AWS SDK pulls in (fixed by `npm audit fix`). npm `overrides` pin patched transitive versions until upstream releases include them: `@grpc/grpc-js` in the frontend, and `glob` and `minimatch` in the backend. Remove them once `firebase` and `firebase-admin` ship fixed releases.
+**Dependencies**: both apps report 0 `npm audit` vulnerabilities. npm `overrides` pin patched transitive versions until upstream releases include them: `@grpc/grpc-js` in the frontend, and `glob` and `minimatch` in the backend. Remove them once `firebase` and `firebase-admin` ship fixed releases.
 
 **Secrets**: `.env` files and `backend/secrets/` are gitignored and have never been committed.
 
@@ -597,7 +597,7 @@ Beyond the local setup, a deployment needs the items below. The full checklist, 
 ## Testing
 
 ```bash
-cd backend && npm test        # 446 tests; no database or network needed
+cd backend && npm test        # 449 tests; no database or network needed
 cd backend && npm run eval -- --check
 cd backend && npm run lint && npm run build
 cd frontend && npm run lint && npm run build
@@ -609,7 +609,7 @@ Backend tests use Node's built-in test runner and replace database and storage c
 
 | Check | Result |
 |---|---|
-| Backend tests | 446 of 446 pass, including the HTTP layer, the endpoint table (312 endpoints) and CORS |
+| Backend tests | 449 of 449 pass, including the HTTP layer, the endpoint table (312 endpoints) and CORS |
 | Offline evaluation (`--check`) | no regressions against `eval/baseline.json` |
 | Lint and build | backend: 0 problems, build succeeds without secrets; frontend: 0 errors (24 warnings), build succeeds |
 | Both apps running locally (`npm start`) | API health, CORS preflights from the frontend, JSON 404s for unknown paths and wrong methods, and `503` when the database is unreachable all behave as before; every page tried returns `200` |
