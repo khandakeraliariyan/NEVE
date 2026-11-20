@@ -219,6 +219,11 @@ async function main() {
     const mineIds = mine.map((p) => p._id);
     await Property.updateMany({ _id: { $in: mineIds } }, { $set: { landlord: users.landlord._id } });
     await UploadedFile.updateMany({ property: { $in: mineIds }, purpose: "property_image" }, { $set: { uploadedBy: users.landlord._id } });
+    // Inquiries and viewings already on those listings follow the new owner, so no record points at a landlord who no longer owns the listing.
+    await Promise.all([
+        Inquiry.updateMany({ property: { $in: mineIds } }, { $set: { landlord: users.landlord._id } }),
+        ViewingRequest.updateMany({ property: { $in: mineIds } }, { $set: { landlord: users.landlord._id } }),
+    ]);
 
     const activity = buildActivity({ renter: users.renter, landlord: users.landlord, listings: mine.concat(saved.filter((p) => !mine.includes(p))), saved });
     const { notifications, ...records } = activity;
