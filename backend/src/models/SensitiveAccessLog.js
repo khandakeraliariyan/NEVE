@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 import { logChainPlugin } from "../services/logChain.service.js";
 
 const idOf = (value) => (value == null ? null : String(value._id ?? value));
@@ -66,4 +67,4 @@ sensitiveAccessLogSchema.index({ createdAt: -1 });
 sensitiveAccessLogSchema.index({ agreement: 1, createdAt: -1 });
 // Access logs are deliberately append-only; do not add a TTL index.
 
-export default mongoose.model("SensitiveAccessLog", sensitiveAccessLogSchema);
+export default defineModel("SensitiveAccessLog", sensitiveAccessLogSchema);

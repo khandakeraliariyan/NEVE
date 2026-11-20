@@ -11,7 +11,6 @@ import {
     validateMaintenanceAssignee,
 } from "../services/maintenanceRequest.service.js";
 import {
-    appendAuditEvent,
     canManageAgreement,
     findAccessibleAgreement,
     findParticipantAgreement,

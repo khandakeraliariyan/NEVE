@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // A person contesting an account decision, or raising a complaint about
 // their account, for an admin to review.
@@ -36,6 +37,6 @@ accountAppealSchema.index(
 );
 accountAppealSchema.index({ status: 1, createdAt: -1 });
 
-const AccountAppeal = mongoose.model("AccountAppeal", accountAppealSchema);
+const AccountAppeal = defineModel("AccountAppeal", accountAppealSchema);
 
 export default AccountAppeal;

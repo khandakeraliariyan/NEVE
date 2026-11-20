@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 import {
     BATHROOM_TYPES,
     OCCUPANT_GENDERS,
@@ -438,6 +439,6 @@ propertySchema.pre("aggregate", function () {
     pipeline.splice(at, 0, { $match: { status: { $ne: "deleted" } } });
 });
 
-const Property = mongoose.model("Property", propertySchema);
+const Property = defineModel("Property", propertySchema);
 
 export default Property;

@@ -1,16 +1,20 @@
 import "dotenv/config";
 import { z } from "zod";
 
-const envSchema = z.object({
+const baseSchema = z.object({
     NODE_ENV: z
         .enum(["development", "test", "production"])
         .default("development"),
+    // Port of the API's Next.js server (see the dev and start scripts).
     PORT: z.coerce.number().int().min(1).max(65535).default(5000),
     // Number of reverse proxies in front of the API (e.g. 1 behind a hosting
     // provider's load balancer). Rate limits and session IPs use the client
     // address only when this matches the real setup; leave unset when the API
     // is reached directly, or clients could fake their IP with X-Forwarded-For.
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+    // Exact origin of the frontend, e.g. https://neve.app or http://localhost:5173.
+    // CORS allows only this origin (src/proxy.js), admin requests must come
+    // from it, and emails link to it.
     CLIENT_URL: z.string().url(),
     MONGODB_URI: z.string().min(1),
     // Firebase Admin credentials: a path to the service-account JSON file
@@ -137,7 +141,9 @@ const envSchema = z.object({
         .string()
         .url()
         .default("http://localhost:5000/api/v1"),
-}).refine(
+});
+
+const envSchema = baseSchema.refine(
     (value) => Boolean(value.FIREBASE_SERVICE_ACCOUNT_PATH || value.FIREBASE_SERVICE_ACCOUNT_JSON),
     { path: ["FIREBASE_SERVICE_ACCOUNT_PATH"], message: "Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON." }
 );
@@ -147,7 +153,19 @@ const definedEnv = Object.fromEntries(
     Object.entries(process.env).filter(([, value]) => typeof value !== "string" || value.trim() !== "")
 );
 
-const parsed = envSchema.safeParse(definedEnv);
+// `next build` loads every API route module to read its settings without
+// handling any request, so a build doesn't need the server's secrets: values
+// that are missing or invalid are left unset (defaults still apply). Running
+// the app (dev, start, tests, scripts) still requires a valid configuration.
+const isNextBuild = process.env.NEXT_PHASE === "phase-production-build";
+
+function lenientBuildEnv() {
+    const partial = baseSchema.partial().safeParse(definedEnv);
+    return { success: true, data: partial.success ? partial.data : baseSchema.partial().parse({}) };
+}
+
+let parsed = envSchema.safeParse(definedEnv);
+if (!parsed.success && isNextBuild) parsed = lenientBuildEnv();
 
 if (!parsed.success) {
     console.error("Invalid environment configuration:");

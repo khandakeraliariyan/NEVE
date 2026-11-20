@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 
@@ -9,7 +9,7 @@ import {
     resolveReviewReport
 } from "../controllers/reviewModeration.controller.js";
 
-const router = express.Router();
+const router = Router();
 
 router.post(
     "/:reviewId/reports",

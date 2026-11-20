@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const propertyReportSchema = new mongoose.Schema(
     {
@@ -75,6 +76,6 @@ propertyReportSchema.index({ reporter: 1, createdAt: -1 });
 propertyReportSchema.index({ status: 1, createdAt: -1 });
 propertyReportSchema.index({ property: 1, createdAt: -1 });
 
-const PropertyReport = mongoose.model("PropertyReport", propertyReportSchema);
+const PropertyReport = defineModel("PropertyReport", propertyReportSchema);
 
 export default PropertyReport;

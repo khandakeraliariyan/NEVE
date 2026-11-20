@@ -1,0 +1,18 @@
+# Safety net for commands run from the repository root. Each app
+# (backend/, frontend/) has its own .gitignore with the full list.
+node_modules/
+.next/
+.vercel/
+*.tsbuildinfo
+.eslintcache
+.env
+.env.*
+!.env.example
+secrets/
+*.log
+AGENTS.md
+.DS_Store
+Thumbs.db
+
+# Local editor settings
+.vscode/

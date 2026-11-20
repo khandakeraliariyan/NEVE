@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // One sign-in (a Firebase auth_time, or an admin token) and where it was
 // used from. Doubles as the login history; removed 90 days after last use.
@@ -23,4 +24,4 @@ userSessionSchema.index({ user: 1, authTime: 1 }, { unique: true });
 userSessionSchema.index({ user: 1, signedInAt: -1 });
 userSessionSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0 });
 
-export default mongoose.model("UserSession", userSessionSchema);
+export default defineModel("UserSession", userSessionSchema);

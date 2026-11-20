@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 import { queueNotificationDelivery } from "../services/notificationDelivery.service.js";
 import { NOTIFICATION_TYPES } from "../services/notificationTypes.js";
 
@@ -130,6 +131,6 @@ notificationSchema.post("save", function deliverNew(doc) {
     }
 });
 
-const Notification = mongoose.model("Notification", notificationSchema);
+const Notification = defineModel("Notification", notificationSchema);
 
 export default Notification;

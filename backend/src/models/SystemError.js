@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // Unexpected server errors, grouped by fingerprint so a recurring failure is
 // one row with a count. Holds no request bodies; messages and stack traces
@@ -31,6 +32,6 @@ const systemErrorSchema = new mongoose.Schema(
 // Groups not seen for 90 days are dropped.
 systemErrorSchema.index({ lastSeenAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60, name: "system_error_ttl" });
 
-const SystemError = mongoose.model("SystemError", systemErrorSchema);
+const SystemError = defineModel("SystemError", systemErrorSchema);
 
 export default SystemError;

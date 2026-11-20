@@ -1,13 +1,14 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { GlobalFonts } from "@napi-rs/canvas";
 
-// Fonts shipped with the API (backend/assets/fonts) for PDF reports, so
+// Fonts shipped with the app (backend/assets/fonts) for PDF reports, so
 // Latin and Bangla text render the same on any host, including serverless
 // hosts such as Vercel that have no system fonts. Registered under the family
-// names reportPdf.service.js asks for.
-const FONT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../assets/fonts");
+// names reportPdf.service.js asks for. The folder is resolved from the
+// backend folder, where Next.js runs; next.config.mjs includes it in the
+// deployed functions.
+const FONT_DIR = path.join(process.cwd(), "assets/fonts");
 const BUNDLED = [
     ["NotoSans-Regular.ttf", "Noto Sans"],
     ["NotoSans-Bold.ttf", "Noto Sans"],

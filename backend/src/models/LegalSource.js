@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 import { CLAUSE_CATEGORIES } from "../services/agreementExtraction.service.js";
 
@@ -129,4 +130,4 @@ legalSourceSchema.index(
 legalSourceSchema.index({ jurisdiction: 1, status: 1 });
 legalSourceSchema.index({ "assignedReviewer.user": 1, status: 1 });
 
-export default mongoose.model("LegalSource", legalSourceSchema);
+export default defineModel("LegalSource", legalSourceSchema);

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router } from "../http/router.js";
 import { adminLogin, adminLogout, getCurrentUser, reportPasswordChanged } from "../controllers/auth.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { completeAdminSetup } from "../controllers/adminStaff.controller.js";

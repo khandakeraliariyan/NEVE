@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const inquirySchema = new mongoose.Schema(
     {
@@ -83,6 +84,6 @@ const inquirySchema = new mongoose.Schema(
 
 inquirySchema.index({ firstLandlordReplyAt: 1, reminderSentAt: 1, createdAt: 1 });
 
-const Inquiry = mongoose.model("Inquiry", inquirySchema);
+const Inquiry = defineModel("Inquiry", inquirySchema);
 
 export default Inquiry;

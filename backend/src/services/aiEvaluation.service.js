@@ -228,7 +228,6 @@ export function calculateEvaluationMetrics(input) {
                 );
             }
             const expectedSet = new Set(expected);
-            const predictedSet = new Set(predicted);
             const tp = predicted.filter((label) => expectedSet.has(label)).length;
             const fp = predicted.length - tp;
             const fn = expected.length - tp;

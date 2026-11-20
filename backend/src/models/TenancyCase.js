@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const caseEvidenceSchema = new mongoose.Schema(
     {
@@ -157,4 +158,4 @@ const tenancyCaseSchema = new mongoose.Schema(
 tenancyCaseSchema.index({ agreement: 1, createdAt: -1 });
 tenancyCaseSchema.index({ "sharedWith.user": 1, "sharedWith.revokedAt": 1 });
 
-export default mongoose.model("TenancyCase", tenancyCaseSchema);
+export default defineModel("TenancyCase", tenancyCaseSchema);

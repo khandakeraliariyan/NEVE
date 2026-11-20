@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const userSchema = new mongoose.Schema(
     {
@@ -276,6 +277,6 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-const User = mongoose.model("User", userSchema);
+const User = defineModel("User", userSchema);
 
 export default User;

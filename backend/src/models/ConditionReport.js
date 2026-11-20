@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const reviewEventSchema = new mongoose.Schema(
     {
@@ -92,4 +93,4 @@ const conditionReportSchema = new mongoose.Schema(
 
 conditionReportSchema.index({ agreement: 1, stage: 1 }, { unique: true });
 
-export default mongoose.model("ConditionReport", conditionReportSchema);
+export default defineModel("ConditionReport", conditionReportSchema);

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // A relationship between two records in one agreement's Evidence Graph, such
 // as a clause that requires an obligation, or a payment that supports an
@@ -38,4 +39,4 @@ tenancyRecordLinkSchema.index(
     { unique: true }
 );
 
-export default mongoose.model("TenancyRecordLink", tenancyRecordLinkSchema);
+export default defineModel("TenancyRecordLink", tenancyRecordLinkSchema);

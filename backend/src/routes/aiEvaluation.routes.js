@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 import {
     createAIEvaluationRun,
     getAIEvaluationRun,
@@ -12,7 +12,7 @@ const reviewerAccess = requirePermission(
     "AI evaluation results aren't shared with legal reviewers."
 );
 
-const router = express.Router();
+const router = Router();
 
 router.use(authenticateUser);
 

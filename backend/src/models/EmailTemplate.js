@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // An admin's changes to one notification type's email: its subject, an
 // opening paragraph, or turning the email off. The rest of the email (the
@@ -16,4 +17,4 @@ const emailTemplateSchema = new mongoose.Schema(
     { timestamps: true, versionKey: false }
 );
 
-export default mongoose.model("EmailTemplate", emailTemplateSchema);
+export default defineModel("EmailTemplate", emailTemplateSchema);

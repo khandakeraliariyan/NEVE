@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const documentDeletionRequestSchema = new mongoose.Schema(
     {
@@ -54,7 +55,7 @@ documentDeletionRequestSchema.index(
     { partialFilterExpression: { status: "pending" } }
 );
 
-export default mongoose.model(
+export default defineModel(
     "DocumentDeletionRequest",
     documentDeletionRequestSchema
 );

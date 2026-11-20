@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // A Legal Copilot conversation. Private to the person who started it. When
 // it is about an agreement, the agreement's clauses and terms are used as
@@ -99,4 +100,4 @@ copilotConversationSchema.index({ owner: 1, updatedAt: -1 });
 
 export const MAX_MESSAGES = 200;
 
-export default mongoose.model("CopilotConversation", copilotConversationSchema);
+export default defineModel("CopilotConversation", copilotConversationSchema);

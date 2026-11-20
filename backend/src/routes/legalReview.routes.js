@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 
 import {
     createLegalSource,
@@ -16,7 +16,7 @@ import { allowRoles, requirePermission } from "../middleware/role.middleware.js"
 
 const canDraft = requirePermission((settings) => settings.rolePermissions.reviewersCanDraftSources !== false, "Drafting legal sources is turned off for legal reviewers.");
 
-const router = express.Router();
+const router = Router();
 
 router.use(authenticateUser);
 router.use(allowRoles("legal_reviewer"));

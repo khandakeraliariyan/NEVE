@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "../http/router.js";
 
 import {
     reviewListingConsistency,
@@ -17,7 +17,7 @@ import {
     allowRoles,
 } from "../middleware/role.middleware.js";
 
-const router = express.Router();
+const router = Router();
 
 router.use(authenticateUser);
 

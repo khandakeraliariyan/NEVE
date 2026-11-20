@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const nearbyPlaceCacheSchema = new mongoose.Schema(
   {
@@ -72,7 +73,7 @@ const nearbyPlaceCacheSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model(
+export default defineModel(
   "NearbyPlaceCache",
   nearbyPlaceCacheSchema
 );

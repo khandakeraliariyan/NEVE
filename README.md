@@ -149,6 +149,8 @@ You need **Node.js 20.9 or later** (20.x or 22+), npm, a running **MongoDB**, an
 
    Generate the admin secret with `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`, then start the API with `npm run dev`.
 
+   **MongoDB for local work.** Use a local database so experiments never touch live data. On Ubuntu with the `mongodb-server-replicaset` snap, start it once with `sudo snap start --enable mongodb-server-replicaset` and set `MONGODB_URI=mongodb://127.0.0.1:27017/neve?directConnection=true`. A local database starts empty: create an admin and import the legal corpus (see [Preparing a demo](#preparing-a-demo)). To use MongoDB Atlas instead, add your computer's public IP under Atlas → **Network Access**, or Atlas refuses the connection.
+
 2. **Frontend**: in a second terminal:
 
    ```bash
@@ -182,7 +184,7 @@ NEVE has two applications that work together:
 Person using browser
         │
         ▼
-Next.js frontend (frontend/) ── HTTP requests + Firebase ID token ──► Express API (backend/)
+Next.js frontend (frontend/) ── HTTP requests + Firebase ID token ──► Next.js API (backend/)
                                 (admins: httpOnly session cookie)       │
                                                                         ├── MongoDB
                                                                         ├── Firebase Admin
@@ -206,14 +208,14 @@ When a signed-in user loads a protected resource, the frontend gets a Firebase I
 | Web application | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
 | Maps | Leaflet and React Leaflet |
 | Authentication | Firebase Authentication in the browser; Firebase Admin in the API; scrypt-hashed passwords and signed JWT cookies for admins |
-| API | Node.js and Express 5 |
+| API | Next.js 16 route handlers (`backend/src/app/api`) on Node.js |
 | Data | MongoDB and Mongoose 9 |
 | Private file storage | Cloudflare R2 via the S3-compatible API |
 | Documents | Tesseract.js OCR (English and Bangla), pdf.js, sharp and @napi-rs/canvas for images and PDF reports |
 | AI features | Groq SDK; optional, with a configurable model per feature |
 | Email | Resend or SendGrid over HTTP |
 | Maps data | OpenStreetMap Overpass (nearby places) and OSRM (walking and driving times) |
-| Validation and API protection | Zod, Helmet, CORS, and express-rate-limit |
+| Validation and API protection | Zod, security headers, CORS (`backend/src/proxy.js`), and per-IP rate limits |
 
 ## Project structure
 
@@ -231,13 +233,17 @@ NEVE/
 │       ├── hooks/             reusable hooks such as useApi
 │       ├── lib/               api.js (API client), adminSession.js, firebase.js, utilities
 │       └── nav.js             role-aware workspace navigation
-└── backend/                   Express REST API
+└── backend/                   REST API (Next.js route handlers, no pages)
+    ├── next.config.mjs        server packages and files included in the deployed functions
+    ├── vercel.json            Vercel region and the daily cron
     ├── src/
-    │   ├── server.js          database connection, scheduled jobs, startup
-    │   ├── app.js             middleware, route mounting, error handling
+    │   ├── app/api/[...path]/ one catch-all Next.js route that runs the whole API
+    │   ├── routes/            HTTP route definitions (about 40 groups), collected in routes/index.js
+    │   ├── proxy.js           CORS: only CLIENT_URL may call the API from a browser
+    │   ├── instrumentation.js database connection and scheduled jobs on a long-running server
+    │   ├── http/              route(): request/response objects, middleware chain, security headers, error handler
     │   ├── config/            env.js (validated settings), database, Firebase, R2
     │   ├── middleware/        authentication, roles, rate limits, request validation
-    │   ├── routes/            HTTP route definitions (about 40 groups)
     │   ├── controllers/       request handling
     │   ├── services/          domain logic: property, tenancy, evidence, legal, privacy, admin, AI
     │   ├── models/            Mongoose models (see Data model)
@@ -246,6 +252,7 @@ NEVE/
     ├── scripts/               create-admin, backup, restore-backup, importLegalSources, seedDemo
     ├── eval/                  AI evaluation runner, datasets, and baseline
     ├── legal-corpus/          official Bangladesh tenancy law text, ready to import for legal review
+    ├── assets/fonts/          fonts for PDF reports
     └── secrets/               Firebase service-account file (gitignored)
 docs/                          full documentation (start at docs/README.md) and hackathon material
 ```
@@ -268,7 +275,7 @@ Public pages load without Firebase settings. Values prefixed `NEXT_PUBLIC_` are 
 
 ### Backend (`backend/.env`)
 
-All settings are validated at startup in `backend/src/config/env.js`, and the API refuses to start if any value is invalid. A blank value such as `EMAIL_PROVIDER=` counts as unset.
+All settings are validated in `backend/src/config/env.js` when the API loads them; if any value is invalid, the API logs the field list and refuses requests. `npm run build` doesn't need them, so the API can be built without its secrets. A blank value such as `EMAIL_PROVIDER=` counts as unset.
 
 **Required**
 
@@ -318,7 +325,7 @@ All settings are validated at startup in `backend/src/config/env.js`, and the AP
 |---|---|---|
 | `EMAIL_PROVIDER` | none | `resend` or `sendgrid`. |
 | `EMAIL_API_KEY`, `EMAIL_FROM` | none | Provider key and sender address. All three email settings are needed to send email. |
-| `API_PUBLIC_URL` | none | Public API address for unsubscribe links and listing thumbnails in emails. |
+| `API_PUBLIC_URL` | `http://localhost:<PORT>` | The API's public origin, **without** `/api/v1` (links add it), for unsubscribe links and listing thumbnails in emails, e.g. `https://neve-api.vercel.app`. |
 | `NOTIFICATION_LINK_SECRET` | derived from `ADMIN_JWT_SECRET` | Signs unsubscribe links (32+ characters). |
 | `NOTIFICATION_TIME_ZONE` | `Asia/Dhaka` | Time zone for dates and the digest hour. |
 | `NOTIFICATION_DIGEST_HOUR` | `8` | Local hour (0–23) for daily digest emails. |
@@ -375,8 +382,10 @@ Run each command from its app directory.
 | Frontend | `npm run build` | Production build. |
 | Frontend | `npm start` | Serve the production build on port 5173. |
 | Frontend | `npm run lint` | ESLint. |
-| Backend | `npm run dev` | API with automatic restarts (nodemon). |
-| Backend | `npm start` | API. |
+| Backend | `npm run dev` | API on port 5000, reloads on change. |
+| Backend | `npm run build` | Production build of the API. |
+| Backend | `npm start` | Serve the API build on port 5000; background jobs run on timers. |
+| Backend | `npm run lint` | ESLint. |
 | Backend | `npm test` | Node.js test suite. |
 | Backend | `npm run create-admin` | Create or update an admin (see [Admin accounts](#admin-accounts)). |
 | Backend | `npm run backup` | Back up the database to R2 now. |
@@ -393,6 +402,8 @@ npm run restore-backup -- --id <backupId> --confirm [--drop]
 ```
 
 Without `--drop`, collections that already contain documents are skipped. Run `npm audit` in both apps after changing dependencies.
+
+The repository root holds only `backend/`, `frontend/`, `docs/` and this README. Each app has its own `.gitignore` covering dependencies, `.next` build output, caches, logs, `.env` files and `secrets/`; a short root `.gitignore` is a safety net for commands run from the root.
 
 ## Frontend routes
 
@@ -561,10 +572,10 @@ All demo names, places and amounts are invented. Don't seed a database that hold
 - Listing photos can only be attached to the listing they were uploaded for.
 
 **HTTP hardening**
-- API: Helmet headers, CORS limited to `CLIENT_URL`, a 1 MB JSON body limit, and per-IP rate limits. Clients never see internal error details.
+- API: the Helmet set of security headers (`backend/src/http/route.js`), CORS limited to `CLIENT_URL` (`backend/src/proxy.js`), a 1 MB JSON body limit, and per-IP rate limits. Clients never see internal error details.
 - Frontend (`frontend/next.config.mjs`): anti-framing (CSP `frame-ancestors` and `X-Frame-Options`), `nosniff`, `Referrer-Policy`, a `Permissions-Policy`, and HSTS in production.
 
-**Dependencies**: both apps report 0 `npm audit` vulnerabilities. npm `overrides` pin patched transitive versions until upstream releases include them: `@grpc/grpc-js` in the frontend, and `glob` and `minimatch` in the backend. Remove them once `firebase`, `firebase-admin`, and `nodemon` ship fixed releases.
+**Dependencies**: the frontend reports 0 `npm audit` vulnerabilities. The backend reports 1 low-severity advisory in `fast-xml-parser`, which the AWS SDK pulls in (fixed by `npm audit fix`). npm `overrides` pin patched transitive versions until upstream releases include them: `@grpc/grpc-js` in the frontend, and `glob` and `minimatch` in the backend. Remove them once `firebase` and `firebase-admin` ship fixed releases.
 
 **Secrets**: `.env` files and `backend/secrets/` are gitignored and have never been committed.
 
@@ -572,7 +583,7 @@ The component guides have more detail: [backend security](backend/README.md#secu
 
 ## Deploying
 
-Beyond the local setup, a deployment needs the items below. The full checklist, backups, key rotation, AI capacity and monitoring are in [docs/operations.md](docs/operations.md). **To deploy both apps on Vercel**, follow [docs/deployment-vercel.md](docs/deployment-vercel.md): the repository includes `backend/vercel.json`, a serverless entry point (`backend/api/index.js`) and a daily Vercel Cron for the background jobs.
+Beyond the local setup, a deployment needs the items below. The full checklist, backups, key rotation, AI capacity and monitoring are in [docs/operations.md](docs/operations.md). **To deploy both apps on Vercel**, follow [docs/deployment-vercel.md](docs/deployment-vercel.md): both apps are Next.js projects, and `backend/vercel.json` adds a daily Vercel Cron for the background jobs.
 
 1. **HTTPS for both apps.** In production the admin session cookie is `Secure`, so it is only sent over HTTPS.
 2. **`NODE_ENV=production`** on the API, and a production frontend build (`npm run build`, then `npm start` or your host's Next.js runtime).
@@ -586,31 +597,36 @@ Beyond the local setup, a deployment needs the items below. The full checklist, 
 ## Testing
 
 ```bash
-cd backend && npm test        # 432 tests; no database or network needed
+cd backend && npm test        # 444 tests; no database or network needed
 cd backend && npm run eval -- --check
+cd backend && npm run lint && npm run build
 cd frontend && npm run lint && npm run build
 ```
 
 Backend tests use Node's built-in test runner and replace database and storage calls with mocks, so they run offline. Run the AI evaluation separately (see [AI features and evaluation](#ai-features-and-evaluation)).
 
-**Last verified run (19 November 2026)**
+**Last verified run (20 November 2026, after moving the API to Next.js)**
 
 | Check | Result |
 |---|---|
-| Backend unit tests | 432 of 432 pass |
-| Offline evaluation (`--check`) | no regressions against `eval/baseline.json`; evidence conflicts F1 0.94, Bangla source retrieval recall 0.88 |
-| End-to-end smoke test against a throwaway MongoDB database, with live Groq calls | 52 of 52 steps pass: corpus import and review, demo seed, evidence graph, flag reviews, Risk Sentinel, evidence report PDF, contract risk, Legal Copilot in English and Bangla |
-| API auth checks | the new endpoints return `401` without a valid token |
-| Frontend | lint has 0 errors (24 warnings); production build succeeds; every page returns `200` |
+| Backend tests | 445 of 445 pass, including the HTTP layer, the endpoint table (312 endpoints) and CORS |
+| Offline evaluation (`--check`) | no regressions against `eval/baseline.json` |
+| Lint and build | backend: 0 problems, build succeeds without secrets; frontend: 0 errors (24 warnings), build succeeds |
+| Both apps running locally (`npm start`) | API health, CORS preflights from the frontend, JSON 404s for unknown paths and wrong methods, and `503` when the database is unreachable all behave as before; every page tried returns `200` |
+| Service credentials (read-only checks) | Firebase Admin, Cloudflare R2, Groq and Resend accept the configured keys |
 
-Not yet verified: the full live (model-backed) evaluation, which costs money, and a click-through in a browser with real sign-ins. In one smoke run, Legal Copilot said a security deposit was allowed, which contradicts section 10 of the Premises Rent Control Act. AI answers still need human review.
+Earlier, on the Express version (19 November 2026), an end-to-end smoke test against a throwaway MongoDB database with live Groq calls passed 52 of 52 steps (corpus import and review, demo seed, evidence graph, flag reviews, Risk Sentinel, evidence report PDF, contract risk, Legal Copilot in English and Bangla).
+
+Not yet verified: since the move to Next.js, the database-backed flows (sign-up, listings, uploads, AI features, PDF reports) haven't been run end to end against a database; the full live (model-backed) evaluation, which costs money; and a click-through in a browser with real sign-ins. In one smoke run, Legal Copilot said a security deposit was allowed, which contradicts section 10 of the Premises Rent Control Act. AI answers still need human review.
 
 ## Troubleshooting
 
 | Problem | What to check |
 |---|---|
-| API exits with "Environment configuration is invalid" | The logged field list; `ADMIN_JWT_SECRET` must be at least 32 characters, and `CLIENT_URL` must be a full URL. |
-| Database connection fails | MongoDB is running and `MONGODB_URI` points at it. |
+| `npm run dev` stops with "OS file watch limit reached" (or `ENOSPC`) | Your system's file-watcher limit is used up, often by the editor watching `node_modules`. Exclude `node_modules` and `.next` from the editor's file watcher (in VS Code, `files.watcherExclude`), or raise `fs.inotify.max_user_watches`. |
+| VS Code's Source Control lists thousands of `.next` or `node_modules` files | Those are generated files. Check that they sit inside `backend/` or `frontend/` (where `.gitignore` covers them), delete any copy at the repository root, and reload the window. |
+| API requests fail and the log says "Environment configuration is invalid" | The logged field list; `ADMIN_JWT_SECRET` must be at least 32 characters, and `CLIENT_URL` must be a full URL. |
+| Database connection fails, or every API request returns `503` | MongoDB is running and `MONGODB_URI` points at it. For the local snap: `sudo snap start --enable mongodb-server-replicaset`. For Atlas: "Could not connect to any servers… IP that isn't whitelisted" means your public IP isn't under Atlas → Network Access. |
 | Firebase initialization fails | The service-account path is relative to `backend/`, and the file is readable. |
 | Browser requests to the API fail (CORS) | `CLIENT_URL` matches the frontend origin exactly, including the port, and `NEXT_PUBLIC_API_BASE_URL` points at the API. |
 | Sign-in is unavailable | The frontend's Firebase web settings, and the frontend domain in Firebase's authorized domains. |

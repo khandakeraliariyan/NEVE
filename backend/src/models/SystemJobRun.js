@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 // One run of a background job (retention purge, backup, notification
 // reminders or the daily digest), scheduled or
@@ -40,6 +41,6 @@ const systemJobLockSchema = new mongoose.Schema(
     { versionKey: false }
 );
 
-export const SystemJobLock = mongoose.model("SystemJobLock", systemJobLockSchema);
+export const SystemJobLock = defineModel("SystemJobLock", systemJobLockSchema);
 
-export default mongoose.model("SystemJobRun", systemJobRunSchema);
+export default defineModel("SystemJobRun", systemJobRunSchema);

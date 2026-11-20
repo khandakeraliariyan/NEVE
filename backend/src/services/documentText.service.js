@@ -1,5 +1,4 @@
 import { copyFile, mkdir, stat } from "node:fs/promises";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 
@@ -9,8 +8,6 @@ import sharp from "sharp";
 // on Neve's own server, so the text can be masked before any AI model sees
 // it. Text PDFs are read directly; scanned PDF pages and photos are read
 // with OCR (Tesseract, English and Bangla).
-
-const require = createRequire(import.meta.url);
 
 export const MAX_PAGES = 30;
 // A PDF page with less text than this is treated as a scan and OCR'd.
@@ -41,7 +38,9 @@ async function languageFolder() {
         const target = path.join(folder, `${lang}.traineddata.gz`);
         const exists = await stat(target).then(() => true, () => false);
         if (!exists) {
-            const pkg = path.dirname(require.resolve(`@tesseract.js-data/${lang}/package.json`));
+            // From the backend folder, where Next.js runs; next.config.mjs includes
+            // these packages in the deployed functions.
+            const pkg = path.join(process.cwd(), "node_modules", "@tesseract.js-data", lang);
             await copyFile(path.join(pkg, "4.0.0_best_int", `${lang}.traineddata.gz`), target);
         }
     }

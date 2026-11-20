@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const renterPreferenceSchema = new mongoose.Schema(
     {
@@ -116,7 +117,7 @@ const renterPreferenceSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-export default mongoose.model(
+export default defineModel(
     "RenterPreference",
     renterPreferenceSchema
 );

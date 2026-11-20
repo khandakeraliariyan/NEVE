@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 
 const propertyClaimSchema = new mongoose.Schema(
     {
@@ -93,4 +94,4 @@ const propertyClaimSchema = new mongoose.Schema(
 
 propertyClaimSchema.index({ property: 1, createdAt: -1 });
 
-export default mongoose.model("PropertyClaim", propertyClaimSchema);
+export default defineModel("PropertyClaim", propertyClaimSchema);

@@ -90,33 +90,30 @@ test("admins list error groups with a summary and change their status", async ()
     assert.equal((await run(updateSystemError, { params: { errorId: String(id()) }, body: { status: "gone" }, neveUser: { _id: admin } })).statusCode, 400);
 });
 
-test("the central error handler records 500s from real routes", async () => {
-    const { default: app } = await import("../src/app.js");
+test("the central error handler records 500s from real routes", async (t) => {
+    const { GET } = await import("../src/app/api/[...path]/route.js");
+    const { setPreflight } = await import("../src/http/route.js");
     const { default: Property } = await import("../src/models/Property.js");
+    setPreflight((req, res, next) => next());
+    t.after(() => setPreflight(null));
     mock.method(Property, "countDocuments", async () => { throw new RangeError("boom for 64b7f0c2a1b2c3d4e5f60718"); });
     mock.method(Property, "find", () => { throw new RangeError("boom for 64b7f0c2a1b2c3d4e5f60718"); });
     const recorded = mock.method(SystemError, "updateOne", async () => ({}));
     mock.method(console, "error", () => {});
 
-    const server = app.listen(0);
-    try {
-        const { port } = server.address();
-        const res = await fetch(`http://127.0.0.1:${port}/api/v1/properties`);
-        assert.equal(res.status, 500);
-        assert.equal((await res.json()).message, "Internal server error.");
-        await new Promise((resolve) => setImmediate(resolve));
-        const [filter, update] = recorded.mock.calls[0].arguments;
-        assert.ok(filter.fingerprint);
-        assert.equal(update.$setOnInsert.route, "/api/v1/properties");
-        assert.equal(update.$setOnInsert.name, "RangeError");
-        assert.equal(update.$set.lastStatus, 500);
+    const res = await GET(new Request("http://localhost/api/v1/properties", { headers: { "x-forwarded-for": "192.0.2.10" } }));
+    assert.equal(res.status, 500);
+    assert.equal((await res.json()).message, "Internal server error.");
+    await new Promise((resolve) => setImmediate(resolve));
+    const [filter, update] = recorded.mock.calls[0].arguments;
+    assert.ok(filter.fingerprint);
+    assert.equal(update.$setOnInsert.route, "/api/v1/properties");
+    assert.equal(update.$setOnInsert.name, "RangeError");
+    assert.equal(update.$set.lastStatus, 500);
 
-        // Client errors are not recorded.
-        recorded.mock.resetCalls();
-        const notFound = await fetch(`http://127.0.0.1:${port}/api/v1/properties?minRent=abc`);
-        assert.equal(notFound.status, 400);
-        assert.equal(recorded.mock.callCount(), 0);
-    } finally {
-        await new Promise((resolve) => server.close(resolve));
-    }
+    // Client errors are not recorded.
+    recorded.mock.resetCalls();
+    const invalid = await GET(new Request("http://localhost/api/v1/properties?minRent=abc", { headers: { "x-forwarded-for": "192.0.2.10" } }));
+    assert.equal(invalid.status, 400);
+    assert.equal(recorded.mock.callCount(), 0);
 });

@@ -1,5 +1,5 @@
 
-import express from "express";
+import { Router } from "../http/router.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { allowRoles } from "../middleware/role.middleware.js";
 import {
@@ -9,7 +9,7 @@ import {
     getLandlordPerformance
 } from "../controllers/landlordPerformance.controller.js";
 
-const router = express.Router();
+const router = Router();
 
 router.get(
     "/properties",

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./defineModel.js";
 import { AI_EVALUATION_TASKS } from "../services/aiEvaluation.service.js";
 
 const caseMetricSchema = new mongoose.Schema(
@@ -71,4 +72,4 @@ const aiEvaluationRunSchema = new mongoose.Schema(
 aiEvaluationRunSchema.index({ task: 1, createdAt: -1 });
 aiEvaluationRunSchema.index({ datasetName: 1, datasetVersion: 1, task: 1 });
 
-export default mongoose.model("AIEvaluationRun", aiEvaluationRunSchema);
+export default defineModel("AIEvaluationRun", aiEvaluationRunSchema);
