@@ -149,6 +149,8 @@ You need **Node.js 20.9 or later** (20.x or 22+), npm, a running **MongoDB**, an
 
    Generate the admin secret with `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`, then start the API with `npm run dev`.
 
+   **MongoDB for local work.** Use a local database so experiments never touch live data. On Ubuntu with the `mongodb-server-replicaset` snap, start it once with `sudo snap start --enable mongodb-server-replicaset` and set `MONGODB_URI=mongodb://127.0.0.1:27017/neve?directConnection=true`. A local database starts empty: create an admin and import the legal corpus (see [Preparing a demo](#preparing-a-demo)). To use MongoDB Atlas instead, add your computer's public IP under Atlas → **Network Access**, or Atlas refuses the connection.
+
 2. **Frontend**: in a second terminal:
 
    ```bash
@@ -273,7 +275,7 @@ Public pages load without Firebase settings. Values prefixed `NEXT_PUBLIC_` are 
 
 ### Backend (`backend/.env`)
 
-All settings are validated at startup in `backend/src/config/env.js`, and the API refuses to start if any value is invalid. A blank value such as `EMAIL_PROVIDER=` counts as unset.
+All settings are validated in `backend/src/config/env.js` when the API loads them; if any value is invalid, the API logs the field list and refuses requests. `npm run build` doesn't need them, so the API can be built without its secrets. A blank value such as `EMAIL_PROVIDER=` counts as unset.
 
 **Required**
 
@@ -323,7 +325,7 @@ All settings are validated at startup in `backend/src/config/env.js`, and the AP
 |---|---|---|
 | `EMAIL_PROVIDER` | none | `resend` or `sendgrid`. |
 | `EMAIL_API_KEY`, `EMAIL_FROM` | none | Provider key and sender address. All three email settings are needed to send email. |
-| `API_PUBLIC_URL` | none | Public API address for unsubscribe links and listing thumbnails in emails. |
+| `API_PUBLIC_URL` | `http://localhost:<PORT>` | The API's public origin, **without** `/api/v1` (links add it), for unsubscribe links and listing thumbnails in emails, e.g. `https://neve-api.vercel.app`. |
 | `NOTIFICATION_LINK_SECRET` | derived from `ADMIN_JWT_SECRET` | Signs unsubscribe links (32+ characters). |
 | `NOTIFICATION_TIME_ZONE` | `Asia/Dhaka` | Time zone for dates and the digest hour. |
 | `NOTIFICATION_DIGEST_HOUR` | `8` | Local hour (0–23) for daily digest emails. |
@@ -400,6 +402,8 @@ npm run restore-backup -- --id <backupId> --confirm [--drop]
 ```
 
 Without `--drop`, collections that already contain documents are skipped. Run `npm audit` in both apps after changing dependencies.
+
+The repository root holds only `backend/`, `frontend/`, `docs/` and this README. Each app has its own `.gitignore` covering dependencies, `.next` build output, caches, logs, `.env` files and `secrets/`; a short root `.gitignore` is a safety net for commands run from the root.
 
 ## Frontend routes
 
@@ -571,7 +575,7 @@ All demo names, places and amounts are invented. Don't seed a database that hold
 - API: the Helmet set of security headers (`backend/src/http/route.js`), CORS limited to `CLIENT_URL` (`backend/src/proxy.js`), a 1 MB JSON body limit, and per-IP rate limits. Clients never see internal error details.
 - Frontend (`frontend/next.config.mjs`): anti-framing (CSP `frame-ancestors` and `X-Frame-Options`), `nosniff`, `Referrer-Policy`, a `Permissions-Policy`, and HSTS in production.
 
-**Dependencies**: both apps report 0 `npm audit` vulnerabilities. npm `overrides` pin patched transitive versions until upstream releases include them: `@grpc/grpc-js` in the frontend, and `glob` and `minimatch` in the backend. Remove them once `firebase` and `firebase-admin` ship fixed releases.
+**Dependencies**: the frontend reports 0 `npm audit` vulnerabilities. The backend reports 1 low-severity advisory in `fast-xml-parser`, which the AWS SDK pulls in (fixed by `npm audit fix`). npm `overrides` pin patched transitive versions until upstream releases include them: `@grpc/grpc-js` in the frontend, and `glob` and `minimatch` in the backend. Remove them once `firebase` and `firebase-admin` ship fixed releases.
 
 **Secrets**: `.env` files and `backend/secrets/` are gitignored and have never been committed.
 
@@ -601,24 +605,28 @@ cd frontend && npm run lint && npm run build
 
 Backend tests use Node's built-in test runner and replace database and storage calls with mocks, so they run offline. Run the AI evaluation separately (see [AI features and evaluation](#ai-features-and-evaluation)).
 
-**Last verified run (19 November 2026)**
+**Last verified run (20 November 2026, after moving the API to Next.js)**
 
 | Check | Result |
 |---|---|
-| Backend unit tests | 432 of 432 pass |
-| Offline evaluation (`--check`) | no regressions against `eval/baseline.json`; evidence conflicts F1 0.94, Bangla source retrieval recall 0.88 |
-| End-to-end smoke test against a throwaway MongoDB database, with live Groq calls | 52 of 52 steps pass: corpus import and review, demo seed, evidence graph, flag reviews, Risk Sentinel, evidence report PDF, contract risk, Legal Copilot in English and Bangla |
-| API auth checks | the new endpoints return `401` without a valid token |
-| Frontend | lint has 0 errors (24 warnings); production build succeeds; every page returns `200` |
+| Backend tests | 445 of 445 pass, including the HTTP layer, the endpoint table (312 endpoints) and CORS |
+| Offline evaluation (`--check`) | no regressions against `eval/baseline.json` |
+| Lint and build | backend: 0 problems, build succeeds without secrets; frontend: 0 errors (24 warnings), build succeeds |
+| Both apps running locally (`npm start`) | API health, CORS preflights from the frontend, JSON 404s for unknown paths and wrong methods, and `503` when the database is unreachable all behave as before; every page tried returns `200` |
+| Service credentials (read-only checks) | Firebase Admin, Cloudflare R2, Groq and Resend accept the configured keys |
 
-Not yet verified: the full live (model-backed) evaluation, which costs money, and a click-through in a browser with real sign-ins. In one smoke run, Legal Copilot said a security deposit was allowed, which contradicts section 10 of the Premises Rent Control Act. AI answers still need human review.
+Earlier, on the Express version (19 November 2026), an end-to-end smoke test against a throwaway MongoDB database with live Groq calls passed 52 of 52 steps (corpus import and review, demo seed, evidence graph, flag reviews, Risk Sentinel, evidence report PDF, contract risk, Legal Copilot in English and Bangla).
+
+Not yet verified: since the move to Next.js, the database-backed flows (sign-up, listings, uploads, AI features, PDF reports) haven't been run end to end against a database; the full live (model-backed) evaluation, which costs money; and a click-through in a browser with real sign-ins. In one smoke run, Legal Copilot said a security deposit was allowed, which contradicts section 10 of the Premises Rent Control Act. AI answers still need human review.
 
 ## Troubleshooting
 
 | Problem | What to check |
 |---|---|
-| API exits with "Environment configuration is invalid" | The logged field list; `ADMIN_JWT_SECRET` must be at least 32 characters, and `CLIENT_URL` must be a full URL. |
-| Database connection fails | MongoDB is running and `MONGODB_URI` points at it. |
+| `npm run dev` stops with "OS file watch limit reached" (or `ENOSPC`) | Your system's file-watcher limit is used up, often by the editor watching `node_modules`. Exclude `node_modules` and `.next` from the editor's file watcher (in VS Code, `files.watcherExclude`), or raise `fs.inotify.max_user_watches`. |
+| VS Code's Source Control lists thousands of `.next` or `node_modules` files | Those are generated files. Check that they sit inside `backend/` or `frontend/` (where `.gitignore` covers them), delete any copy at the repository root, and reload the window. |
+| API requests fail and the log says "Environment configuration is invalid" | The logged field list; `ADMIN_JWT_SECRET` must be at least 32 characters, and `CLIENT_URL` must be a full URL. |
+| Database connection fails, or every API request returns `503` | MongoDB is running and `MONGODB_URI` points at it. For the local snap: `sudo snap start --enable mongodb-server-replicaset`. For Atlas: "Could not connect to any servers… IP that isn't whitelisted" means your public IP isn't under Atlas → Network Access. |
 | Firebase initialization fails | The service-account path is relative to `backend/`, and the file is readable. |
 | Browser requests to the API fail (CORS) | `CLIENT_URL` matches the frontend origin exactly, including the port, and `NEXT_PUBLIC_API_BASE_URL` points at the API. |
 | Sign-in is unavailable | The frontend's Firebase web settings, and the frontend domain in Firebase's authorized domains. |
