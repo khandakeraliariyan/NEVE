@@ -17,6 +17,7 @@
     "import-legal-sources": "node scripts/importLegalSources.js",
     "seed-demo": "node scripts/seedDemo.js",
     "seed-listings": "node scripts/seedListings.js",
+    "seed-demo-data": "node scripts/seedDemoData.js",
     "eval": "node eval/run.js"
   },
   "dependencies": {
