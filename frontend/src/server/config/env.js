@@ -86,6 +86,10 @@ const baseSchema = z.object({
         .default("https://routing.openstreetmap.de/routed-car"),
     // AI features run on Groq. Without a key they report "not configured".
     GROQ_API_KEY: z.string().optional(),
+    // Optional: run the AI features on Claude instead (AI_PROVIDER=anthropic).
+    AI_PROVIDER: z.enum(["groq", "anthropic"]).default("groq"),
+    ANTHROPIC_API_KEY: z.string().optional(),
+    ANTHROPIC_MODEL: z.string().min(1).default("claude-sonnet-5-5"),
     // The Groq model every AI feature uses unless overridden below. It must
     // support strict JSON-schema output.
     AI_MODEL: z.string().min(1).default("openai/gpt-oss-120b"),

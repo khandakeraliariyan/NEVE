@@ -183,3 +183,47 @@ test("label references the model writes in prose are removed, other brackets sta
     assert.equal(stripLabelRefs("ধারা ১০ (L7) অনুযায়ী"), "ধারা ১০ অনুযায়ী");
     assert.equal(stripLabelRefs("Rent (BDT 25,000) is due on day (5) under Section 7(c)."), "Rent (BDT 25,000) is due on day (5) under Section 7(c).");
 });
+
+// --- Claude (AI_PROVIDER=anthropic) -----------------------------------------
+import { anthropicErrorKind, callAnthropic } from "../src/server/services/anthropicClient.service.js";
+
+function fakeFetch(status, body) {
+    const calls = [];
+    const impl = async (url, init) => {
+        calls.push({ url, init, body: JSON.parse(init.body) });
+        return { ok: status >= 200 && status < 300, status, json: async () => body };
+    };
+    impl.calls = calls;
+    return impl;
+}
+
+test("Claude request carries the key, schema and conversation, and the answer is normalised", async () => {
+    const fetchImpl = fakeFetch(200, {
+        model: "claude-sonnet-5-5",
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: "{\"a\":1}" }],
+        usage: { input_tokens: 11, output_tokens: 7 },
+    });
+    const result = await callAnthropic({
+        apiKey: "k", model: "claude-sonnet-5-5", system: "sys", messages: [{ role: "user", content: "hi" }],
+        maxTokens: 100, jsonSchema: { type: "object" }, fetchImpl,
+    });
+    const call = fetchImpl.calls[0];
+    assert.equal(call.init.headers["x-api-key"], "k");
+    assert.equal(call.body.system, "sys");
+    assert.equal(call.body.output_config.format.type, "json_schema");
+    assert.deepEqual(result, { content: "{\"a\":1}", stopReason: "end", model: "claude-sonnet-5-5", usage: { inputTokens: 11, outputTokens: 7 } });
+});
+
+test("Claude max_tokens stop is reported, and HTTP failures map to AI error kinds", async () => {
+    const cut = await callAnthropic({
+        apiKey: "k", model: "m", system: "s", messages: [], maxTokens: 1, jsonSchema: {},
+        fetchImpl: fakeFetch(200, { stop_reason: "max_tokens", content: [{ type: "text", text: "{" }] }),
+    });
+    assert.equal(cut.stopReason, "max_tokens");
+    assert.deepEqual([401, 403, 429, 529, 400, 500].map(anthropicErrorKind), ["auth", "auth", "rate_limit", "rate_limit", "bad_request", "api"]);
+    await assert.rejects(
+        callAnthropic({ apiKey: "k", model: "m", system: "s", messages: [], maxTokens: 1, jsonSchema: {}, fetchImpl: fakeFetch(429, { error: { message: "slow down" } }) }),
+        (error) => error.kind === "rate_limit" && error.message === "slow down"
+    );
+});

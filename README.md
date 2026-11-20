@@ -305,6 +305,7 @@ All settings are validated in `frontend/src/server/config/env.js` when the API l
 | Setting | Default | Description |
 |---|---|---|
 | `GROQ_API_KEY` | none | Without it, AI features report "not configured". |
+| `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | `groq`, none, `claude-sonnet-5-5` | Optional. Set `AI_PROVIDER=anthropic` with a key to run the AI features on Claude instead of Groq. |
 | `AI_MODEL` | `openai/gpt-oss-120b` | Default model; must support strict JSON-schema output. |
 | `AGREEMENT_EXTRACTION_MODEL` | `AI_MODEL` | Agreement, clause, risk, and legal features. |
 | `RECOMMENDATION_MODEL` | `AI_MODEL` | AI ranking of a renter's recommendation shortlist. |

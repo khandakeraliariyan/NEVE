@@ -74,7 +74,7 @@ async function checkServices() {
     return [
         service("File storage (R2)", storage, true, storage ? `Bucket ${env.R2_BUCKET_NAME}.` : "Uploads and downloads fail until R2 is set up."),
         service("Email", isEmailConfigured(), false, isEmailConfigured() ? `Sending with ${env.EMAIL_PROVIDER} from ${env.EMAIL_FROM}.` : "Notifications are in-app only."),
-        service("AI (Groq)", isExtractionConfigured(), false, isExtractionConfigured() ? `Model ${env.AGREEMENT_EXTRACTION_MODEL}; ranking ${env.RECOMMENDATION_MODEL}.` : "Set GROQ_API_KEY. Until then extraction, Legal Copilot, AI suggestions and AI ranking are unavailable; legal sources fall back to keyword matching."),
+        service(`AI (${env.AI_PROVIDER === "anthropic" ? "Claude" : "Groq"})`, isExtractionConfigured(), false, isExtractionConfigured() ? (env.AI_PROVIDER === "anthropic" ? `Model ${env.ANTHROPIC_MODEL}.` : `Model ${env.AGREEMENT_EXTRACTION_MODEL}; ranking ${env.RECOMMENDATION_MODEL}.`) : `Set ${env.AI_PROVIDER === "anthropic" ? "ANTHROPIC_API_KEY" : "GROQ_API_KEY"}. Until then extraction, Legal Copilot, AI suggestions and AI ranking are unavailable; legal sources fall back to keyword matching.`),
         service("ID number encryption", isFieldEncryptionConfigured(), false, isFieldEncryptionConfigured() ? `Key version ${env.FIELD_ENCRYPTION_KEY_VERSION}.` : "Identity verification requests are refused."),
         service("Public API address", Boolean(env.API_PUBLIC_URL), false, env.API_PUBLIC_URL ? env.API_PUBLIC_URL : "Unsubscribe links and email photos point at localhost."),
         service("Bangla font for PDF reports", fonts.bengali, false, fonts.bengali ? "Installed." : "Bangla text in PDF reports will show as boxes; install Noto Sans Bengali."),

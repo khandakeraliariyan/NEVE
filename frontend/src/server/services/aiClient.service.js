@@ -5,13 +5,15 @@ import { env } from "../config/env.js";
 import { AI_FEATURES } from "../models/AIUsageEvent.js";
 import { recordAIUsage } from "./aiUsage.service.js";
 import { settingsSnapshot } from "./platformSettings.service.js";
+import { callAnthropic } from "./anthropicClient.service.js";
 
 // The one place Neve calls an AI model. Every AI feature asks for JSON that
 // matches a Zod schema; this module sends the request to Groq with a strict
 // JSON schema, validates the answer with the same Zod schema, maps provider
 // errors to AIServiceError, and records usage for the admin AI monitoring view.
 
-export const AI_PROVIDER = "groq";
+// "groq" by default; "anthropic" when AI_PROVIDER=anthropic (see env.js).
+export const AI_PROVIDER = env.AI_PROVIDER;
 
 // Reasoning tokens are assumed to count toward the output limit, so every
 // request gets at least this much room.
@@ -28,9 +30,10 @@ export class AIServiceError extends Error {
     }
 }
 
-// AI features need a Groq API key, and an admin can switch them off.
+// AI features need an API key for the chosen provider, and an admin can switch them off.
 export function isAIConfigured() {
-    return Boolean(env.GROQ_API_KEY) && settingsSnapshot().integrations?.aiEnabled !== false;
+    const key = env.AI_PROVIDER === "anthropic" ? env.ANTHROPIC_API_KEY : env.GROQ_API_KEY;
+    return Boolean(key) && settingsSnapshot().integrations?.aiEnabled !== false;
 }
 
 // Keywords Groq's strict mode isn't documented to accept. Lengths and ranges
@@ -146,13 +149,52 @@ export function stripLabelRefs(text) {
 }
 
 // Creates a client for one feature. `groq` and `record` are injectable for tests.
-export function createAIClient({ feature, groq = null, record = recordAIUsage, now = () => Date.now() }) {
+export function createAIClient({ feature, groq = null, anthropicFetch = undefined, record = recordAIUsage, now = () => Date.now() }) {
     if (!AI_FEATURES.includes(feature)) throw new TypeError(`Unknown AI feature: ${feature}`);
+    // An injected Groq stub (tests) always wins; otherwise the configured provider decides.
+    const useAnthropic = !groq && env.AI_PROVIDER === "anthropic";
     let provider = groq;
     const getProvider = () => {
         provider ??= new Groq({ apiKey: env.GROQ_API_KEY });
         return provider;
     };
+
+    // Same contract as the Groq path: validated result, usage recorded, errors mapped.
+    async function generateWithAnthropic({ model, system, conversation, schema, maxTokens, startedAt }) {
+        let result;
+        try {
+            result = await callAnthropic({
+                apiKey: env.ANTHROPIC_API_KEY,
+                model,
+                system,
+                messages: conversation,
+                maxTokens: Math.min(MAX_OUTPUT_TOKENS, Math.max(MIN_OUTPUT_TOKENS, maxTokens)),
+                jsonSchema: toStrictJsonSchema(schema),
+                fetchImpl: anthropicFetch,
+            });
+        } catch (error) {
+            const mapped = error.kind ? new AIServiceError(error.kind, error.message) : new AIServiceError("api", error.message);
+            console.error(`AI call failed (${feature}, ${model}, ${mapped.kind}): ${mapped.message}`);
+            await record({ feature, model, error: mapped, latencyMs: now() - startedAt });
+            throw mapped;
+        }
+        await record({
+            feature,
+            model,
+            response: {
+                model: result.model,
+                stop_reason: result.stopReason,
+                usage: { input_tokens: result.usage.inputTokens, output_tokens: result.usage.outputTokens },
+            },
+            latencyMs: now() - startedAt,
+        });
+        return {
+            parsed: result.stopReason === "end" ? parseStructured(result.content, schema) : null,
+            stopReason: result.stopReason,
+            model: result.model,
+            usage: result.usage,
+        };
+    }
 
     return {
         // Returns { parsed, stopReason, model, usage: { inputTokens, outputTokens } }.
@@ -161,8 +203,11 @@ export function createAIClient({ feature, groq = null, record = recordAIUsage, n
         // Pass either `user` (a string, or strings joined with blank lines) or
         // `messages`, an earlier conversation of { role, content } turns.
         async generate({ model = env.AI_MODEL, system, user, messages, schema, schemaName, maxTokens = MIN_OUTPUT_TOKENS, effort = "medium" }) {
+            // Per-feature model settings hold Groq model names, so Claude uses its own.
+            if (useAnthropic) model = env.ANTHROPIC_MODEL;
             const conversation = messages ?? [{ role: "user", content: Array.isArray(user) ? user.join("\n\n") : user }];
             const startedAt = now();
+            if (useAnthropic) return generateWithAnthropic({ model, system, conversation, schema, maxTokens, startedAt });
             const request = {
                 model,
                 messages: [{ role: "system", content: system }, ...conversation],
