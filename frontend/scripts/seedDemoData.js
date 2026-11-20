@@ -10,6 +10,9 @@
 //   npm run seed-demo-data -- --confirm --reset    (replaces earlier demo activity)
 //   npm run seed-demo-data -- --renter you@gmail.com --keep-profile --confirm
 //       attaches the demo activity to a real account without changing its name or details
+//   npm run seed-demo-data -- --renter you@gmail.com --remove [--confirm]
+//       deletes the demo activity and the [DEMO] agreement of that account (preview unless --confirm);
+//       the account, its name and the seeded listings stay
 //
 // The three accounts must already exist in Firebase (see secrets/local-accounts.txt).
 // This script looks up their IDs by email and never touches passwords.
@@ -17,7 +20,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mongoose from "mongoose";
 
+import ConditionReport from "../src/server/models/ConditionReport.js";
+import ContractRiskAnalysis from "../src/server/models/ContractRiskAnalysis.js";
 import Inquiry from "../src/server/models/Inquiry.js";
+import MaintenanceRequest from "../src/server/models/MaintenanceRequest.js";
 import InquiryMessage from "../src/server/models/InquiryMessage.js";
 import Notification from "../src/server/models/Notification.js";
 import Property from "../src/server/models/Property.js";
@@ -25,6 +31,7 @@ import RenterPreference from "../src/server/models/RenterPreference.js";
 import Review from "../src/server/models/Review.js";
 import SavedProperty from "../src/server/models/SavedProperty.js";
 import SavedSearch from "../src/server/models/SavedSearch.js";
+import TenancyAgreement from "../src/server/models/TenancyAgreement.js";
 import UploadedFile from "../src/server/models/UploadedFile.js";
 import User from "../src/server/models/User.js";
 import ViewingRequest from "../src/server/models/ViewingRequest.js";
@@ -120,9 +127,44 @@ async function lookupFirebase() {
     return found;
 }
 
+// Deletes (or, without --confirm, counts) everything this script and seed-demo attached to one renter.
+async function removeFor(email) {
+    const renter = await User.findOne({ email, role: "renter" }).select("_id displayName");
+    if (!renter) throw new Error(`No renter account has the email ${email}.`);
+    const confirm = flag("confirm");
+    const agreements = await TenancyAgreement.find({ renter: renter._id, title: { $regex: "^\\[DEMO\\]" } }).select("_id inquiry property landlord");
+    const agreementIds = agreements.map((a) => a._id);
+    const inquiries = await Inquiry.find({ renter: renter._id }).select("_id");
+    const inquiryIds = inquiries.map((i) => i._id);
+    const byRenter = { renter: renter._id };
+    const plan = [
+        ["saved homes", SavedProperty, byRenter],
+        ["saved searches", SavedSearch, byRenter],
+        ["preferences", RenterPreference, byRenter],
+        ["viewing requests", ViewingRequest, byRenter],
+        ["reviews", Review, byRenter],
+        ["inquiry messages", InquiryMessage, { inquiry: { $in: inquiryIds } }],
+        ["inquiries", Inquiry, { _id: { $in: inquiryIds } }],
+        ["notifications (renter)", Notification, { recipient: renter._id }],
+        ["notifications (landlord, about this renter)", Notification, { message: { $regex: `^${renter.displayName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} ` }, type: { $in: ["inquiry_received", "viewing_request_received"] } }],
+        ["maintenance requests", MaintenanceRequest, { agreement: { $in: agreementIds } }],
+        ["condition reports", ConditionReport, { agreement: { $in: agreementIds } }],
+        ["risk analyses", ContractRiskAnalysis, { agreement: { $in: agreementIds } }],
+        ["[DEMO] agreements", TenancyAgreement, { _id: { $in: agreementIds } }],
+        ["[DEMO] listings", Property, { _id: { $in: agreements.map((a) => a.property) }, title: { $regex: "^\\[DEMO\\]" } }],
+    ];
+    for (const [label, Model, filter] of plan) {
+        const count = await Model.countDocuments(filter);
+        if (confirm && count) await Model.deleteMany(filter);
+        console.log(`${confirm ? "Removed" : "Would remove"} ${count} ${label}`);
+    }
+    console.log(confirm ? `Done. ${renter.displayName}'s account and details are unchanged.` : "Preview only. Add --confirm to delete.");
+}
+
 async function main() {
     const { connectDatabase } = await import("../src/server/config/database.js");
     await connectDatabase();
+    if (flag("remove")) return removeFor(EMAILS.renter);
 
     const listings = await Property.find({ status: "published" }).select("title landlord");
     if (listings.length < 20) throw new Error("Run `npm run seed-listings -- --confirm` first.");
