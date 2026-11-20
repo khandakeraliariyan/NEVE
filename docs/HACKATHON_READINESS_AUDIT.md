@@ -2,6 +2,8 @@
 
 **Event:** International AI Builders Congress 2026, JusticeSphere AI track
 **Audit date:** 2026-11-19
+
+> **Historical snapshot.** The inventory and verification results in sections 1–10 describe the repository on 19 November 2026, before the API migration from Express to Next.js and before the documentation set was completed. They are retained as an audit trail, not as a current status report. The progress section at the end records completed work after that snapshot. The current setup and architecture are documented in the [root README](../README.md), [architecture guide](architecture.md), [deployment guide](deployment-vercel.md), and [documentation index](README.md).
 **Branch audited:** `ariyan` at `3a109d6` (clean working tree)
 **Scope:** Sections 3 and 16 of `NEVE_Hackathon_Final_Round_Readiness_Plan.md`. The audit made no code changes.
 

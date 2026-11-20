@@ -38,8 +38,8 @@ against the agreement).
 ## 3. What makes it different
 
 Most legal AI tools give answers. NEVE gives **traceable findings**: every
-flag connects to the original record and says why it was raised, how sure
-the system can be, and what a human decided about it. It separates what is
+flag connects to the original record, explains why it was raised, identifies
+whether it came from a rule or AI, and shows the review state. It separates what is
 **documented, disputed, uncertain and missing**, and never issues a verdict.
 
 ## 4. How it maps to the judging criteria
@@ -47,7 +47,7 @@ the system can be, and what a human decided about it. It separates what is
 | Criterion | What we show |
 |---|---|
 | **Innovation (20%)** | An evidence graph across contract, payments, maintenance and law; cross-record contradiction detection with source-linked values; a decision trace on every finding; cross-language retrieval between English questions and Bangla statutes. |
-| **Technical execution (20%)** | Next.js and Express/MongoDB; Groq models with strict schema output; quote verification; citation allowlisting; 432 automated tests; a reproducible evaluation suite with regression baselines (see [evaluation-methodology.md](evaluation-methodology.md)). |
+| **Technical execution (20%)** | Next.js route handlers and MongoDB; Groq models with strict schema output; source-quote verification; citation allowlisting; automated backend coverage; a reproducible evaluation suite with regression baselines (see [evaluation-methodology.md](evaluation-methodology.md)). |
 | **Business model and global readiness (20%)** | See section 6. Jurisdiction is a property of every legal source, so a new country is a new reviewed corpus, not a rewrite. |
 | **Real-world impact and ethical AI (20%)** | Built for a common, under-served problem. PII masking before AI calls, human review, audit trails and neutral wording; legal sources approved by people. See [responsible-ai.md](responsible-ai.md). |
 | **Scalability and NRB collaboration (10%)** | A stateless API with private object storage, background jobs and per-feature model settings. Non-resident Bangladeshis who rent out property at home are a natural landlord segment and collaboration channel (a hypothesis to test). |

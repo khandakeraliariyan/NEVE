@@ -174,7 +174,7 @@ The layers and request lifecycle are described in [docs/architecture.md](../docs
 
 ### Adding an endpoint
 
-Add it to the route file for its area in `src/routes/`, the same way as with Express:
+Add it to the route file for its area in `src/routes/`. The small router in `src/http/router.js` and `src/http/route.js` adapts these route definitions to Next.js request and response objects; `src/app/api/[...path]/route.js` is the Next.js catch-all entry point.
 
 ```js
 router.get("/:thingId", authenticateUser, allowRoles("renter"), getThing);

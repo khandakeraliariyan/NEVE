@@ -1,6 +1,6 @@
 # NEVE documentation
 
-NEVE is an evidence-based legal intelligence platform for renting in Bangladesh. These documents explain what it does, how it is built, and how to run, use and change it. Setup steps are in the [root README](../README.md).
+NEVE is an evidence-based legal intelligence platform for renting in Bangladesh. Its legal-intelligence workflows include agreement extraction and risk review, Legal Copilot, an evidence graph, cross-record conflict checks, and Risk Sentinel, alongside rental discovery and tenancy management. These documents explain what it does, how it is built, and how to run, use and change it. Setup steps are in the [root README](../README.md).
 
 ## Start here
 

@@ -2,7 +2,7 @@
   "name": "backend",
   "private": true,
   "version": "1.0.0",
-  "description": "Neve rental discovery and tenancy intelligence API (Next.js route handlers)",
+  "description": "NEVE legal intelligence and tenancy workflow API (Next.js route handlers)",
   "type": "module",
   "scripts": {
     "dev": "next dev -p 5000",
