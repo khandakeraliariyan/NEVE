@@ -48,7 +48,7 @@ test("each route file serves only paths under its own folder, and every endpoint
             total += 1;
         }
     }
-    assert.equal(total, 312);
+    assert.equal(total, 313);
 });
 
 test("requests go to the first matching endpoint in their route file", async () => {

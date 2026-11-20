@@ -40,9 +40,9 @@ const UNAVAILABLE = {
 const NOT_FOUND = { success: false, message: "Route not found" };
 
 // Opens the database connection (reused while the instance stays warm) and
-// loads platform settings. The health check doesn't need either.
+// loads platform settings. The health checks don't need either (the status check tests them itself).
 async function defaultPreflight(req, res, next) {
-    if (req.path === "/api/v1/health") return next();
+    if (req.path === "/api/v1/health" || req.path === "/api/v1/health/status") return next();
     try {
         await connectDatabase();
         await getSettings();
