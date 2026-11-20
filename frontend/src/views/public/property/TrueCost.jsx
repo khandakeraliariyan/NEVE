@@ -156,12 +156,12 @@ export default function TrueCost() {
                             <p className="mb-3 font-semibold">Monthly cost distribution</p>
                             <div className="flex h-3 overflow-hidden rounded-full">
                                 {monthlyItems.map((item, i) => (
-                                    <span key={item.name} style={{ width: `${(Number(item.amount) / monthlyQuantified) * 100}%`, background: BAR_COLORS[i % BAR_COLORS.length] }} />
+                                    <span key={`${item.name}-${i}`} style={{ width: `${(Number(item.amount) / monthlyQuantified) * 100}%`, background: BAR_COLORS[i % BAR_COLORS.length] }} />
                                 ))}
                             </div>
                             <ul className="mt-3 space-y-1 text-xs">
                                 {monthlyItems.map((item, i) => (
-                                    <li key={item.name} className="flex items-center justify-between gap-2">
+                                    <li key={`${item.name}-${i}`} className="flex items-center justify-between gap-2">
                                         <span className="flex items-center gap-2">
                                             <span className="h-2.5 w-2.5 rounded-sm" style={{ background: BAR_COLORS[i % BAR_COLORS.length] }} />
                                             {item.name}

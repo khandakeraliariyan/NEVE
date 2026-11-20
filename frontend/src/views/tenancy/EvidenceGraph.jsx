@@ -533,8 +533,8 @@ export default function EvidenceGraph() {
                                     </button>
                                     {f.values?.length > 0 && (
                                         <div className="mt-1 space-y-1 rounded-lg border border-line p-2 text-xs">
-                                            {f.values.map((v) => (
-                                                <p key={v.source}>
+                                            {f.values.map((v, index) => (
+                                                <p key={`${v.source}-${v.label}-${index}`}>
                                                     <span className="font-semibold">{v.label}:</span> {money(v.amountBdt)}
                                                     {v.source === "listing" && v.listingUpdatedAt ? ` (listing last edited ${date(v.listingUpdatedAt)})` : ""}
                                                     {v.sourcePage ? ` · page ${v.sourcePage}` : ""}

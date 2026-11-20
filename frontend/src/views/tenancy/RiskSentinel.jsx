@@ -83,8 +83,9 @@ export default function RiskSentinel() {
                                     {item.description && <p className="mt-1 text-muted">{item.description}</p>}
                                     {item.values?.length > 0 && (
                                         <ul className="mt-2 space-y-0.5 text-xs">
-                                            {item.values.map((v) => (
-                                                <li key={v.source}>
+                                            {item.values.map((v, index) => (
+                                                // Two values can share a source (both parties' records of one payment), so the key adds the label and position.
+                                                <li key={`${v.source}-${v.label}-${index}`}>
                                                     <span className="font-semibold">{v.label}:</span> {money(v.amountBdt)}
                                                     {v.sourcePage ? ` (page ${v.sourcePage})` : ""}
                                                 </li>
