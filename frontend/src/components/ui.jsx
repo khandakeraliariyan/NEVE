@@ -6,7 +6,7 @@ import { Counter, RollText } from "./motion";
 
 export function Button({ variant = "primary", className = "", as: Component = "button", children, ...props }) {
     const styles = {
-        primary: "bg-forest text-white hover:bg-forest-hover hover:-translate-y-px shadow-soft",
+        primary: "bg-forest text-white hover:bg-forest-hover hover:-translate-y-px active:translate-y-0 shadow-soft",
         secondary: "bg-sage text-forest hover:bg-sage-strong",
         outline: "border border-forest/15 bg-white/60 text-forest hover:border-forest/40 hover:bg-white",
         ghost: "text-forest hover:bg-sage",
@@ -15,7 +15,7 @@ export function Button({ variant = "primary", className = "", as: Component = "b
     };
     return (
         <Component
-            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium tracking-tight transition disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]} ${className}`}
+            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold tracking-tight transition active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]} ${className}`}
             {...props}
         >
             <RollText>{children}</RollText>
@@ -33,7 +33,7 @@ export function ButtonLink({ to, variant = "primary", className = "", children }
 
 export function Card({ className = "", children, ...props }) {
     return (
-        <div data-reveal="up" className={`rounded-2xl border border-line/70 bg-panel p-6 shadow-soft ${className}`} {...props}>
+        <div data-reveal="up" className={`rounded-2xl border border-line/70 bg-panel p-6 shadow-soft transition-shadow duration-300 hover:shadow-[0_12px_32px_-12px_rgb(0_0_0/0.18)] ${className}`} {...props}>
             {children}
         </div>
     );
@@ -61,7 +61,7 @@ const STATUS_TONES = {
 
 export function Badge({ tone = "green", className = "", children }) {
     return (
-        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${BADGE_TONES[tone]} ${className}`}>
+        <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${BADGE_TONES[tone]} ${className}`}>
             {children}
         </span>
     );
@@ -76,8 +76,8 @@ export function PageHeader({ eyebrow, title, description, actions }) {
         <div data-reveal="up" className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div className="max-w-3xl">
                 {eyebrow && <p className="eyebrow mb-3">{eyebrow}</p>}
-                <h1 className="text-3xl text-ink md:text-[2.5rem]">{title}</h1>
-                {description && <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>}
+                <h1 className="text-3xl text-ink md:text-[2.75rem]">{title}</h1>
+                {description && <p className="mt-3 text-[0.95rem] leading-relaxed text-muted">{description}</p>}
             </div>
             {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
@@ -87,7 +87,7 @@ export function PageHeader({ eyebrow, title, description, actions }) {
 export function Loading({ text = "Loading…" }) {
     return (
         <div className="flex items-center gap-3 py-10 text-sm text-muted" role="status">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-sage-strong border-t-taupe" />
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-sage-strong border-t-forest" />
             {text}
         </div>
     );
