@@ -46,7 +46,7 @@ export default function RevealObserver() {
                 started = true;
                 scan();
                 mo.observe(document.body, { childList: true, subtree: true });
-            }, 500);
+            }, 150);
         };
         if (document.readyState === "complete") start();
         else window.addEventListener("load", start, { once: true });
