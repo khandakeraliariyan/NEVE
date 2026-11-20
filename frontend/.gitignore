@@ -17,11 +17,16 @@ next-env.d.ts
 .cache/
 coverage/
 
-# Environment (never commit; NEXT_PUBLIC_ values are still keys)
+# AI evaluation results (npm run eval)
+eval/results/
+
+# Environment and credentials (never commit; NEXT_PUBLIC_ values are still keys)
 .env
 .env.*
 !.env.example
 *.local
+secrets/
+*.pem
 
 # Logs
 logs/

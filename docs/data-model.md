@@ -1,6 +1,6 @@
 # Data model
 
-NEVE stores its data in MongoDB through the Mongoose models in `backend/src/models/`. This page explains how the models fit together and what the important fields mean. The schema files are the reference for every field and limit.
+NEVE stores its data in MongoDB through the Mongoose models in `frontend/src/server/models/`. This page explains how the models fit together and what the important fields mean. The schema files are the reference for every field and limit.
 
 ## How the main records relate
 

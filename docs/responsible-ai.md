@@ -19,7 +19,7 @@ reviewable, and points to the code that enforces each one.
 |---|---|---|
 | The model invents facts or quotes from the agreement | Extracted quotes are checked word for word against the document text; unverified quotes are labelled in the UI | `makeQuoteVerifier` in `agreementExtraction.service.js`; `ClauseAiPanels.jsx` |
 | The model invents law or citations | Copilot and AI risk review may cite only section IDs they were given; others are dropped, and coverage is downgraded when citations are dropped | `normalizeAnswer` in `legalCopilot.service.js`; `normalizeAiFindings` in `contractRisk.service.js` |
-| Unreviewed or unofficial law is used | Sources go through draft, review and approval by a legal reviewer; corpus files record provenance and never set a status | `legalSource.service.js`; `legalCorpusImport.service.js`; `backend/legal-corpus/README.md` |
+| Unreviewed or unofficial law is used | Sources go through draft, review and approval by a legal reviewer; corpus files record provenance and never set a status | `legalSource.service.js`; `legalCorpusImport.service.js`; `frontend/legal-corpus/README.md` |
 | Outdated law is cited | Every citation stores the source version; superseded citations are flagged | `legalCitationCurrency.service.js` |
 | Malformed model output | Strict JSON-schema output from Zod schemas; invalid or truncated output is refused with a safe message | `aiClient.service.js` |
 | Prompt injection in documents or questions | Prompts treat document and question text as untrusted data; extraction reports embedded instructions as limitations; live evaluation cases test this | system prompts in the AI services; `eval/datasets/*` (`prompt_injection` tags) |

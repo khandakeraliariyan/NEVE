@@ -5,12 +5,12 @@ are, and what they do and don't show.
 
 ## What is measured
 
-The evaluation suite lives in `backend/eval/`. Every task compares labels
+The evaluation suite lives in `frontend/eval/`. Every task compares labels
 the system produced with labels written down in advance, and reports
 precision, recall, F1 and exact-match rate (the share of cases where the
 predicted labels match exactly). The admin and legal-reviewer
 AI-evaluation pages use the same metric code
-(`calculateEvaluationMetrics` in `backend/src/services/aiEvaluation.service.js`).
+(`calculateEvaluationMetrics` in `frontend/src/server/services/aiEvaluation.service.js`).
 
 | Dataset (`--task`) | What it checks | Labels | Cases | Runs |
 |---|---|---|---|---|
@@ -25,7 +25,7 @@ AI-evaluation pages use the same metric code
 | `copilot_answer_quality` | Copilot cites supporting sections or abstains | section numbers or `abstain` | 12 | `--live` only |
 
 ```bash
-cd backend
+cd frontend
 npm run eval                  # every offline dataset
 npm run eval -- --check       # exit 1 if any score falls below eval/baseline.json
 npm run eval -- --live        # also the model-backed datasets (calls Groq; costs money)

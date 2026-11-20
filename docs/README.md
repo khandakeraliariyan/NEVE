@@ -31,7 +31,7 @@ NEVE is an evidence-based legal intelligence platform for renting in Bangladesh.
 
 **Operations**
 - [operations.md](operations.md): deployment checklist, scheduled jobs, backups, key rotation, AI capacity, loading the legal corpus, monitoring, troubleshooting.
-- [deployment-vercel.md](deployment-vercel.md): step-by-step deployment of both apps on Vercel, with MongoDB Atlas, Vercel Cron and the limits of serverless hosting.
+- [deployment-vercel.md](deployment-vercel.md): step-by-step deployment on Vercel (one project), with MongoDB Atlas, Vercel Cron and the limits of serverless hosting.
 
 **AI quality and responsibility**
 - [evaluation-methodology.md](evaluation-methodology.md): datasets, metrics, current results and known failures.
@@ -43,5 +43,5 @@ NEVE is an evidence-based legal intelligence platform for renting in Bangladesh.
 - [HACKATHON_READINESS_AUDIT.md](HACKATHON_READINESS_AUDIT.md): the readiness audit and progress since.
 
 **Elsewhere in the repository**
-- [Backend README](../backend/README.md) and [Frontend README](../frontend/README.md): setup and reference for each app.
-- [backend/legal-corpus/README.md](../backend/legal-corpus/README.md): the official legal texts and how to add more.
+- [Backend README](api.md) and [Frontend README](../frontend/README.md): setup and reference for each app.
+- [frontend/legal-corpus/README.md](../frontend/legal-corpus/README.md): the official legal texts and how to add more.

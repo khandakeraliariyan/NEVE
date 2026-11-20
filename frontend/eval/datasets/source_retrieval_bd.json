@@ -1,0 +1,29 @@
+{
+    "name": "neve-source-retrieval-bd",
+    "version": "1",
+    "task": "source_retrieval",
+    "description": "Everyday tenancy questions, in English and in colloquial Bangla, against the real legal corpus in frontend/legal-corpus (official text of the Premises Rent Control Act, 1991 and Chapter V of the Transfer of Property Act, 1882). Labels are <source>:<section>; a case passes when every expected section is among the top k retrieved (read recall@k). Expected sections were chosen by the development team from the section text and still need checking by a qualified legal reviewer. They mark where the answer is found, not what the answer is.",
+    "k": 3,
+    "sourceFiles": ["bd-premises-rent-control-act-1991.json", "bd-transfer-of-property-act-1882-ch5.json"],
+    "sourceAliases": { "bd-premises-rent-control-act-1991": "prca", "bd-transfer-of-property-act-1882-ch5": "tpa" },
+    "cases": [
+        { "id": "advance-limit-en", "language": "en", "question": "How much advance rent can a landlord ask for?", "expected": ["prca:10"] },
+        { "id": "advance-limit-bn", "language": "bn", "question": "বাড়িওয়ালা অগ্রীম ভাড়া কত মাসের নিতে পারে?", "expected": ["prca:10"] },
+        { "id": "salami-en", "language": "en", "question": "Is the landlord allowed to take salami or a premium when I rent the flat?", "expected": ["prca:10"] },
+        { "id": "salami-bn", "language": "bn", "question": "ভাড়া দেওয়ার সময় সালামী বা জামানত নেওয়া কি বৈধ?", "expected": ["prca:10"] },
+        { "id": "receipt-en", "language": "en", "question": "Does the landlord have to give me a receipt when I pay rent?", "expected": ["prca:13"] },
+        { "id": "receipt-bn", "language": "bn", "question": "ভাড়া দিলে বাড়ী-মালিক কি রশিদ দিতে বাধ্য?", "expected": ["prca:13"] },
+        { "id": "rent-increase-en", "language": "en", "question": "How often can the standard rent be fixed again?", "expected": ["prca:16"] },
+        { "id": "rent-increase-bn", "language": "bn", "question": "মানসম্মত ভাড়া কত বছর পর পর পুনঃ নির্ধারণ করা যায়?", "expected": ["prca:16"] },
+        { "id": "eviction-en", "language": "en", "question": "Can I be evicted if I pay the rent in full and follow the agreement?", "expected": ["prca:18"] },
+        { "id": "eviction-bn", "language": "bn", "question": "ভাড়া নিয়মিত দিলে কি বাড়ী-মালিক উচ্ছেদের আদেশ পেতে পারেন?", "expected": ["prca:18"] },
+        { "id": "repairs-en", "language": "en", "question": "The landlord won't do repairs. Can the tenant repair and deduct the cost?", "expected": ["prca:21"] },
+        { "id": "repairs-bn", "language": "bn", "question": "বাড়ী-মালিক মেরামত না করলে ভাড়াটিয়া কি নিজে মেরামত করতে পারে?", "expected": ["prca:21"] },
+        { "id": "electricity-en", "language": "en", "question": "Can a tenant get an electricity connection without the landlord's permission?", "expected": ["prca:32"] },
+        { "id": "supply-cut-en", "language": "en", "question": "The landlord cut off a supply or facility to force me out. Is that an offence?", "expected": ["prca:24"] },
+        { "id": "vacant-possession-en", "language": "en", "question": "When I leave, must I hand over vacant possession to the landlord?", "expected": ["prca:26"] },
+        { "id": "lessee-duties-en", "language": "en", "question": "What are the lessee's duties to pay rent and keep the property in good condition?", "expected": ["tpa:108"] },
+        { "id": "monthly-lease-notice-en", "language": "en", "question": "If there is no written lease, how much notice ends a monthly tenancy of a house?", "expected": ["tpa:106"] },
+        { "id": "holding-over-en", "language": "en", "question": "What happens if the tenant stays on after the lease ends and the landlord accepts rent?", "expected": ["tpa:116"] }
+    ]
+}

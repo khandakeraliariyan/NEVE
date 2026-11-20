@@ -2,7 +2,7 @@
 
 How to deploy, configure and run NEVE: the first-run checklist, scheduled jobs, backups, key rotation, AI capacity, loading the legal corpus, monitoring and troubleshooting.
 
-Every environment variable, with its default, is listed in the [root README's Configuration section](../README.md#configuration). For a step-by-step deployment of both apps on Vercel, see [deployment-vercel.md](deployment-vercel.md). The API validates them at startup (`backend/src/config/env.js`) and refuses to start if any value is invalid.
+Every environment variable, with its default, is listed in the [root README's Configuration section](../README.md#configuration). For a step-by-step deployment on Vercel, see [deployment-vercel.md](deployment-vercel.md). The API validates them (`frontend/src/server/config/env.js`) and refuses requests if any value is invalid; `npm run build` doesn't need them.
 
 ## Deployment checklist
 
@@ -10,12 +10,12 @@ Every environment variable, with its default, is listed in the [root README's Co
 |---|---|---|
 | 1 | HTTPS for the frontend and the API | The admin session cookie is `Secure` in production. |
 | 2 | `NODE_ENV=production` on the API | Secure cookies; no development defaults. |
-| 3 | `CLIENT_URL` set to the frontend's exact public origin | CORS and admin CSRF checks only accept this origin. |
-| 4 | `NEXT_PUBLIC_API_BASE_URL` set **before** `npm run build` | `NEXT_PUBLIC_` values are fixed at build time. |
-| 5 | Frontend and API on the same site (for example `neve.app` and `api.neve.app`), or `ADMIN_COOKIE_SAMESITE=none` | Otherwise the browser drops the admin cookie. |
-| 6 | `TRUST_PROXY_HOPS` = number of proxies in front of the API (usually `1`) | Rate limits and session IPs use the real client IP. Leaving it at `0` behind a proxy puts every user in one rate-limit bucket. |
+| 3 | `CLIENT_URL` set to the app's exact public origin | Admin CSRF checks only accept this origin, and email links use it. |
+| 4 | `NEXT_PUBLIC_FIREBASE_*` set **before** `npm run build` | `NEXT_PUBLIC_` values are fixed at build time. |
+| 5 | A proxy in front of `next start` (hosting platforms provide one) | The client IP comes from `X-Forwarded-For`, which clients can set themselves when they connect directly. |
+| 6 | `TRUST_PROXY_HOPS` = number of proxies in front of the app (usually `1`) | Rate limits and session IPs use the real client IP. Leaving it at `0` behind a proxy puts every user in one rate-limit bucket. |
 | 7 | Strong unique secrets: `ADMIN_JWT_SECRET`, `FIELD_ENCRYPTION_KEY`, `NOTIFICATION_LINK_SECRET` | Sessions, field encryption, unsubscribe links. |
-| 8 | Firebase: the frontend domain in **Authorized domains**; the service-account file on the API host | Sign-in and token verification. |
+| 8 | Firebase: the app's domain in **Authorized domains**, Email/Password and Google sign-in turned on; the service-account file or `FIREBASE_SERVICE_ACCOUNT_JSON` on the host | Sign-in and token verification. |
 | 9 | R2 bucket and credentials | Uploads, documents, media, backups. |
 | 10 | `GROQ_API_KEY`, on a tier with enough tokens per minute | AI features (see [AI capacity](#ai-capacity)). |
 | 11 | Email provider (`EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM`) and `API_PUBLIC_URL` | Emails and their links. |
@@ -26,20 +26,13 @@ Every environment variable, with its default, is listed in the [root README's Co
 ### Build and start
 
 ```bash
-# API
-cd backend
-npm ci
-npm run build
-npm start                      # serves the API on port 5000
-
-# Frontend
 cd frontend
 npm ci
 npm run build                  # after setting NEXT_PUBLIC_* values
-npm start                      # serves on port 5173
+npm start                      # pages and API on port 5173; starts the background jobs
 ```
 
-Run `npm audit` in both apps after changing dependencies. The API is stateless apart from MongoDB and R2, so several instances can run behind a load balancer. Each instance starts the background jobs; a database lock makes sure only one instance runs a given job at a time, and runs are recorded so admins can see them.
+Run `npm audit` after changing dependencies. The app is stateless apart from MongoDB and R2, so several instances can run behind a load balancer. Each instance starts the background jobs; a database lock makes sure only one instance runs a given job at a time, and runs are recorded so admins can see them.
 
 **Serverless hosts** (Vercel) have no background timers. There, a scheduler calls `GET /api/v1/cron/:task` with `Authorization: Bearer <CRON_SECRET>`:
 - `:task` is a single job (`notification_reminders`, `notification_digest`, `retention_purge`, `backup`, `notification_delivery`), or `all` to run every enabled one;
@@ -73,7 +66,7 @@ What the retention purge removes:
 Backups are written to R2: to `BACKUP_BUCKET_NAME`, or to `R2_BUCKET_NAME` if that isn't set.
 
 ```bash
-cd backend
+cd frontend
 npm run backup                                     # back up now
 npm run restore-backup -- --list                   # list backups
 npm run restore-backup -- --id <backupId> --confirm          # restore into empty collections
@@ -109,7 +102,7 @@ Never remove an old key while data or backups encrypted with it exist.
 Legal features use only sources a legal reviewer approved. To load the Bangladesh corpus:
 
 ```bash
-cd backend
+cd frontend
 npm run import-legal-sources -- --dry-run legal-corpus/*.json
 npm run import-legal-sources -- --as admin@example.com --submit legal-corpus/*.json
 ```
@@ -118,7 +111,7 @@ npm run import-legal-sources -- --as admin@example.com --submit legal-corpus/*.j
 - `--submit` sends each draft for review.
 - Nothing is ever approved by the script.
 
-A legal reviewer other than the drafter then compares each source with the official page and approves it under **Legal review → Legal sources**. A new version of an existing source is only created when that source has no draft or version in review. See [backend/legal-corpus/README.md](../backend/legal-corpus/README.md) for the files, their provenance and the rules for adding sources.
+A legal reviewer other than the drafter then compares each source with the official page and approves it under **Legal review → Legal sources**. A new version of an existing source is only created when that source has no draft or version in review. See [frontend/legal-corpus/README.md](../frontend/legal-corpus/README.md) for the files, their provenance and the rules for adding sources.
 
 ## Demo data
 
@@ -155,7 +148,6 @@ Never seed a database that holds real user data. The walkthrough is in [HACKATHO
 | Problem | What to check |
 |---|---|
 | API exits with "Environment configuration is invalid" | The logged field list. `ADMIN_JWT_SECRET` needs 32+ characters; `CLIENT_URL` must be a full URL. |
-| Browser requests fail with CORS errors | `CLIENT_URL` must match the frontend origin exactly, including the port. |
 | Admin is signed straight back out, or sees `CSRF_CHECK_FAILED` | `CLIENT_URL`, same-site hosting (or `ADMIN_COOKIE_SAMESITE=none`), HTTPS in production. |
 | Everyone gets "Too many requests" | `TRUST_PROXY_HOPS` isn't set behind a proxy. |
 | AI features say "busy" (`503`) | Groq's per-minute token limit; wait a minute or upgrade the tier. |

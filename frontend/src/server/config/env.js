@@ -1,0 +1,184 @@
+import "dotenv/config";
+import { z } from "zod";
+
+const baseSchema = z.object({
+    NODE_ENV: z
+        .enum(["development", "test", "production"])
+        .default("development"),
+    // Port of the Next.js server (see the dev and start scripts).
+    PORT: z.coerce.number().int().min(1).max(65535).default(5173),
+    // Number of reverse proxies in front of the API (e.g. 1 behind a hosting
+    // provider's load balancer). Rate limits and session IPs use the client
+    // address only when this matches the real setup; leave unset when the API
+    // is reached directly, or clients could fake their IP with X-Forwarded-For.
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+    // Exact public origin of the app, e.g. https://neve.app or http://localhost:5173.
+    // Admin requests must come from it, and emails link to it.
+    CLIENT_URL: z.string().url(),
+    MONGODB_URI: z.string().min(1),
+    // Firebase Admin credentials: a path to the service-account JSON file
+    // (relative to the app folder, frontend/), or, where there is no file system to put it on
+    // (e.g. Vercel), the JSON itself or its base64 encoding. One is required.
+    FIREBASE_SERVICE_ACCOUNT_PATH: z.string().min(1).optional(),
+    FIREBASE_SERVICE_ACCOUNT_JSON: z.string().min(1).optional(),
+    // Shared secret that scheduled-job requests must send as
+    // "Authorization: Bearer <secret>" (Vercel Cron does this automatically
+    // when CRON_SECRET is set). Without it the cron endpoint is disabled.
+    CRON_SECRET: z.string().min(16, "CRON_SECRET must be at least 16 characters").optional(),
+    // Signs admin session JWTs. Use a long random value, e.g.
+    // node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
+    ADMIN_JWT_SECRET: z.string().min(32, "ADMIN_JWT_SECRET must be at least 32 characters"),
+    ADMIN_JWT_EXPIRES_IN: z.string().min(1).default("8h"),
+    // SameSite for the admin session cookie. Pages and API share one origin,
+    // so "strict" is right; "lax" and "none" remain for unusual proxy setups
+    // ("none" makes the cookie Secure-only).
+    ADMIN_COOKIE_SAMESITE: z.enum(["strict", "lax", "none"]).default("strict"),
+    R2_ACCOUNT_ID: z.string().optional(),
+    R2_ACCESS_KEY_ID: z.string().optional(),
+    R2_SECRET_ACCESS_KEY: z.string().optional(),
+    R2_BUCKET_NAME: z.string().optional(),
+    R2_REGION: z.string().default("auto"),
+    UPLOAD_URL_TTL_SECONDS: z.coerce
+        .number()
+        .int()
+        .min(60)
+        .max(3600)
+        .default(300),
+    MAX_PROPERTY_IMAGE_SIZE_MB: z.coerce
+        .number()
+        .positive()
+        .default(5),
+    MAX_TENANCY_EVIDENCE_SIZE_MB: z.coerce
+        .number()
+        .positive()
+        .default(15),
+    MAX_PROPERTY_VIDEO_SIZE_MB: z.coerce
+        .number()
+        .positive()
+        .default(50),
+    MAX_FLOOR_PLAN_SIZE_MB: z.coerce
+        .number()
+        .positive()
+        .default(10),
+    // One Overpass server, or several separated by commas: each is tried in
+    // turn when the one before it fails or is too slow.
+    OVERPASS_API_URL: z
+        .string()
+        .default("https://overpass-api.de/api/interpreter")
+        .refine(
+            (value) =>
+                value
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter(Boolean)
+                    .every((item) => URL.canParse(item)),
+            "OVERPASS_API_URL must be one URL or a comma-separated list of URLs."
+        ),
+    OVERPASS_TIMEOUT_SECONDS: z.coerce.number().int().min(5).max(120).default(25),
+    // OSRM-compatible routing services for walking and driving times.
+    ROUTING_WALKING_URL: z
+        .string()
+        .url()
+        .default("https://routing.openstreetmap.de/routed-foot"),
+    ROUTING_DRIVING_URL: z
+        .string()
+        .url()
+        .default("https://routing.openstreetmap.de/routed-car"),
+    // AI features run on Groq. Without a key they report "not configured".
+    GROQ_API_KEY: z.string().optional(),
+    // The Groq model every AI feature uses unless overridden below. It must
+    // support strict JSON-schema output.
+    AI_MODEL: z.string().min(1).default("openai/gpt-oss-120b"),
+    // Optional overrides: agreement and legal features, and the AI ranking of
+    // a renter's recommendation shortlist.
+    AGREEMENT_EXTRACTION_MODEL: z.string().min(1).optional(),
+    RECOMMENDATION_MODEL: z.string().min(1).optional(),
+    // Email delivery through an HTTP email API. All three are needed.
+    EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).optional(),
+    EMAIL_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().email().optional(),
+    // Public address of this API, used for unsubscribe links and listing
+    // thumbnails in emails, e.g. https://api.neve.app
+    API_PUBLIC_URL: z.string().url().optional(),
+    // Signs unsubscribe links. Falls back to a key derived from ADMIN_JWT_SECRET.
+    NOTIFICATION_LINK_SECRET: z.string().min(32).optional(),
+    // Time zone used for dates in notifications and the digest hour.
+    NOTIFICATION_TIME_ZONE: z.string().min(1).default("Asia/Dhaka"),
+    // Local hour (0-23) when daily digest emails go out.
+    NOTIFICATION_DIGEST_HOUR: z.coerce.number().int().min(0).max(23).default(8),
+    // AES-256-GCM key for NID/passport numbers and dates of birth: 32 random
+    // bytes, base64. node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+    FIELD_ENCRYPTION_KEY: z.string().optional(),
+    FIELD_ENCRYPTION_KEY_VERSION: z.coerce.number().int().min(1).default(1),
+    // Earlier keys kept for reading old values after a rotation: "1:base64,2:base64".
+    FIELD_ENCRYPTION_OLD_KEYS: z.string().optional(),
+    // Days an account's photos and listing media are kept after the account
+    // is deleted, before the retention purge removes them.
+    ACCOUNT_DELETION_FILE_RETENTION_DAYS: z.coerce.number().int().min(0).max(3650).default(30),
+    // Inquiry, viewing, obligation and lease reminders.
+    NOTIFICATION_REMINDERS_ENABLED: z
+        .enum(["true", "false"])
+        .default("true")
+        .transform((value) => value === "true"),
+    // Background jobs. Both are off unless enabled.
+    RETENTION_PURGE_ENABLED: z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((value) => value === "true"),
+    RETENTION_PURGE_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(10080).default(60),
+    ABANDONED_UPLOAD_HOURS: z.coerce.number().int().min(1).max(720).default(24),
+    VERIFICATION_DOCUMENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+    BACKUP_ENABLED: z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((value) => value === "true"),
+    BACKUP_INTERVAL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
+    BACKUP_RETENTION_COUNT: z.coerce.number().int().min(1).max(365).default(14),
+    BACKUP_BUCKET_NAME: z.string().optional(),
+    NEVE_API_BASE_URL: z
+        .string()
+        .url()
+        .default("http://localhost:5173/api/v1"),
+});
+
+const envSchema = baseSchema.refine(
+    (value) => Boolean(value.FIREBASE_SERVICE_ACCOUNT_PATH || value.FIREBASE_SERVICE_ACCOUNT_JSON),
+    { path: ["FIREBASE_SERVICE_ACCOUNT_PATH"], message: "Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON." }
+);
+
+// A blank line like "EMAIL_PROVIDER=" means "not set", not an empty value.
+const definedEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([, value]) => typeof value !== "string" || value.trim() !== "")
+);
+
+// `next build` loads every API route module to read its settings without
+// handling any request, so a build doesn't need the server's secrets: values
+// that are missing or invalid are left unset (defaults still apply). Running
+// the app (dev, start, tests, scripts) still requires a valid configuration.
+const isNextBuild = process.env.NEXT_PHASE === "phase-production-build";
+
+function lenientBuildEnv() {
+    const partial = baseSchema.partial().safeParse(definedEnv);
+    return { success: true, data: partial.success ? partial.data : baseSchema.partial().parse({}) };
+}
+
+let parsed = envSchema.safeParse(definedEnv);
+if (!parsed.success && isNextBuild) parsed = lenientBuildEnv();
+
+if (!parsed.success) {
+    console.error("Invalid environment configuration:");
+    console.error(
+        parsed.error.issues.map((issue) => ({
+            field: issue.path.join("."),
+            message: issue.message,
+        }))
+    );
+
+    throw new Error("Environment configuration is invalid.");
+}
+
+export const env = {
+    ...parsed.data,
+    AGREEMENT_EXTRACTION_MODEL: parsed.data.AGREEMENT_EXTRACTION_MODEL ?? parsed.data.AI_MODEL,
+    RECOMMENDATION_MODEL: parsed.data.RECOMMENDATION_MODEL ?? parsed.data.AI_MODEL,
+};

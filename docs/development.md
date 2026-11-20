@@ -4,11 +4,10 @@ How to work on NEVE's code: local setup, conventions, testing, evaluation, and s
 
 ## Local setup
 
-Follow the [root README's Quick start](../README.md#quick-start): Node.js 20.9 or later, MongoDB, a Firebase project, `backend/.env` and `frontend/.env.local`. Then:
+Follow the [root README's Quick start](../README.md#quick-start): Node.js 20.9 or later, MongoDB, a Firebase project, and `frontend/.env`. Then:
 
 ```bash
-cd backend && npm run dev      # API on :5000, reloads on change
-cd frontend && npm run dev     # web app on :5173
+cd frontend && npm run dev     # pages and API on :5173, reloads on change
 ```
 
 Optional services (R2, Groq, email) can be left unset; their features report "not configured".
@@ -18,15 +17,16 @@ Optional services (R2, Groq, email) can be left unset; their features report "no
 ## Repository layout
 
 ```text
-backend/
-  src/        app/api (route files), http, config, middleware, controllers, services, models
-  test/       node:test suites (*.test.js), offline
-  eval/       AI evaluation: runner, datasets, baseline.json, results/ (gitignored)
-  scripts/    create-admin, backup, restore-backup, importLegalSources, seedDemo
-  legal-corpus/  official legal texts as JSON, imported as drafts
-frontend/
-  src/app/    routes (thin), src/views/ pages, src/components/ shared UI
-docs/         this documentation
+frontend/                one Next.js app
+  src/app/               pages (thin route files) and api/v1/<area>/[[...path]]/route.js (the API)
+  src/views/, components/ pages and shared UI; src/lib/ the API client
+  src/server/            API code: http, config, middleware, controllers, services, models
+  test/                  node:test unit tests (*.test.js), offline
+  e2e/                   Selenium browser smoke tests
+  eval/                  AI evaluation: runner, datasets, baseline.json, results/ (gitignored)
+  scripts/               create-admin, backup, restore-backup, importLegalSources, seedDemo
+  legal-corpus/          official legal texts as JSON, imported as drafts
+docs/                    this documentation
 ```
 
 ## Conventions
@@ -53,7 +53,7 @@ docs/         this documentation
 ## Testing
 
 ```bash
-cd backend
+cd frontend
 npm test                                  # all suites, offline (about 440 tests)
 node --test test/riskSentinel.test.js     # one suite
 ```
@@ -71,9 +71,20 @@ npm run lint
 npm run build
 ```
 
+### Selenium browser tests
+
+The frontend includes a Selenium smoke suite for public browser flows. Start the frontend with `npm run dev` in one terminal. In a second terminal, run:
+
+```bash
+cd frontend
+npm run test:e2e
+```
+
+It checks the landing page, search navigation and query parameters, comparison page, responsive menu navigation, and privacy page. It does not sign in or require seeded listings. Selenium Manager locates or downloads ChromeDriver for local Chrome. For Selenium Grid, set `SELENIUM_REMOTE_URL`; use `E2E_BASE_URL` to target another frontend origin and `CHROME_BIN` for a custom local Chrome binary. Keep the target on a development or disposable environment. Unlike the unit tests above, browser tests need a running frontend and a browser/driver.
+
 ## Evaluation
 
-`backend/eval/` scores AI and retrieval behaviour against small labelled datasets. The method, the datasets and the current results are in [evaluation-methodology.md](evaluation-methodology.md).
+`frontend/eval/` scores AI and retrieval behaviour against small labelled datasets. The method, the datasets and the current results are in [evaluation-methodology.md](evaluation-methodology.md).
 
 | Task | Dataset | Runs |
 |---|---|---|
@@ -101,7 +112,7 @@ Run `--check` before committing changes to rules, retrieval or evidence checks. 
 
 1. Add the handler to the right controller in `src/controllers/`. Load the record and check the caller may access it.
 2. Put the logic in a service, as a pure function where possible.
-3. Register the route in `src/routes/<area>.routes.js` with `authenticateUser`, `allowRoles(...)` and, for input, `validateRequest(schema)`. A new route file also needs a line in `src/routes/index.js`.
+3. Add the route to its area's route file, `src/app/api/v1/<area>/[[...path]]/route.js`, with `authenticateUser`, `allowRoles(...)` and, for input, `validateRequest(schema)`. For a new area, copy an existing route file into a new folder (see the [API guide](api.md#adding-an-endpoint)).
 4. Add tests for the service, and for access rules when they're new.
 5. Regenerate or edit [api-reference.md](api-reference.md).
 
@@ -134,7 +145,7 @@ Run `--check` before committing changes to rules, retrieval or evidence checks. 
 
 ### Add a legal source to the corpus
 
-Follow [backend/legal-corpus/README.md](../backend/legal-corpus/README.md):
+Follow [frontend/legal-corpus/README.md](../frontend/legal-corpus/README.md):
 - copy the text from the official publisher, never from memory or an AI model;
 - record the provenance;
 - tag the sections with topics;
@@ -146,4 +157,4 @@ To help English questions find a Bangla text, add statutory terms to the bilingu
 
 - Work on a branch, and keep commits focused on one change, with a message that says what changed and why.
 - Run `npm test`, `npm run eval -- --check` and the frontend lint before pushing.
-- Never commit `.env` files, `backend/secrets/`, or real user data.
+- Never commit `.env` files, `frontend/secrets/`, or real user data.

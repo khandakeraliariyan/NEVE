@@ -118,7 +118,7 @@ draft ──submit──► in_review ──approve──► approved ──reti
 
 Only **approved** sources are used by Copilot, legal suggestions, contract-risk legal references and clause rewrites. Each of these stores the version it cited, so admins can find citations that point at an outdated version.
 
-**The Bangladesh corpus** (`backend/legal-corpus/`) is official text, ready to import as drafts for review:
+**The Bangladesh corpus** (`frontend/legal-corpus/`) is official text, ready to import as drafts for review:
 
 | Source | Coverage | Text |
 |---|---|---|

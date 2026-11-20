@@ -3,8 +3,9 @@ import { ADMIN_REQUEST_HEADER, clearAdminSession, endAdminSession, hasAdminSessi
 
 export const SESSION_REVOKED_EVENT = "neve:session-revoked";
 
-export const API_BASE_URL =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api/v1";
+// The API is part of this Next.js app (src/app/api), so requests go to the
+// same origin by default.
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 
 export class ApiError extends Error {
     constructor(status, message, errors = [], code = null) {

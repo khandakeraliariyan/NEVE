@@ -11,7 +11,7 @@
 | Step | How | Check |
 |---|---|---|
 | Demo accounts | Create one renter and one landlord account in the deployed app (Firebase sign-up). Optionally a legal-reviewer account invited by an admin. | Both can sign in. |
-| Seed the scenario | `cd backend && npm run seed-demo -- --renter <renter email> --landlord <landlord email> --confirm` | The output gives the agreement ID. `--reset` replaces an earlier demo. |
+| Seed the scenario | `cd frontend && npm run seed-demo -- --renter <renter email> --landlord <landlord email> --confirm` | The output gives the agreement ID. `--reset` replaces an earlier demo. |
 | Legal corpus | `npm run import-legal-sources -- --as <admin email> --submit legal-corpus/*.json`. Then the legal reviewer compares each source with the official page and approves it. | Legal library shows both sources as approved. |
 | Run the risk check once | As the renter, open the agreement, go to **Risk check** and select **Run risk check** (rule checks work without AI). | Findings appear (see step 2). |
 | Warm up Copilot | Ask the step 3 question once beforehand. | It answers with citations, or the keyword fallback lists sections. **Read the answer against section 10:** in one test Copilot wrongly said a deposit was allowed. If it gets it wrong, show the cited section text instead of the answer, or use the recording. |

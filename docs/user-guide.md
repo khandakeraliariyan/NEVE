@@ -79,7 +79,7 @@ Your sidebar has **Case queue**, **Risk Sentinel**, **Legal sources**, **AI over
 3. **Approve**, **request changes** or **reject**. You can't approve a source you drafted. Once approved, the source is used by Copilot, legal suggestions, risk findings and rewrites.
 4. If you find a problem in an approved source later, **flag** it.
 
-The corpus files and their provenance are described in [backend/legal-corpus/README.md](../backend/legal-corpus/README.md).
+The corpus files and their provenance are described in [frontend/legal-corpus/README.md](../frontend/legal-corpus/README.md).
 
 ### Reviewing cases
 

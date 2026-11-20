@@ -6,13 +6,14 @@ How NEVE is put together: the two applications, how a request is handled, how AI
 
 ```text
 Browser
-  │  Next.js frontend (frontend/)
+  │  one Next.js app (frontend/)
+  │    pages: src/app/(public|auth|workspace), src/views
   │    - renders pages, keeps sign-in state
-  │    - sends a Firebase ID token, or the admin session cookie
+  │    - calls /api/v1 on the same origin with a Firebase ID token, or the admin session cookie
   ▼
-Next.js API (backend/)  ── /api/v1 ──────────────────────────────────────────
-  │  proxy.js: CORS (CLIENT_URL only); route(): security headers, rate limits, JSON body limit
-  │  route files → auth + role middleware → controllers → services → models
+API route files (src/app/api/v1/<area>/[[...path]]/route.js) ── code in src/server ──
+  │  route(): security headers, rate limits, JSON body limit
+  │  auth + role middleware → controllers → services → models
   │
   ├── MongoDB (Mongoose)            all application data
   ├── Firebase Admin                verifies user ID tokens
@@ -24,24 +25,26 @@ Next.js API (backend/)  ── /api/v1 ─────────────�
 
 The browser never talks to MongoDB, and files go straight between the browser and R2 through short-lived signed URLs that the API issues. Every external service except MongoDB and Firebase is optional. Without one, its feature reports that it isn't configured, and the rest of the app keeps working.
 
-## Backend
+## API
+
+All paths below are inside `frontend/`.
 
 ### Layers
 
 | Layer | Folder | Responsibility |
 |---|---|---|
 | Startup | `src/instrumentation.js` | On a long-running server (`npm start`), connects to MongoDB and starts background jobs. |
-| HTTP | `src/http/`, `src/proxy.js` | `route()` turns an endpoint into a Next.js route handler: request and response objects for the `(req, res, next)` controllers, security headers, the rate limit, the database connection and platform settings, body parsing, and the error handler (which records unexpected errors as `SystemError` without leaking details). `proxy.js` handles CORS. |
-| Config | `src/config/` | `env.js` validates every environment variable with Zod at startup; the API refuses to start on invalid values. Also the database, Firebase and R2 clients. |
-| Middleware | `src/middleware/` | `authenticateUser` (Firebase token or admin cookie, plus session and account checks), `allowRoles` / `allowSuspendedRoles` / `requirePermission`, rate limiters, and `validateRequest` (Zod). |
-| Routes | `src/routes/` | 41 route files mapping paths to controllers, collected in `routes/index.js`. One Next.js catch-all route (`src/app/api/[...path]/route.js`) sends each request to the first matching endpoint; unknown paths get a JSON 404. Listed in [api-reference.md](api-reference.md). |
-| Controllers | `src/controllers/` | Parse the request, load the record, check the caller may access that record, call services, shape the response. |
-| Services | `src/services/` | Domain logic, mostly pure functions that tests can call directly: contract risk, Copilot, evidence analysis, Risk Sentinel, matching, privacy, notifications, jobs. |
-| Models | `src/models/` | Mongoose schemas. See [data-model.md](data-model.md). |
+| HTTP | `src/server/http/` | `route()` turns an endpoint into a Next.js route handler: request and response objects for the `(req, res, next)` controllers, security headers, the rate limit, the database connection and platform settings, body parsing, and the error handler (which records unexpected errors as `SystemError` without leaking details). There is no CORS: pages and API share one origin. |
+| Config | `src/server/config/` | `env.js` validates every environment variable with Zod when first loaded; requests fail on invalid values (`next build` tolerates missing ones). Also the database, Firebase and R2 clients. |
+| Middleware | `src/server/middleware/` | `authenticateUser` (Firebase token or admin cookie, plus session and account checks), `allowRoles` / `allowSuspendedRoles` / `requirePermission`, rate limiters, and `validateRequest` (Zod). |
+| Routes | `src/app/api/v1/` | One Next.js route file per area (`<area>/[[...path]]/route.js`, 44 in all) declares that area's routes with `Router()` and maps each to its middleware and controller; within a file the first matching route wins. Unknown paths get a JSON 404 from `src/app/api/[...path]`. Listed in [api-reference.md](api-reference.md). |
+| Controllers | `src/server/controllers/` | Parse the request, load the record, check the caller may access that record, call services, shape the response. |
+| Services | `src/server/services/` | Domain logic, mostly pure functions that tests can call directly: contract risk, Copilot, evidence analysis, Risk Sentinel, matching, privacy, notifications, jobs. |
+| Models | `src/server/models/` | Mongoose schemas. See [data-model.md](data-model.md). |
 
 ### Request lifecycle
 
-1. **Shared steps.** CORS limited to `CLIENT_URL` (`proxy.js`), then in `route()`: Helmet's set of security headers, the per-IP rate limit, the database connection, and a 1 MB JSON limit.
+1. **Shared steps** (`route()`): Helmet's set of security headers, the per-IP rate limit, the database connection, and a 1 MB JSON limit.
 2. **Authentication** (`authenticateUser`):
    - For renters, landlords and legal reviewers, it verifies the Firebase ID token with Firebase Admin.
    - For admins, it verifies the signed JWT in the httpOnly cookie. Cookie requests must carry `X-Neve-Admin: 1`, and any `Origin` they send must equal `CLIENT_URL` (CSRF protection).

@@ -1,10 +1,10 @@
 # API reference
 
-This is every HTTP endpoint of the NEVE API, generated from `backend/src/routes/` (collected in `backend/src/routes/index.js`). For how requests are authenticated and checked, see [architecture.md](architecture.md). For what each feature does, see [features.md](features.md).
+This is every HTTP endpoint of the NEVE API, generated from `frontend/src/app/api/v1/` (collected in `frontend/src/app/api/v1/`). For how requests are authenticated and checked, see [architecture.md](architecture.md). For what each feature does, see [features.md](features.md).
 
 ## Conventions
 
-**Base URL.** Every path below is relative to `/api/v1`, for example `http://localhost:5000/api/v1`.
+**Base URL.** Every path below is relative to `/api/v1`, for example `http://localhost:5173/api/v1`.
 
 **Authentication.**
 - Renters, landlords and legal reviewers send a Firebase ID token: `Authorization: Bearer <token>`.
@@ -55,7 +55,7 @@ Files are then referenced by `fileId`. Private files are opened through `GET /up
 
 ## Endpoints by area
 
-The **Handler** column names the controller function in `backend/src/controllers/`, which is the place to look for the exact request and response fields. In **Notes**, *validated query* means the query string is checked against a Zod schema, and *role permission setting* means an admin can switch the feature off for a role.
+The **Handler** column names the controller function in `frontend/src/server/controllers/`, which is the place to look for the exact request and response fields. In **Notes**, *validated query* means the query string is checked against a Zod schema, and *role permission setting* means an admin can switch the feature off for a role.
 
 The legal intelligence endpoints are under [`/tenancy`](#tenancy) (risk analysis, evidence graph, evidence flags, Risk Sentinel, legal suggestions), [`/copilot`](#copilot), [`/legal-sources`](#legal-sources) and [`/legal-review`](#legal-review).
 

@@ -24,11 +24,11 @@ NEVE is further along than the readiness plan assumes. The four "Priority 0" cap
 
 | Check | Command | Result |
 |---|---|---|
-| Backend tests | `cd backend && npm test` | **399 / 399 pass**, 0 fail (≈22 s, offline, mocked DB) |
-| Offline AI evaluation | `cd backend && npm run eval` | 4 deterministic tasks run; **no regressions** against `eval/baseline.json` (scores in §4.6) |
+| Backend tests | `cd frontend && npm test` | **399 / 399 pass**, 0 fail (≈22 s, offline, mocked DB) |
+| Offline AI evaluation | `cd frontend && npm run eval` | 4 deterministic tasks run; **no regressions** against `eval/baseline.json` (scores in §4.6) |
 | Frontend lint | `cd frontend && npm run lint` | **0 errors, 24 warnings** (`react-hooks/set-state-in-effect`, `@next/next/no-img-element`) |
 | Frontend production build | `cd frontend && npm run build` | **Succeeds** |
-| Live (Groq) evaluation | `npm run eval -- --live` | **Not run.** It calls a paid API, so it needs approval first. `GROQ_API_KEY` is set in `backend/.env`. |
+| Live (Groq) evaluation | `npm run eval -- --live` | **Not run.** It calls a paid API, so it needs approval first. `GROQ_API_KEY` is set in `frontend/.env`. |
 | Running app (MongoDB, Firebase, R2) | not started | **Not verified.** Backend env keys for MongoDB, R2, Groq, email and field encryption are present. `frontend/.env.local` is **absent**, so sign-in will not work locally until it is created. |
 
 ---
@@ -52,9 +52,9 @@ NEVE is further along than the readiness plan assumes. The four "Priority 0" cap
 
 - **Backend:** Express 5, Mongoose 9, Zod. About 40 route groups, 70+ controllers and services, 47 models, 63 test files.
 - **Frontend:** Next.js 16 and React 19. About 75 App Router pages with role-aware navigation (`frontend/src/nav.js`).
-- **AI:** Groq through `backend/src/services/aiClient.service.js`. It uses strict JSON-schema output generated from Zod schemas. Each feature has its own model setting, and every call is recorded in `AIUsageEvent`.
+- **AI:** Groq through `frontend/src/server/services/aiClient.service.js`. It uses strict JSON-schema output generated from Zod schemas. Each feature has its own model setting, and every call is recorded in `AIUsageEvent`.
 - **Documents:** pdf.js reads text; Tesseract OCR handles English and Bangla (`documentText.service.js`); output is page-marked text.
-- **Evaluation:** `backend/eval/` has a runner, 7 datasets, a baseline and a regression test. There is also an admin evaluation UI and a legal-reviewer evaluation UI.
+- **Evaluation:** `frontend/eval/` has a runner, 7 datasets, a baseline and a regression test. There is also an admin evaluation UI and a legal-reviewer evaluation UI.
 
 ---
 
@@ -306,10 +306,10 @@ Clause-category changes, schema migrations, new libraries, AI prompts, and the R
 
 ### Affected files (expected)
 
-- `backend/src/controllers/tenancyAgreement.controller.js` (graph builder)
-- `backend/src/services/evidenceChecks.service.js`, `evidenceGraphAnalysis.service.js`
-- `backend/eval/runner.js`, `backend/eval/datasets/contradiction_detection.json`, `backend/eval/baseline.json`
-- `backend/test/evidenceChecks.test.js`, `evidenceGraphAnalysis.test.js`, `evalRegression.test.js`
+- `frontend/src/server/controllers/tenancyAgreement.controller.js` (graph builder)
+- `frontend/src/server/services/evidenceChecks.service.js`, `evidenceGraphAnalysis.service.js`
+- `frontend/eval/runner.js`, `frontend/eval/datasets/contradiction_detection.json`, `frontend/eval/baseline.json`
+- `frontend/test/evidenceChecks.test.js`, `evidenceGraphAnalysis.test.js`, `evalRegression.test.js`
 - `frontend/src/views/tenancy/EvidenceGraph.jsx`
 
 ### Acceptance criteria
