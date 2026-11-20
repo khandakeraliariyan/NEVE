@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { api } from "../../lib/api";
 import { dateTime, money, relativeTime } from "../../lib/format";
@@ -29,7 +30,7 @@ export default function RenterDashboard() {
     const inquiryList = inquiries.data?.inquiries ?? [];
     const pendingInquiries = inquiryList.filter((i) => ["pending", "submitted", "acknowledged"].includes(i.status)).length;
     const viewingList = viewings.data?.data ?? [];
-    const now = Date.now();
+    const [now] = useState(() => Date.now());
     const upcoming = viewingList
         .filter((v) => ["requested", "confirmed"].includes(v.status) && new Date(v.requestedDate).getTime() >= now)
         .sort((a, b) => new Date(a.requestedDate) - new Date(b.requestedDate));

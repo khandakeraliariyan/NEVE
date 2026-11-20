@@ -160,7 +160,7 @@ export default function PropertyComparison() {
                                         highlight
                                         title="Estimated monthly total"
                                         hint="Rent plus recurring charges"
-                                        cells={monthlyTotals.map((v) => <strong className="text-lg">{money(v)}</strong>)}
+                                        cells={monthlyTotals.map((v, i) => <strong key={i} className="text-lg">{money(v)}</strong>)}
                                         best={bestIndex(monthlyTotals)}
                                         bestLabel="Lowest monthly"
                                     />
@@ -168,12 +168,12 @@ export default function PropertyComparison() {
                                         highlight
                                         title="Estimated move-in total"
                                         hint="First month, advance rent, deposit"
-                                        cells={moveInTotals.map((v) => <strong className="text-lg">{money(v)}</strong>)}
+                                        cells={moveInTotals.map((v, i) => <strong key={i} className="text-lg">{money(v)}</strong>)}
                                         best={bestIndex(moveInTotals)}
                                         bestLabel="Lowest upfront"
                                     />
                                     <Row title="Security deposit" cells={items.map((p) => money(p.rentalCosts.pricing.securityDeposit))} />
-                                    <Row title="Undisclosed costs" cells={items.map((p) => (p.rentalCosts.moveIn.complete ? "None" : <span className="text-amber-ink">{p.rentalCosts.moveIn.missingComponents.length + p.rentalCosts.unknownCosts.length} item(s)</span>))} />
+                                    <Row title="Undisclosed costs" cells={items.map((p, i) => (p.rentalCosts.moveIn.complete ? "None" : <span key={i} className="text-amber-ink">{p.rentalCosts.moveIn.missingComponents.length + p.rentalCosts.unknownCosts.length} item(s)</span>))} />
                                 </Group>
                                 <Group title="Home" columns={items.length}>
                                     <Row title="Type" cells={items.map((p) => label(p.propertyType))} />
@@ -192,7 +192,7 @@ export default function PropertyComparison() {
                                 {amenities.length > 0 && (
                                     <Group title="Amenities" columns={items.length}>
                                         {amenities.map((amenity) => (
-                                            <Row key={amenity} title={amenity} cells={items.map((p) => (p.amenities.includes(amenity) ? <span className="text-forest">✓ Yes</span> : <span className="text-muted">—</span>))} />
+                                            <Row key={amenity} title={amenity} cells={items.map((p, i) => (p.amenities.includes(amenity) ? <span key={i} className="text-forest">✓ Yes</span> : <span key={i} className="text-muted">—</span>))} />
                                         ))}
                                     </Group>
                                 )}
