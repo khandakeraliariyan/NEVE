@@ -1,10 +1,12 @@
-import { Inter, Inter_Tight } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans, Noto_Sans_Bengali } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
 import RevealObserver from "@/components/RevealObserver";
 import "@/index.css";
 
 const body = Inter({ subsets: ["latin"], variable: "--font-body", display: "swap" });
-const heading = Inter_Tight({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-heading", display: "swap" });
+const heading = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-heading", display: "swap" });
+// Bangla fallback so Bengali text in agreements, listings and the copilot renders in a matching face.
+const bengali = Noto_Sans_Bengali({ subsets: ["bengali"], weight: ["400", "500", "600", "700"], variable: "--font-bengali", display: "swap" });
 
 // Runs before first paint so scroll-reveal elements start hidden instead of flashing in.
 const REVEAL_BOOT = `if(!matchMedia("(prefers-reduced-motion: reduce)").matches&&"IntersectionObserver" in window)document.documentElement.classList.add("reveal-ready")`;
@@ -22,7 +24,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
     return (
-        <html lang="en" className={`${body.variable} ${heading.variable}`} suppressHydrationWarning>
+        <html lang="en" className={`${body.variable} ${heading.variable} ${bengali.variable}`} suppressHydrationWarning>
             <head>
                 <script dangerouslySetInnerHTML={{ __html: REVEAL_BOOT }} />
             </head>
